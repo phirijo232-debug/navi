@@ -87,11 +87,11 @@ function generateOTP(key, forceNew = false) {
   return otp;
 }
 
-async function sendOTP(purpose = 'Account Verification', targetEmail = null, forceNew = false) {
+async function sendOTP(purpose = 'Account Verification', targetEmail = null, forceNew = false, recipientOverride = null) {
   const normalizedEmail = normalizeEmailAddress(targetEmail);
   const key = buildOtpKey(normalizedEmail, purpose);
   const otp = generateOTP(key, forceNew);
-  const recipient = normalizedEmail || process.env.GMAIL_USER;
+  const recipient = normalizeEmailAddress(recipientOverride) || normalizedEmail || process.env.GMAIL_USER;
 
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD || !recipient) {
     throw new Error('OTP email configuration is incomplete.');

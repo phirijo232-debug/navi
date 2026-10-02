@@ -49,8 +49,9 @@ test('admin login sends OTP to the configured mailbox and reuses the same truste
     await requestLogin(loginReq, loginRes);
 
     assert.equal(loginRes.body.otpSentTo, process.env.GMAIL_USER);
-    assert.equal(sendOtp.mock.calls[0].arguments[1], process.env.GMAIL_USER);
-    const otp = otpService.generateOTP(`${process.env.GMAIL_USER}:Login Verification`);
+    assert.equal(sendOtp.mock.calls[0].arguments[1], 'sameuser@example.com');
+    assert.equal(sendOtp.mock.calls[0].arguments[3], process.env.GMAIL_USER);
+    const otp = otpService.generateOTP('sameuser@example.com:Login Verification');
 
     const confirmReq = {
       body: { email: 'sameuser@example.com', otp },

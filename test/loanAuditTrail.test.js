@@ -7,7 +7,7 @@ const emailService = require('../middleware/email');
 
 const LOANS_FILE = path.join(__dirname, '../data/loans.json');
 
-test('loan status updates create a status history and admin summary includes all decision categories', async () => {
+test('loan status updates create a status history and admin summary includes all decision categories', async (t) => {
   const original = fs.readFileSync(LOANS_FILE, 'utf8');
   const sampleLoan = {
     id: 9991,
@@ -31,6 +31,7 @@ test('loan status updates create a status history and admin summary includes all
   fs.writeFileSync(LOANS_FILE, JSON.stringify([sampleLoan], null, 2));
 
   try {
+    t.mock.method(emailService, 'sendCustomerEmail', async () => ({ ok: true }));
     const req = {
       params: { id: 9991 },
       body: { action: 'approve', reason: 'Approved after review.' },

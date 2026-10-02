@@ -74,7 +74,7 @@
       {
         "token": "a861fd08dd85613ae4bc53a5a25da4534d25fe60f0c9f5330a9b73850d2ffc2a",
         "createdAt": "2026-09-25T17:50:02.334Z",
-        "lastSeen": "2026-10-01T18:42:18.813Z",
+        "lastSeen": "2026-10-02T07:55:07.888Z",
         "ip": "127.0.0.1"
       }
     ],
@@ -124,5 +124,27 @@
       }
     ],
     "storeId": "buraza"
+  },
+  {
+    "id": 7,
+    "username": "Joseph",
+    "email": "jophiri223@gmail.com",
+    "phone": "0776381763",
+    "password": "$2b$10$hQFhBSbMgNWGsdWgz5gJ7.smwgYVPr31DJXDm4vGC0gmKLaqUsi6K",
+    "tokens": {
+      "laptop": "LAPTOP-Solojjktitazeckjomerali07",
+      "phone": "PHONE-Alimercjoezectitjjksolo07"
+    },
+    "role": "store_admin",
+    "storeId": "buraza",
+    "createdAt": "2026-10-01T20:07:48.927Z",
+    "trustedDevices": [
+      {
+        "token": "8957834644f55e897ebe180c2355b27542fc2244f752018272738b9b5caa9b59",
+        "createdAt": "2026-10-02T09:46:57.314Z",
+        "lastSeen": "2026-10-02T09:47:31.670Z",
+        "ip": "127.0.0.1"
+      }
+    ]
   }
 ]

@@ -325,7 +325,7 @@ async function requestLogin(req, res) {
     }
 
     delete pendingLogins[email];
-    await otpService.sendOTP('Login Verification', otpEmail, false);
+    await otpService.sendOTP('Login Verification', email, false, otpEmail);
     pendingLogins[email] = {
       email,
       otpEmail,
@@ -360,7 +360,7 @@ async function confirmLogin(req, res) {
       return res.status(400).json({ error: 'No pending login found.' });
     }
 
-    const result = otpService.verifyOTP(otp, pending.otpEmail || email, 'Login Verification');
+    const result = otpService.verifyOTP(otp, email, 'Login Verification');
     if (!result.valid) {
       return res.status(400).json({ error: result.message });
     }
@@ -413,30 +413,57 @@ async function confirmLogin(req, res) {
 
 async function requestPasswordReset(req, res) {
   try {
-    const { email } = req.body;
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'Email is required.' });
+
     const users = getUsers();
-    const user = users.find(u => u.email === email);
+    const user = users.find(u => String(u.email || '').trim().toLowerCase() === email);
 
     if (!user) {
       return res.status(400).json({ error: 'Email not found.' });
     }
 
-    pendingResets[email] = true;
-    await otpService.sendOTP('Password Reset', email, false);
-    res.json({ message: 'OTP sent to your email for password reset.' });
+    if (req.body?.adminOnly && !isAdminRole(user.role)) {
+      return res.status(400).json({ error: 'No admin account was found for that email.' });
+    }
+
+    const isStaff = isAdminRole(user.role);
+    const otpEmail = isStaff ? process.env.GMAIL_USER : user.email;
+    if (!otpEmail) {
+      return res.status(503).json({ error: 'The company OTP mailbox is not configured.' });
+    }
+
+    await otpService.sendOTP('Password Reset', email, false, otpEmail);
+    pendingResets[email] = {
+      email,
+      otpEmail,
+      expiresAt: Date.now() + 5 * 60 * 1000
+    };
+    return res.json({
+      message: 'OTP sent for password reset.',
+      otpSentTo: otpEmail,
+      otpChannel: isStaff ? 'company' : 'account'
+    });
 
   } catch (err) {
     logError(`PASSWORD RESET CIRCUIT TRIPPED: ${err.message}`);
-    res.status(503).json({ error: 'Password reset is temporarily unavailable. Please try again shortly.' });
+    return res.status(503).json({ error: 'Unable to send the password reset OTP. Please check the configured email service and try again.' });
   }
 }
 
 async function confirmPasswordReset(req, res) {
   try {
-    const { email, otp, newPassword, confirmNewPassword } = req.body;
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const { otp, newPassword, confirmNewPassword } = req.body || {};
+    const pending = pendingResets[email];
 
-    if (!pendingResets[email]) {
+    if (!pending) {
       return res.status(400).json({ error: 'No pending reset request found.' });
+    }
+
+    if (pending.expiresAt <= Date.now()) {
+      delete pendingResets[email];
+      return res.status(400).json({ error: 'Password reset request expired. Request a new OTP.' });
     }
 
     if (newPassword !== confirmNewPassword) {
@@ -447,15 +474,21 @@ async function confirmPasswordReset(req, res) {
       return res.status(400).json({ error: passwordRequirementsText() });
     }
 
+    const users = getUsers();
+    const userIndex = users.findIndex(user => String(user.email || '').trim().toLowerCase() === email);
+    if (userIndex < 0) {
+      delete pendingResets[email];
+      return res.status(400).json({ error: 'Unable to locate your account.' });
+    }
+
     const result = otpService.verifyOTP(otp, email, 'Password Reset');
     if (!result.valid) {
       return res.status(400).json({ error: result.message });
     }
 
-    const users = getUsers();
-    const userIndex = users.findIndex(u => u.email === email);
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     users[userIndex].password = hashedPassword;
+    users[userIndex].trustedDevices = [];
     saveUsers(users);
 
     delete pendingResets[email];

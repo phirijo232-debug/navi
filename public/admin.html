@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Pryme Vertex</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      min-height: 100vh;
+      background: #050510;
+      color: #eaeaf9;
+    }
+    body.light {
+      background: #f0f4ff;
+      color: #1a1a2e;
+    }
+    .admin-shell {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 18px 60px;
+    }
+    .panel {
+      background: rgba(18, 20, 38, 0.78);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.28);
+      backdrop-filter: blur(12px);
+    }
+    body.light .panel {
+      background: rgba(255,255,255,0.9);
+      border-color: rgba(44, 62, 121, 0.18);
+      box-shadow: 0 18px 40px rgba(99, 78, 173, 0.12);
+    }
+    .brand-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 36px;
+    }
+    .brand-mark {
+      color: inherit;
+      font-size: 1.2rem;
+      font-weight: 800;
+      text-decoration: none;
+    }
+    .store-context {
+      font-size: 0.9rem;
+      opacity: 0.75;
+    }
+    #modeBtn {
+      position: fixed;
+      top: 16px;
+      right: 18px;
+      z-index: 30;
+      width: auto;
+      max-width: none;
+    }
+    .screen-title {
+      margin-bottom: 8px;
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+    }
+    .store-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 22px;
+    }
+    .store-card {
+      min-height: 150px;
+      padding: 20px;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .store-card:hover:not(:disabled) {
+      transform: translateY(-2px);
+      border-color: rgba(0,207,255,0.7);
+    }
+    .store-card:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+    .store-card h2 { margin-bottom: 8px; }
+    .store-status {
+      display: inline-block;
+      margin-top: 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .admin-auth {
+      max-width: 420px;
+      margin: 0 auto;
+      padding: 26px 20px 24px;
+    }
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      width: 100%;
+      margin-top: 18px;
+    }
+    .auth-input, .search-box, .modal-input {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: transparent;
+      color: inherit;
+      padding: 12px 14px;
+      font-size: 15px;
+    }
+    body.light .auth-input,
+    body.light .search-box,
+    body.light .modal-input {
+      border-color: rgba(0,0,0,0.2);
+      color: #1a1a2e;
+    }
+    .header-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .admin-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin: 18px 0 20px;
+      flex-wrap: wrap;
+    }
+    .admin-topbar h1 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      letter-spacing: 1px;
+    }
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .user-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 18px;
+    }
+    .user-card {
+      padding: 18px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.03);
+      cursor: pointer;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+      width: 100%;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+    }
+    body.light .user-card {
+      border-color: rgba(0,0,0,0.08);
+      background: rgba(125, 140, 255, 0.04);
+    }
+    .user-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(123,47,255,0.8);
+    }
+    .user-card h3 {
+      margin-bottom: 8px;
+      font-size: 1.1rem;
+    }
+    .user-meta {
+      margin: 4px 0;
+      opacity: 0.82;
+      font-size: 0.92rem;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(2, 3, 14, 0.72);
+      padding: 18px;
+      overflow-y: auto;
+    }
+    .modal-content {
+      width: min(920px, 100%);
+      margin: 60px auto;
+      padding: 22px 20px 20px;
+      border-radius: 16px;
+      background: rgba(13, 15, 26, 0.98);
+      border: 1px solid rgba(255,255,255,0.12);
+      position: relative;
+    }
+    body.light .modal-content {
+      background: rgba(255,255,255,0.98);
+      border-color: rgba(0,0,0,0.08);
+    }
+    .close {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      font-size: 2rem;
+      cursor: pointer;
+      line-height: 1;
+      opacity: 0.8;
+    }
+    .loan-item {
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 12px;
+      background: rgba(255,255,255,0.03);
+    }
+    body.light .loan-item {
+      border-color: rgba(0,0,0,0.08);
+      background: rgba(8, 15, 32, 0.02);
+    }
+    .loan-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .status-tag {
+      display: inline-block;
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .status-pending { background: rgba(255,193,7,0.18); color: #ffd56a; }
+    .status-approved { background: rgba(40,167,69,0.15); color: #82e6a2; }
+    .status-declined { background: rgba(220,53,69,0.15); color: #ff9ca9; }
+    .status-overdue { background: rgba(255,103,103,0.16); color: #ff9d9d; }
+    .status-in_progress { background: rgba(0,123,255,0.15); color: #9ec8ff; }
+    .status-paid { background: rgba(23,162,184,0.16); color: #7fe6ec; }
+    .loan-filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 14px 0;
+    }
+    .loan-filter.active { border-color: #00cfff; background: rgba(0,207,255,0.18); }
+    .loan-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 6px 14px;
+      margin: 12px 0;
+    }
+    .proof-link { display: inline-block; margin: 4px 8px 4px 0; }
+    .announcement-form { max-width: 720px; }
+    .announcement-form textarea { min-height: 180px; resize: vertical; }
+    .store-section { margin-top: 26px; padding: 20px; }
+    .report-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 12px; margin: 16px 0; }
+    .report-metric { padding: 12px; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; }
+    body.light .report-metric { border-color: rgba(0,0,0,0.12); }
+    .report-metric strong { display: block; margin-top: 5px; font-size: 1.2rem; }
+    .feedback-item { padding: 14px 0; border-top: 1px solid rgba(255,255,255,0.12); }
+    body.light .feedback-item { border-color: rgba(0,0,0,0.1); }
+    .feedback-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+    .feedback-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .detail-feedback { min-height: 24px; margin: 8px 0; }
+    .hidden { display: none !important; }
+    .message-text {
+      min-height: 24px;
+      margin-top: 8px;
+      text-align: center;
+      opacity: 0.9;
+    }
+    .loader {
+      display: none;
+      width: 100%;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .loader.active { display: flex; }
+    .loader span {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #7b2fff, #00cfff);
+      animation: bounce 0.9s infinite alternate;
+    }
+    .loader span:nth-child(2) { animation-delay: 0.15s; }
+    .loader span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes bounce {
+      0% { transform: translateY(0); opacity: 0.5; }
+      100% { transform: translateY(-6px); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <button class="toggle-mode" id="modeBtn" type="button">Switch Mode</button>
+
+  <div class="admin-shell">
+    <header class="brand-header">
+      <a class="brand-mark" href="index.html">Pryme Vertex</a>
+      <span class="store-context" id="storeContext"></span>
+    </header>
+
+    <section id="storeSelect">
+      <h1 class="screen-title">Choose a store</h1>
+      <p>Select the business workspace you need to access.</p>
+      <div class="store-grid">
+        <button type="button" class="panel store-card" data-store="buraza">
+          <h2>Buraza Micro Finance</h2>
+          <p>Loans and customer accounts</p>
+          <span class="store-status">Active · BMF</span>
+        </button>
+        <button type="button" class="panel store-card" disabled>
+          <h2>Other stores</h2>
+          <p>Additional subsidiaries can be added here later.</p>
+          <span class="store-status">Not configured</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="adminAuth" class="panel admin-auth hidden">
+      <p class="tagline" style="letter-spacing: 2px;">Admin Access</p>
+
+      <form id="adminLoginForm" class="auth-form">
+        <input type="email" id="adminEmail" class="auth-input" placeholder="Admin email" required autocomplete="email">
+        <input type="password" id="adminPassword" class="auth-input" placeholder="Password" required autocomplete="current-password">
+        <button type="submit" class="enter-btn">Login</button>
+        <button type="button" id="showPasswordReset" class="toggle-mode">Forgot password?</button>
+        <button type="button" id="backToStores" class="toggle-mode">Back to stores</button>
+      </form>
+
+      <form id="adminOtpForm" class="auth-form hidden">
+        <p id="otpSentTo" class="message-text"></p>
+        <input type="text" id="adminOtp" class="auth-input" placeholder="Enter OTP from email" required autocomplete="one-time-code" inputmode="numeric">
+        <button type="submit" class="enter-btn">Verify OTP</button>
+        <button type="button" id="backToLogin" class="toggle-mode">Back</button>
+      </form>
+
+      <form id="passwordResetRequestForm" class="auth-form hidden">
+        <p>Request a password-reset code for your admin account.</p>
+        <input type="email" id="resetEmail" class="auth-input" placeholder="Admin email" required autocomplete="email">
+        <button type="submit" class="enter-btn">Send reset code</button>
+        <button type="button" class="toggle-mode" data-reset-back>Back to login</button>
+      </form>
+
+      <form id="passwordResetConfirmForm" class="auth-form hidden">
+        <p id="resetOtpSentTo" class="message-text"></p>
+        <input type="text" id="resetOtp" class="auth-input" placeholder="Enter OTP" required autocomplete="one-time-code" inputmode="numeric">
+        <input type="password" id="resetNewPassword" class="auth-input" placeholder="New password" required autocomplete="new-password">
+        <input type="password" id="resetConfirmPassword" class="auth-input" placeholder="Confirm new password" required autocomplete="new-password">
+        <button type="submit" class="enter-btn">Reset password</button>
+        <button type="button" id="resendResetOtp" class="toggle-mode">Request another code</button>
+        <button type="button" class="toggle-mode" data-reset-back>Back to login</button>
+      </form>
+
+      <div class="loader" id="loader"><span></span><span></span><span></span></div>
+      <p id="authMessage" class="message-text"></p>
+    </section>
+
+    <section id="adminDashboard" class="hidden">
+      <div class="admin-topbar">
+        <h1>Admin Control Panel</h1>
+        <div class="button-row">
+          <button id="announcementBtn" class="toggle-mode" type="button" style="max-width: 220px;">Send announcement</button>
+          <button id="notifyOverdueBtn" class="toggle-mode" type="button" style="max-width: 200px;">Notify overdue</button>
+          <button id="createUserBtn" class="enter-btn" type="button" style="max-width: 200px;">Create User</button>
+          <button id="backToStoresDashboard" class="toggle-mode" type="button" style="max-width: 180px;">Switch store</button>
+          <button id="logoutBtn" class="toggle-mode" type="button" style="max-width: 180px;">Logout</button>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <input type="text" id="userSearch" class="search-box" placeholder="Search users by name or email..." style="max-width: 520px;">
+      </div>
+
+      <div id="userList" class="user-grid"></div>
+
+      <section class="panel store-section" aria-labelledby="storeReportsTitle">
+        <div class="admin-topbar">
+          <div>
+            <h2 id="storeReportsTitle">BMF portfolio reports</h2>
+            <p>Payments collected, outstanding balances, settlements, and account status.</p>
+          </div>
+          <div class="button-row">
+            <button type="button" class="toggle-mode" data-report-format="xlsx">Download Excel</button>
+            <button type="button" class="toggle-mode" data-report-format="pdf">Download PDF</button>
+          </div>
+        </div>
+        <div id="storeReportMetrics" class="report-metrics"><p>Loading report summary...</p></div>
+        <p id="storeReportNote" class="message-text"></p>
+      </section>
+
+      <section class="panel store-section" aria-labelledby="storeFeedbackTitle">
+        <h2 id="storeFeedbackTitle">BMF customer feedback</h2>
+        <div class="loan-filters" id="storeFeedbackFilters" role="group" aria-label="Filter customer feedback">
+          <button type="button" class="toggle-mode loan-filter active" data-feedback-filter="all">All</button>
+          <button type="button" class="toggle-mode loan-filter" data-feedback-filter="complaint">Complaints</button>
+          <button type="button" class="toggle-mode loan-filter" data-feedback-filter="experience">Experiences</button>
+          <button type="button" class="toggle-mode loan-filter" data-feedback-filter="improvement">Improvements</button>
+          <button type="button" class="toggle-mode loan-filter" data-feedback-filter="inquiry">Inquiries</button>
+        </div>
+        <div id="storeFeedbackList"><p>Loading feedback...</p></div>
+      </section>
+    </section>
+  </div>
+
+  <div id="userModal" class="modal">
+    <div class="modal-content">
+      <button class="close" type="button" data-close-modal="userModal" aria-label="Close">&times;</button>
+      <div id="modalBody"></div>
+      <p id="detailFeedback" class="detail-feedback" role="status"></p>
+    </div>
+  </div>
+
+  <div id="announcementModal" class="modal">
+    <div class="modal-content">
+      <button class="close" type="button" data-close-modal="announcementModal" aria-label="Close">&times;</button>
+      <h2>Buraza customer announcement</h2>
+      <p>Send an email to all registered customer accounts.</p>
+      <form id="announcementForm" class="auth-form announcement-form">
+        <input id="announcementSubject" class="modal-input" type="text" maxlength="120" placeholder="Subject" required>
+        <textarea id="announcementMessage" class="modal-input" maxlength="5000" placeholder="Announcement or interest-rate update" required></textarea>
+        <button type="submit" class="enter-btn">Send to all customers</button>
+      </form>
+      <p id="announcementFeedback" class="message-text" role="status"></p>
+    </div>
+  </div>
+
+  <div id="createUserModal" class="modal">
+    <div class="modal-content">
+      <button class="close" type="button" data-close-modal="createUserModal" aria-label="Close">&times;</button>
+      <h2>Create New User</h2>
+      <form id="createUserForm" class="auth-form" style="margin-top: 18px;">
+        <input type="text" id="newUserName" class="modal-input" placeholder="Full name" required>
+        <input type="email" id="newUserEmail" class="modal-input" placeholder="Email" required>
+        <input type="tel" id="newUserPhone" class="modal-input" placeholder="Phone (optional)">
+        <select id="newUserRole" class="modal-input">
+          <option value="user">Customer account</option>
+          <option value="store_admin">BMF store admin</option>
+        </select>
+        <input type="password" id="newUserPassword" class="modal-input" placeholder="Password" required>
+        <input type="password" id="newUserConfirmPassword" class="modal-input" placeholder="Confirm password" required>
+        <button type="submit" class="enter-btn">Create User</button>
+      </form>
+      <p id="createUserMessage" class="message-text"></p>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>
+

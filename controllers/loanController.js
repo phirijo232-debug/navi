@@ -160,6 +160,10 @@ async function requestLoan(req, res) {
     const authEmail = req.authUser?.email;
     const storeId = req.authUser?.storeId || config.DEFAULT_STORE_ID;
 
+    if (!config.STORES.some(store => store.id === storeId && store.active)) {
+      return res.status(403).json({ error: 'Loan requests are not enabled for this store.' });
+    }
+
     if (!email || !product || !amount || !dueDate) {
       return res.status(400).json({ error: 'All loan request fields are required.' });
     }

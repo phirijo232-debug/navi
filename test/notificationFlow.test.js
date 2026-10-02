@@ -81,7 +81,8 @@ test('admin announcements target deduplicated non-admin users and report deliver
   try {
     const sendMail = t.mock.method(emailService, 'sendCustomerEmail', async () => ({ ok: true }));
     const req = {
-      authUser: { role: 'admin' },
+      authUser: { role: 'store_admin', storeId: 'buraza' },
+      headers: {},
       body: { subject: 'Interest update', message: 'Rates change next month.' }
     };
     const res = {
@@ -103,4 +104,23 @@ test('admin announcements target deduplicated non-admin users and report deliver
   } finally {
     fs.writeFileSync(USERS_FILE, originalUsers);
   }
+});
+
+test('franchise admins cannot broadcast directly to BMF customers', async (t) => {
+  const sendMail = t.mock.method(emailService, 'sendCustomerEmail', async () => ({ ok: true }));
+  const req = {
+    authUser: { role: 'admin', email: 'franchise@example.test' },
+    headers: {},
+    body: { subject: 'Update', message: 'An update.' }
+  };
+  const res = {
+    statusCode: 200,
+    status(code) { this.statusCode = code; return this; },
+    json(payload) { this.body = payload; return this; }
+  };
+
+  await sendAdminAnnouncement(req, res);
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(sendMail.mock.calls.length, 0);
 });
