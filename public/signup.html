@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pryme Vertex — Sign Up</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .eye-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; width: 20px; height: 20px; opacity: 0.6; }
+    .eye-icon:hover { opacity: 1; }
+    .input-wrap { position: relative; }
+    .input-wrap input { width: 100%; padding-right: 36px; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="toggle-mode back-corner">← Back</a>
+  <button class="toggle-mode" id="modeBtn">Switch Mode</button>
+
+  <div class="landing">
+    <h1 class="brand">Pryme Vertex</h1>
+    <p class="tagline">Create Your Account</p>
+
+    <form id="signupForm" class="auth-form">
+      <input type="text" id="username" placeholder="Username" required class="auth-input">
+      <input type="email" id="email" placeholder="Email" required class="auth-input">
+      <input type="tel" id="phone" placeholder="WhatsApp number (required)" required class="auth-input" inputmode="tel">
+      <p class="form-note">Please provide a valid WhatsApp number so we can reach you by WhatsApp, SMS, or direct call when needed.</p>
+      <div class="input-wrap">
+        <input type="password" id="password" placeholder="Password" required class="auth-input">
+        <svg id="togglePass1" class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </div>
+      <p class="form-note">Use 8+ characters with letters, numbers, and symbols (e.g. @, #, !)</p>
+      <div class="input-wrap">
+        <input type="password" id="confirmPassword" placeholder="Confirm Password" required class="auth-input">
+        <svg id="togglePass2" class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </div>
+      <button type="submit" class="enter-btn">Sign Up</button>
+    </form>
+
+    <form id="otpForm" class="auth-form hidden">
+      <p id="otpSentTo" class="message-text"></p>
+      <input type="text" id="otp" placeholder="Enter OTP from email" required class="auth-input">
+      <button type="submit" class="enter-btn">Verify OTP</button>
+      <button type="button" id="resendBtn" class="toggle-mode">Resend OTP</button>
+      <button type="button" id="backToSignup" class="toggle-mode">Back</button>
+    </form>
+
+    <div class="loader" id="loader"><span></span><span></span><span></span></div>
+    <p id="message" class="message-text"></p>
+  </div>
+
+  <script>
+    function applyTheme(theme) {
+      document.documentElement.classList.remove('dark', 'light');
+      document.body.classList.remove('dark', 'light');
+      document.documentElement.classList.add(theme);
+      document.body.classList.add(theme);
+    }
+
+    function toggleTheme() {
+      const nextMode = document.body.classList.contains('dark') ? 'light' : 'dark';
+      applyTheme(nextMode);
+      localStorage.setItem('mode', nextMode);
+    }
+
+    const savedMode = localStorage.getItem('mode') || 'dark';
+    applyTheme(savedMode);
+
+    document.getElementById('modeBtn').addEventListener('click', toggleTheme);
+
+    function animateTagline(selector) {
+      const tagline = document.querySelector(selector);
+      if (!tagline) return;
+      const text = tagline.textContent.trim();
+      tagline.innerHTML = '';
+      text.split('').forEach((letter, index) => {
+        const span = document.createElement('span');
+        span.textContent = letter === ' ' ? '\u00A0' : letter;
+        span.style.animationDelay = `${index * 0.05}s`;
+        span.className = 'tagline-letter';
+        tagline.appendChild(span);
+      });
+    }
+
+    animateTagline('.tagline');
+
+    let pendingEmail = '';
+    const eyeOpen = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+    const eyeClosed = `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>`;
+
+    function setupToggle(toggleId, inputId) {
+      const toggle = document.getElementById(toggleId);
+      const input = document.getElementById(inputId);
+      let visible = false;
+      toggle.addEventListener('click', function() {
+        visible = !visible;
+        input.type = visible ? 'text' : 'password';
+        toggle.innerHTML = visible ? eyeOpen : eyeClosed;
+      });
+    }
+    setupToggle('togglePass1', 'password');
+    setupToggle('togglePass2', 'confirmPassword');
+
+    document.getElementById('signupForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      document.getElementById('loader').classList.add('active');
+
+      const username = document.getElementById('username').value;
+      const email = document.getElementById('email').value;
+      const phone = document.getElementById('phone').value;
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+      const strengthRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?"{}|<>]).{8,}$/;
+
+      if (password !== confirmPassword) {
+        document.getElementById('message').textContent = 'Passwords do not match.';
+        document.getElementById('loader').classList.remove('active');
+        return;
+      }
+
+      if (!strengthRegex.test(password)) {
+        document.getElementById('message').textContent = 'Password must be at least 8 characters and include uppercase, lowercase, number, and special character.';
+        document.getElementById('loader').classList.remove('active');
+        return;
+      }
+
+      const res = await fetch('/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, phone, password, confirmPassword })
+      });
+      const data = await res.json();
+
+      document.getElementById('loader').classList.remove('active');
+      document.getElementById('message').textContent = data.message || data.error;
+
+      if (data.message) {
+        pendingEmail = email;
+        document.getElementById('otpSentTo').textContent = `OTP sent to: ${email}`;
+        document.getElementById('signupForm').classList.add('hidden');
+        document.getElementById('otpForm').classList.remove('hidden');
+        document.getElementById('otp').focus();
+      }
+    });
+
+    document.getElementById('otpForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      document.getElementById('loader').classList.add('active');
+
+      const otp = document.getElementById('otp').value;
+      const res = await fetch('/signup/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingEmail, otp })
+      });
+      const data = await res.json();
+
+      document.getElementById('loader').classList.remove('active');
+      document.getElementById('message').textContent = data.message || data.error;
+
+      if (data.message === 'Account created successfully.') {
+        // Keep first-time experience on the user dashboard, but avoid relying on long-lived flags.
+        localStorage.setItem('newSignup', 'true');
+        // After signup, send the user to the login screen to complete OTP-based access.
+        setTimeout(() => window.location.href = 'login.html', 2000);
+      }
+
+    });
+
+    document.getElementById('resendBtn').addEventListener('click', async function() {
+      document.getElementById('loader').classList.add('active');
+      const res = await fetch('/signup/resend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingEmail })
+      });
+      const data = await res.json();
+      document.getElementById('loader').classList.remove('active');
+      document.getElementById('message').textContent = data.message || data.error;
+    });
+
+    document.getElementById('backToSignup').addEventListener('click', function() {
+      document.getElementById('otpForm').classList.add('hidden');
+      document.getElementById('signupForm').classList.remove('hidden');
+      document.getElementById('message').textContent = '';
+    });
+  </script>
+</body>
+</html>

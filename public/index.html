@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>document.documentElement.className = localStorage.getItem('mode') || 'dark';</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Pryme Vertex</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <button class="toggle-mode" id="modeBtn">Switch Mode</button>
+  <div class="landing">
+    <h1 class="brand">Pryme Vertex</h1>
+    <p class="tagline">Private. Powerful. Yours.</p>
+    <a href="login.html" class="enter-btn">Login</a>
+    <a href="signup.html" class="toggle-mode">Sign Up</a>
+  </div>
+  <script>
+    function applyTheme(theme) {
+      document.documentElement.classList.remove('dark', 'light');
+      document.body.classList.remove('dark', 'light');
+      document.documentElement.classList.add(theme);
+      document.body.classList.add(theme);
+    }
+
+    function toggleTheme() {
+      const nextMode = document.body.classList.contains('dark') ? 'light' : 'dark';
+      applyTheme(nextMode);
+      localStorage.setItem('mode', nextMode);
+    }
+
+    const savedMode = localStorage.getItem('mode') || 'dark';
+    applyTheme(savedMode);
+
+    document.getElementById('modeBtn').addEventListener('click', toggleTheme);
+
+    function animateTagline(selector) {
+      const element = document.querySelector(selector);
+      if (!element) return;
+      const text = element.textContent.trim();
+      element.textContent = '';
+      text.split('').forEach((char, index) => {
+        const span = document.createElement('span');
+        span.textContent = char === ' ' ? '\u00A0' : char;
+        span.className = 'tagline-letter';
+        span.style.animationDelay = `${index * 0.05}s`;
+        element.appendChild(span);
+      });
+    }
+
+    animateTagline('.tagline');
+  </script>
+</body>
+</html>

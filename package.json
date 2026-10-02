@@ -1,0 +1,51 @@
+{
+  "name": "navi-server",
+  "description": "Navi Server API and dashboard backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "content-type": "^2.0.0",
+    "dotenv": "^18.0.4",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "media-typer": "^1.1.0",
+    "mime-types": "^3.0.0",
+    "multer": "^2.4.0",
+    "nodemailer": "^10.0.12",
+    "pdfkit": "^0.20.2"
+  },
+  "devDependencies": {
+    "eslint": "7.32.0",
+    "eslint-config-standard": "14.1.1",
+    "eslint-plugin-import": "2.31.0",
+    "eslint-plugin-markdown": "2.2.1",
+    "eslint-plugin-node": "11.1.0",
+    "eslint-plugin-promise": "5.2.0",
+    "eslint-plugin-standard": "4.1.0",
+    "mocha": "9.2.2",
+    "nyc": "15.1.0"
+  },
+  "engines": {
+    "node": ">= 18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "lint": "eslint .",
+    "test": "mocha --reporter spec --check-leaks --bail test/",
+    "test:debug": "mocha --reporter spec --check-leaks --inspect --inspect-brk test/",
+    "test-ci": "nyc --reporter=lcovonly --reporter=text npm test",
+    "test-cov": "nyc --reporter=html --reporter=text npm test"
+  },
+  "keywords": [
+    "navi",
+    "server",
+    "api",
+    "dashboard"
+  ]
+}

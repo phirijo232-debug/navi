@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pryme Vertex — My Account</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <button class="menu-toggle" id="menuBtn">⋮</button>
+  <div class="dropdown-menu" id="menuDropdown">
+    <button class="menu-action" data-view="loans">Loans</button>
+    <button class="menu-action" data-view="payments">Payments</button>
+    <button class="menu-action" data-view="complaints">Complaints</button>
+    <button class="menu-action" data-view="improvements">Improvements</button>
+    <button class="menu-action" data-view="inquiries">Inquiries</button>
+    <button class="menu-action" data-view="experience">Experience</button>
+    <button class="menu-action" data-view="about">About Us</button>
+    <button id="logoutBtn">Logout</button>
+  </div>
+  <button class="toggle-mode" id="modeBtn">Switch Mode</button>
+
+  <div class="dashboard">
+    <div class="dash-header">
+      <h1 class="brand animated-text">Pryme Vertex</h1>
+    </div>
+
+    <div class="loan-tabs">
+      <button class="loan-tab active" data-tab="summary">Loan Summary</button>
+      <button class="loan-tab" data-tab="loans">My Loans</button>
+      <button class="loan-tab" data-tab="request">New Request</button>
+    </div>
+
+    <div class="screen-sections">
+      <div id="summarySection" class="screen-section active">
+        <div class="loan-summary-grid">
+          <div class="loan-summary-card">
+            <h3 id="greetingLabel">Welcome Back</h3>
+            <p class="summary-label">Logged in as</p>
+            <p class="summary-value" id="welcomeName">--</p>
+          </div>
+          <div class="loan-summary-card">
+            <h3>Loan Summary</h3>
+            <p class="summary-value" id="loanTotal">--</p>
+            <p class="summary-label">Total loans</p>
+          </div>
+          <div class="loan-summary-card">
+            <h3>Outstanding</h3>
+            <p class="summary-value" id="loanOutstanding">--</p>
+            <p class="summary-label">Total balance</p>
+          </div>
+          <div class="loan-summary-card">
+            <h3>Server Status</h3>
+            <p class="summary-value">RUNNING</p>
+            <p class="summary-label">Connection active</p>
+          </div>
+        </div>
+        <div class="loan-summary-grid" id="statusSummaryCards">
+          <div class="loan-summary-card">
+            <h3>Pending</h3>
+            <p class="summary-value" id="loanPending">0</p>
+          </div>
+          <div class="loan-summary-card">
+            <h3>Running</h3>
+            <p class="summary-value" id="loanRunning">0</p>
+          </div>
+          <div class="loan-summary-card">
+            <h3>Closed</h3>
+            <p class="summary-value" id="loanClosed">0</p>
+          </div>
+        </div>
+        <div class="board-card loan-overview-card">
+          <h3>Loan Overview</h3>
+          <div id="overviewSummary" class="overview-grid"></div>
+        </div>
+      </div>
+
+      <div id="loansSection" class="screen-section hidden">
+        <div class="loan-filters">
+          <button class="loan-filter active" data-filter="all">All</button>
+          <button class="loan-filter" data-filter="pending">Pending</button>
+          <button class="loan-filter" data-filter="running">Running</button>
+          <button class="loan-filter" data-filter="closed">Closed</button>
+        </div>
+        <div class="loan-filters history-filters">
+          <button class="history-filter" data-range="today">Today</button>
+          <button class="history-filter" data-range="yesterday">Yesterday</button>
+          <button class="history-filter" data-range="7">Last 7 days</button>
+          <button class="history-filter" data-range="30">Last 30 days</button>
+          <button class="history-filter" data-range="month">This month</button>
+          <button class="history-filter" data-range="year">This year</button>
+          <button class="history-filter active" data-range="all">All time</button>
+        </div>
+        <ul class="loan-list" id="loan-list"></ul>
+        <div id="loanDetailPanel" class="loan-detail-panel hidden"></div>
+      </div>
+
+      <div id="paymentsSection" class="screen-section hidden">
+        <div class="board-card">
+          <h2>Payments</h2>
+          <div class="overview-grid" id="paymentSummary"></div>
+        </div>
+      </div>
+
+      <div id="complaintsSection" class="screen-section hidden">
+        <div class="board-card">
+          <h2>Customer Feedback</h2>
+          <div class="request-field-grid two-up compact-row">
+            <label class="field-label" for="feedbackCategory">Feedback type</label>
+            <select id="feedbackCategory" class="auth-input">
+              <option value="complaint">Complaint</option>
+              <option value="improvement">Improvement</option>
+              <option value="inquiry">Inquiry</option>
+              <option value="experience">Experience</option>
+            </select>
+          </div>
+          <textarea id="complaintMessage" class="auth-input" rows="6" placeholder="Tell us what you want fixed, improved, or clarified in the system."></textarea>
+          <button type="button" class="enter-btn" id="submitComplaintBtn">Send Feedback</button>
+          <p id="complaintMessageText" class="message-text"></p>
+        </div>
+      </div>
+
+      <div id="aboutSection" class="screen-section hidden">
+        <div class="board-card">
+          <h2>About You</h2>
+          <div id="aboutUserDetails" class="about-user-grid"></div>
+        </div>
+      </div>
+
+      <div id="requestSection" class="screen-section hidden">
+        <div class="panel">
+          <h2>Request New Loan</h2>
+          <form id="loanRequestForm" class="auth-form" enctype="multipart/form-data">
+            <div class="request-field-grid">
+              <input type="text" id="loanProduct" placeholder="Loan purpose" required class="auth-input">
+              <input type="number" id="loanAmount" placeholder="Amount" min="1" required class="auth-input">
+            </div>
+
+            <div class="request-field-grid two-up">
+              <div class="timeframe-field">
+                <label class="field-label" for="loanDueDate">Timeframe</label>
+                <div class="timeframe-toggle" role="group" aria-label="Choose timeframe mode">
+                  <button type="button" class="timeframe-mode-btn active" data-mode="weeks">Weeks</button>
+                  <button type="button" class="timeframe-mode-btn" data-mode="date">Custom date</button>
+                </div>
+              </div>
+              <select id="loanUrgency" class="auth-input">
+                <option value="low">Low urgency</option>
+                <option value="standard" selected>Standard</option>
+                <option value="urgent">Urgent</option>
+                <option value="emergency">Emergency</option>
+              </select>
+            </div>
+
+            <div class="request-field-grid two-up compact-row">
+              <input type="date" id="loanDueDate" class="auth-input" disabled>
+              <select id="loanTenureWeeks" class="auth-input">
+                <option value="1">1 week</option>
+                <option value="2" selected>2 weeks</option>
+                <option value="3">3 weeks</option>
+                <option value="4">4 weeks</option>
+              </select>
+            </div>
+
+            <div class="request-field-grid two-up compact-row">
+              <select id="loanPaymentMode" class="auth-input">
+                <option value="">Payment mode (optional)</option>
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank transfer</option>
+                <option value="mobile_money">Mobile money</option>
+                <option value="salary_deduction">Salary deduction</option>
+                <option value="custom">Custom</option>
+              </select>
+              <input type="text" id="loanCustomPaymentMode" class="auth-input hidden" placeholder="Custom payment mode">
+            </div>
+
+            <input type="text" id="loanCollateralDescription" class="auth-input" placeholder="Collateral description">
+
+            <div class="upload-stack">
+              <div class="upload-field-wrap">
+                <label class="field-label" for="loanCollateralFront">Collateral front image</label>
+                <input type="file" id="loanCollateralFront" accept="image/*" class="auth-input file-input">
+              </div>
+              <div class="upload-field-wrap">
+                <label class="field-label" for="loanCollateralBack">Collateral back image</label>
+                <input type="file" id="loanCollateralBack" accept="image/*" class="auth-input file-input">
+              </div>
+            </div>
+
+            <select id="loanCollateralGrade" class="auth-input">
+              <option value="">Collateral grade (optional)</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+            </select>
+
+            <div class="loan-estimate-box" aria-live="polite">
+              <div><span>Rate</span> <strong id="loanRateDisplay">16%</strong></div>
+              <div><span>Interest</span> <strong id="loanInterestDisplay">K0</strong></div>
+              <div><span>Total</span> <strong id="loanTotalDisplay">K0</strong></div>
+              <div><span>Approval target</span> <strong id="loanApprovalDisplay">48h</strong></div>
+            </div>
+
+            <details class="terms-box" aria-live="polite">
+              <summary>Read more</summary>
+              <ul>
+                <li>I confirm the loan purpose and amount requested are true and necessary for my stated need.</li>
+                <li>I understand the approved amount, interest rate, total repayment, and repayment due date are based on my selected timeframe and urgency.</li>
+                <li>I agree to repay the full approved amount on or before the agreed due date, and I accept that unpaid balances may be recorded as outstanding.</li>
+                <li>I understand that all submitted information, supporting documents, and collateral details are provided honestly and may be reviewed by the platform or admin team.</li>
+                <li>I accept that approval is subject to review and that the platform may request additional information before processing.</li>
+                <li>I agree that this request is for a desktop-only service and that I will not misrepresent my identity, documents, or repayment ability.</li>
+              </ul>
+            </details>
+
+            <label class="checkbox-row">
+              <input type="checkbox" id="loanAgreeTerms" required>
+              <span>I have read, understood, and agree to these terms and conditions before submitting this request.</span>
+            </label>
+            <button type="submit" class="enter-btn">Submit Request</button>
+          </form>
+          <p id="loanRequestMessage" class="message-text"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const deviceToken = localStorage.getItem('deviceToken');
+    localStorage.setItem('lastAppPage', 'user.html');
+    const savedMode = localStorage.getItem('mode') || 'dark';
+    applyTheme(savedMode);
+
+    async function handleInvalidDeviceToken() {
+      localStorage.removeItem('deviceToken');
+      localStorage.removeItem('username');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('userRole');
+      window.location.href = 'login.html';
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.classList.remove('dark', 'light');
+      document.body.classList.remove('dark', 'light');
+      document.documentElement.classList.add(theme);
+      document.body.classList.add(theme);
+    }
+
+    document.getElementById('modeBtn').addEventListener('click', function() {
+      const body = document.body;
+      const nextMode = body.classList.contains('dark') ? 'light' : 'dark';
+      applyTheme(nextMode);
+      localStorage.setItem('mode', nextMode);
+    });
+
+    const username = localStorage.getItem('username') || 'User';
+    const userEmail = localStorage.getItem('userEmail');
+    const userRole = localStorage.getItem('userRole') || 'user';
+    const isNewSignup = localStorage.getItem('newSignup') === 'true';
+    const justCreated = isNewSignup; // naming clarity for first-time flow
+
+
+    document.getElementById('welcomeName').textContent = username;
+
+    if (isNewSignup) {
+      document.getElementById('greetingLabel').textContent = 'Welcome Aboard!';
+      localStorage.removeItem('newSignup');
+    } else {
+      document.getElementById('greetingLabel').textContent = 'Welcome Back';
+    }
+
+    function formatKwacha(value) {
+      const amount = Number(value) || 0;
+      return `K${amount.toLocaleString('en-ZM')}`;
+    }
+
+    function formatDateDisplay(dateValue) {
+      if (!dateValue) return '';
+      const date = new Date(dateValue);
+      if (Number.isNaN(date.getTime())) return dateValue;
+      return date.toLocaleDateString('en-GB');
+    }
+
+    const dueDateInput = document.getElementById('loanDueDate');
+    const tenureSelect = document.getElementById('loanTenureWeeks');
+    const urgencySelect = document.getElementById('loanUrgency');
+    const amountInput = document.getElementById('loanAmount');
+    const timeframeButtons = document.querySelectorAll('.timeframe-mode-btn');
+
+    function getSelectedWeeksFromDate() {
+      if (!dueDateInput.value) return Number(tenureSelect.value) || 1;
+      const selectedDate = new Date(`${dueDateInput.value}T00:00:00`);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffDays = Math.max(1, Math.ceil((selectedDate - today) / (1000 * 60 * 60 * 24)));
+      return Math.min(4, Math.max(1, Math.ceil(diffDays / 7)));
+    }
+
+    function getLoanEstimate() {
+      const amount = Number(amountInput.value) || 0;
+      const weeks = dueDateInput.disabled ? (Number(tenureSelect.value) || 1) : getSelectedWeeksFromDate();
+      const rates = { 1: 10, 2: 16, 3: 24, 4: 32 };
+      const rate = rates[weeks] || 10;
+      const interest = amount * (rate / 100);
+      const total = amount + interest;
+      const approvalHours = { low: 72, standard: 48, urgent: 24, emergency: 4 };
+      const urgency = (urgencySelect.value || 'standard').toLowerCase();
+      const approvalTarget = approvalHours[urgency] || 48;
+      return { rate, interest, total, approvalTarget, weeks };
+    }
+
+    function setTimeframeMode(mode) {
+      const isDateMode = mode === 'date';
+      dueDateInput.disabled = !isDateMode;
+      dueDateInput.setAttribute('aria-disabled', String(!isDateMode));
+      if (!isDateMode) {
+        dueDateInput.value = '';
+      }
+      tenureSelect.disabled = isDateMode;
+      tenureSelect.setAttribute('aria-disabled', String(isDateMode));
+
+      timeframeButtons.forEach(button => {
+        const isActive = button.dataset.mode === mode;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+      });
+    }
+
+    function updateLoanEstimateDisplay() {
+      const estimate = getLoanEstimate();
+      document.getElementById('loanRateDisplay').textContent = `${estimate.rate}%`;
+      document.getElementById('loanInterestDisplay').textContent = formatKwacha(estimate.interest);
+      document.getElementById('loanTotalDisplay').textContent = formatKwacha(estimate.total);
+      document.getElementById('loanApprovalDisplay').textContent = `${estimate.approvalTarget}h`;
+    }
+
+    amountInput.addEventListener('input', updateLoanEstimateDisplay);
+    tenureSelect.addEventListener('change', updateLoanEstimateDisplay);
+    dueDateInput.addEventListener('change', updateLoanEstimateDisplay);
+    urgencySelect.addEventListener('change', updateLoanEstimateDisplay);
+
+    timeframeButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        setTimeframeMode(button.dataset.mode);
+        updateLoanEstimateDisplay();
+      });
+    });
+
+    setTimeframeMode('weeks');
+    updateLoanEstimateDisplay();
+
+    const paymentModeSelect = document.getElementById('loanPaymentMode');
+    const customPaymentMode = document.getElementById('loanCustomPaymentMode');
+
+    function toggleCustomPaymentMode() {
+      const showCustom = paymentModeSelect.value === 'custom';
+      customPaymentMode.classList.toggle('hidden', !showCustom);
+      customPaymentMode.required = showCustom;
+      if (!showCustom) customPaymentMode.value = '';
+    }
+
+    paymentModeSelect.addEventListener('change', toggleCustomPaymentMode);
+
+    document.getElementById('loanRequestForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const messageEl = document.getElementById('loanRequestMessage');
+      messageEl.textContent = '';
+      const product = document.getElementById('loanProduct').value.trim();
+      const amount = document.getElementById('loanAmount').value;
+      const dueDate = document.getElementById('loanDueDate').value;
+      const selectedWeeks = Number(document.getElementById('loanTenureWeeks').value) || 1;
+      const urgency = document.getElementById('loanUrgency').value;
+      const agreedToTerms = document.getElementById('loanAgreeTerms').checked;
+      const collateralDescription = document.getElementById('loanCollateralDescription').value.trim();
+      const collateralGrade = document.getElementById('loanCollateralGrade').value || '';
+      const deviceToken = localStorage.getItem('deviceToken');
+      const computedWeeks = dueDate ? getSelectedWeeksFromDate() : selectedWeeks;
+      const chosenPaymentMode = paymentModeSelect.value === 'custom'
+        ? (customPaymentMode.value.trim() || 'Custom')
+        : paymentModeSelect.value;
+
+      if (!product || !amount || (!dueDate && !selectedWeeks) || !urgency) {
+        messageEl.textContent = 'Please fill all required loan request fields.';
+        return;
+      }
+
+      if (!dueDate && !selectedWeeks) {
+        messageEl.textContent = 'Choose either a custom due date or a fixed duration.';
+        return;
+      }
+
+      if (!agreedToTerms) {
+        messageEl.textContent = 'You must agree to the loan terms to continue.';
+        return;
+      }
+
+      if (!deviceToken) {
+        messageEl.textContent = 'Device token missing. Please login again.';
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('email', userEmail);
+        formData.append('product', product);
+        formData.append('amount', amount);
+        formData.append('dueDate', dueDate || new Date(Date.now() + computedWeeks * 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+        formData.append('tenureWeeks', String(computedWeeks));
+        formData.append('urgency', urgency);
+        formData.append('agreedToTerms', String(agreedToTerms));
+        formData.append('paymentMode', chosenPaymentMode || '');
+        formData.append('collateralDescription', collateralDescription || '');
+        formData.append('collateralGrade', collateralGrade || '');
+
+        const frontFile = document.getElementById('loanCollateralFront').files[0];
+        const backFile = document.getElementById('loanCollateralBack').files[0];
+        if (frontFile) formData.append('collateralFront', frontFile);
+        if (backFile) formData.append('collateralBack', backFile);
+
+        const res = await fetch('/loans/request', {
+          method: 'POST',
+          headers: { 'x-device-token': deviceToken },
+          body: formData
+        });
+        const data = await res.json();
+        if (data.error) {
+          messageEl.textContent = data.error;
+        } else {
+          messageEl.textContent = data.message || 'Request submitted.';
+          document.getElementById('loanRequestForm').reset();
+          document.getElementById('loanTenureWeeks').value = '2';
+          document.getElementById('loanUrgency').value = 'standard';
+          paymentModeSelect.value = '';
+          toggleCustomPaymentMode();
+          setTimeframeMode('weeks');
+          updateLoanEstimateDisplay();
+          loadLoans(currentHistoryFilter);
+        }
+      } catch (err) {
+        messageEl.textContent = 'Unable to send loan request. Try again later.';
+      }
+    });
+
+    let allLoans = [];
+    let currentLoanFilter = 'all';
+    let currentHistoryFilter = 'all';
+
+    function setOverviewSection(sectionKey) {
+      document.querySelectorAll('.screen-section').forEach(section => {
+        const isMatch = section.id === `${sectionKey}Section`;
+        section.classList.toggle('hidden', !isMatch);
+      });
+      localStorage.setItem('lastUserView', sectionKey);
+
+      if (sectionKey === 'payments') {
+        renderPaymentOverview();
+      }
+
+      if (sectionKey === 'about') {
+        renderAboutSection();
+      }
+    }
+
+    function setActiveLoanTab(tab) {
+      localStorage.setItem('lastUserView', tab);
+      document.querySelectorAll('.loan-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+      document.querySelectorAll('.screen-section').forEach(section => {
+        section.classList.toggle('hidden', section.id !== `${tab}Section`);
+      });
+      if (tab === 'loans') {
+        renderLoanList();
+      }
+    }
+
+    function renderPaymentOverview() {
+      const container = document.getElementById('paymentSummary');
+      if (!container) return;
+
+      const active = allLoans.filter(loan => ['running', 'approved', 'active', 'in_progress', 'in-progress'].includes(loan.status));
+      const settled = allLoans.filter(loan => ['paid', 'completed', 'closed'].includes(loan.status));
+      const totalActive = active.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
+      const totalSettled = settled.reduce((sum, loan) => sum + (Number(loan.totalRepayment) || Number(loan.amount) || 0), 0);
+
+      container.innerHTML = `
+        <div class="summary-inline-card">
+          <h3>Active loans</h3>
+          <p>${active.length}</p>
+          <span>${formatKwacha(totalActive)}</span>
+        </div>
+        <div class="summary-inline-card">
+          <h3>Settled</h3>
+          <p>${settled.length}</p>
+          <span>${formatKwacha(totalSettled)}</span>
+        </div>
+        <div class="summary-inline-card">
+          <h3>Total to pay</h3>
+          <p>${active.length + settled.length}</p>
+          <span>${formatKwacha(totalActive + totalSettled)}</span>
+        </div>
+      `;
+    }
+
+    function renderOverviewSummary(loans) {
+      const container = document.getElementById('overviewSummary');
+      if (!container) return;
+
+      const totalRequested = loans.reduce((sum, loan) => sum + (Number(loan.amount) || 0), 0);
+      const totalOutstanding = loans.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
+      const pending = loans.filter(loan => loan.status === 'pending').length;
+      const active = loans.filter(loan => ['running', 'approved', 'active', 'in_progress', 'in-progress'].includes(loan.status)).length;
+      const closed = loans.filter(loan => ['paid', 'closed', 'completed', 'declined'].includes(loan.status)).length;
+
+      container.innerHTML = `
+        <div class="summary-inline-card">
+          <h3>Total requested</h3>
+          <p>${loans.length}</p>
+          <span>${formatKwacha(totalRequested)}</span>
+        </div>
+        <div class="summary-inline-card">
+          <h3>Outstanding</h3>
+          <p>${pending + active}</p>
+          <span>${formatKwacha(totalOutstanding)}</span>
+        </div>
+        <div class="summary-inline-card">
+          <h3>Settled</h3>
+          <p>${closed}</p>
+          <span>${formatKwacha(loans.reduce((sum, loan) => sum + (Number(loan.totalRepayment) || Number(loan.amount) || 0), 0))}</span>
+        </div>
+      `;
+    }
+
+    function renderAboutSection() {
+      const container = document.getElementById('aboutUserDetails');
+      if (!container) return;
+
+      const user = {
+        name: localStorage.getItem('username') || 'User',
+        email: localStorage.getItem('userEmail') || 'Not available',
+        role: localStorage.getItem('userRole') || 'user',
+        deviceToken: localStorage.getItem('deviceToken') || 'Not available',
+        theme: localStorage.getItem('mode') || 'dark'
+      };
+
+      container.innerHTML = `
+        <div class="info-row"><strong>Name:</strong> <span>${user.name}</span></div>
+        <div class="info-row"><strong>Email:</strong> <span>${user.email}</span></div>
+        <div class="info-row"><strong>Role:</strong> <span>${user.role}</span></div>
+        <div class="info-row"><strong>Theme:</strong> <span>${user.theme}</span></div>
+        <div class="info-row"><strong>Device token:</strong> <span>${user.deviceToken}</span></div>
+      `;
+    }
+
+    function setLoanFilter(filter) {
+      currentLoanFilter = filter;
+      document.querySelectorAll('.loan-filter').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+      });
+      renderLoanList();
+    }
+
+    function setHistoryFilter(range) {
+      currentHistoryFilter = range;
+      document.querySelectorAll('.history-filter').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.range === range);
+      });
+      loadLoans(range);
+    }
+
+    function formatStatusLabel(status) {
+      if (!status) return 'Unknown';
+      return String(status).replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+    }
+
+    function countLoanStatus(loans) {
+      return {
+        pending: loans.filter(loan => loan.status === 'pending').length,
+        running: loans.filter(loan => ['running', 'approved', 'active', 'in_progress', 'in-progress'].includes(loan.status)).length,
+        closed: loans.filter(loan => ['paid', 'closed', 'completed', 'declined'].includes(loan.status)).length
+      };
+    }
+
+    function renderLoanSummaryCounts(loans) {
+      const counts = countLoanStatus(loans);
+      document.getElementById('loanPending').textContent = counts.pending;
+      document.getElementById('loanRunning').textContent = counts.running;
+      document.getElementById('loanClosed').textContent = counts.closed;
+      renderOverviewSummary(loans);
+    }
+
+    function renderLoanList() {
+      const loanList = document.getElementById('loan-list');
+      const filtered = allLoans.filter(loan => {
+        if (currentLoanFilter === 'pending') return loan.status === 'pending';
+        if (currentLoanFilter === 'running') return ['running', 'approved', 'active', 'in_progress', 'in-progress'].includes(loan.status);
+        if (currentLoanFilter === 'closed') return ['paid', 'closed', 'completed', 'declined'].includes(loan.status);
+        return true;
+      });
+
+      loanList.innerHTML = filtered.length
+        ? filtered.map(loan => `
+            <li class="loan-card" title="Product: ${loan.product || 'Loan'}\nRequested: ${formatKwacha(loan.amount)}\nInterest: ${formatKwacha(loan.interestAmount || 0)}\nTotal: ${formatKwacha(loan.totalRepayment || loan.amount || 0)}\nTenure: ${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'}\nUrgency: ${formatStatusLabel(loan.urgency || 'standard')}\nDue: ${formatDateDisplay(loan.dueDate)}\nDecision: ${loan.adminReason || 'No decision reason yet.'}" onclick="openLoanDetails(${loan.id})">
+              <div class="loan-card-heading">
+                <strong>${loan.product}</strong>
+                <span class="loan-badge ${loan.status || 'pending'}">${formatStatusLabel(loan.status).toUpperCase()}</span>
+              </div>
+              <div class="loan-meta">
+                Amount: ${formatKwacha(loan.amount)} • Due: ${formatDateDisplay(loan.dueDate)} • Balance: ${formatKwacha(loan.outstanding)}
+              </div>
+              <div class="loan-meta">
+                Requested: ${formatDateDisplay(loan.createdAt || loan.dueDate)} • Interest: ${formatKwacha(loan.interestAmount || 0)} • Total: ${formatKwacha(loan.totalRepayment || loan.amount || 0)}
+              </div>
+              <div class="loan-meta">
+                Tenure: ${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'} • Urgency: ${formatStatusLabel(loan.urgency || 'standard')}
+              </div>
+            </li>
+          `).join('')
+        : '<li class="loan-empty">No loans found for this category.</li>';
+    }
+
+    function renderLoanDetailPanel(loan) {
+      const panel = document.getElementById('loanDetailPanel');
+      if (!panel || !loan) return;
+      const collateralText = loan.collateralDescription || loan.collateralFront || loan.collateralBack || 'No collateral provided';
+      const decisionText = loan.adminReason || 'No decision reason provided yet.';
+
+      panel.innerHTML = `
+        <div class="loan-detail-card">
+          <div class="loan-detail-header">
+            <h3>${loan.product || 'Loan Request'}</h3>
+            <span class="loan-badge ${loan.status || 'pending'}">${formatStatusLabel(loan.status).toUpperCase()}</span>
+          </div>
+          <div class="loan-detail-grid">
+            <p><strong>Requested by:</strong> ${loan.email || 'Unknown'}</p>
+            <p><strong>Amount requested:</strong> ${formatKwacha(loan.amount)}</p>
+            <p><strong>Interest rate:</strong> ${loan.interestRate || 0}%</p>
+            <p><strong>Interest amount:</strong> ${formatKwacha(loan.interestAmount || 0)}</p>
+            <p><strong>Total after interest:</strong> ${formatKwacha(loan.totalRepayment || loan.amount || 0)}</p>
+            <p><strong>Outstanding:</strong> ${formatKwacha(loan.outstanding || 0)}</p>
+            <p><strong>Due date:</strong> ${formatDateDisplay(loan.dueDate)}</p>
+            <p><strong>Urgency:</strong> ${formatStatusLabel(loan.urgency || 'standard')}</p>
+            <p><strong>Collateral:</strong> ${collateralText}</p>
+            <p><strong>Requested:</strong> ${formatDateDisplay(loan.createdAt)}</p>
+            <p class="loan-detail-full"><strong>Decision reason:</strong> ${decisionText}</p>
+          </div>
+        </div>
+      `;
+      panel.classList.remove('hidden');
+    }
+
+    async function loadLoans(filterDays = currentHistoryFilter) {
+      const loanList = document.getElementById('loan-list');
+      const deviceToken = localStorage.getItem('deviceToken');
+      if (!userEmail) {
+        loanList.innerHTML = '<li>Please login again to see your loan information.</li>';
+        document.getElementById('loanTotal').textContent = '0 loans';
+        document.getElementById('loanOutstanding').textContent = 'K0';
+        renderLoanSummaryCounts([]);
+        return;
+      }
+
+      if (!deviceToken) {
+        loanList.innerHTML = '<li>Device token missing. Please login again.</li>';
+        return;
+      }
+
+      try {
+        const params = new URLSearchParams({ email: userEmail });
+        if (filterDays && filterDays !== 'all') params.set('filter', String(filterDays));
+        const res = await fetch(`/loans?${params.toString()}`, {
+          headers: {
+            'x-device-token': deviceToken
+          }
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          loanList.innerHTML = `<li>${data.error}</li>`;
+          return;
+        }
+
+        allLoans = data.loans || [];
+        const totalLoans = data.summary?.total || 0;
+        const outstanding = data.summary?.outstanding || 0;
+        document.getElementById('loanTotal').textContent = `${totalLoans} loan${totalLoans === 1 ? '' : 's'}`;
+        document.getElementById('loanOutstanding').textContent = formatKwacha(outstanding);
+        renderLoanSummaryCounts(allLoans);
+        renderLoanList();
+      } catch (err) {
+        loanList.innerHTML = '<li>Unable to load loan information. Please try again later.</li>';
+      }
+    }
+
+    // First-time / loan-business behavior:
+    // - On first-time signup, user should see ONLY what they entered (their current loan requests).
+    // - Keep tab defaults consistent.
+    // - Any invitation/unique onboarding is handled by /signup.html?invite=... and auth flow (no backend change).
+    // If a signup just happened, force the UI to stay on Loan Summary (do not show other tabs by default).
+    if (isNewSignup) {
+      currentLoanFilter = 'all';
+    }
+
+    const savedUserView = localStorage.getItem('lastUserView');
+    if (savedUserView && ['summary', 'loans', 'request', 'payments', 'complaints', 'about'].includes(savedUserView)) {
+      if (['payments', 'complaints', 'about'].includes(savedUserView)) {
+        setOverviewSection(savedUserView);
+      } else {
+        setActiveLoanTab(savedUserView);
+      }
+    }
+
+    loadLoans(currentHistoryFilter);
+
+    document.querySelectorAll('.loan-tab').forEach(btn => {
+      btn.addEventListener('click', () => setActiveLoanTab(btn.dataset.tab));
+    });
+
+    document.querySelectorAll('.loan-filter').forEach(btn => {
+      btn.addEventListener('click', () => setLoanFilter(btn.dataset.filter));
+    });
+
+    document.querySelectorAll('.history-filter').forEach(btn => {
+      btn.addEventListener('click', () => setHistoryFilter(btn.dataset.range));
+    });
+
+    document.getElementById('submitComplaintBtn').addEventListener('click', async () => {
+      const field = document.getElementById('complaintMessage');
+      const categoryField = document.getElementById('feedbackCategory');
+      const message = document.getElementById('complaintMessageText');
+
+      if (!field || !field.value.trim()) {
+        message.textContent = 'Please add a complaint, improvement area, or inquiry before sending.';
+        return;
+      }
+
+      try {
+        const res = await fetch('/feedback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-device-token': localStorage.getItem('deviceToken') || ''
+          },
+          body: JSON.stringify({
+            email: userEmail,
+            message: field.value.trim(),
+            category: categoryField ? categoryField.value : 'complaint'
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          message.textContent = data.error || 'Unable to send feedback right now.';
+          return;
+        }
+
+        message.textContent = 'Thank you. Your feedback has been saved and categorized for review.';
+        field.value = '';
+      } catch (err) {
+        message.textContent = 'Unable to send feedback right now.';
+      }
+    });
+
+    document.querySelectorAll('.menu-action').forEach(button => {
+      button.addEventListener('click', () => {
+        const view = button.dataset.view;
+        const menu = document.getElementById('menuDropdown');
+        const feedbackCategoryField = document.getElementById('feedbackCategory');
+
+        if (view === 'loans') { setActiveLoanTab('loans'); }
+        if (view === 'payments') { setOverviewSection('payments'); }
+        if (view === 'complaints') {
+          setOverviewSection('complaints');
+          if (feedbackCategoryField) feedbackCategoryField.value = 'complaint';
+        }
+        if (view === 'improvements') {
+          setOverviewSection('complaints');
+          if (feedbackCategoryField) feedbackCategoryField.value = 'improvement';
+        }
+        if (view === 'inquiries') {
+          setOverviewSection('complaints');
+          if (feedbackCategoryField) feedbackCategoryField.value = 'inquiry';
+        }
+        if (view === 'experience') {
+          setOverviewSection('complaints');
+          if (feedbackCategoryField) feedbackCategoryField.value = 'experience';
+        }
+        if (view === 'about') { setOverviewSection('about'); }
+        if (menu) menu.classList.remove('active');
+      });
+    });
+
+    function setupMenu() {
+      const toggle = document.getElementById('menuBtn');
+      const dropdown = document.getElementById('menuDropdown');
+      const logout = document.getElementById('logoutBtn');
+      if (toggle && dropdown) {
+        toggle.addEventListener('click', () => dropdown.classList.toggle('active'));
+        window.addEventListener('click', event => {
+          if (!dropdown.contains(event.target) && event.target !== toggle) {
+            dropdown.classList.remove('active');
+          }
+        });
+      }
+      if (logout) {
+        logout.addEventListener('click', () => {
+          localStorage.removeItem('deviceToken');
+          localStorage.removeItem('username');
+          localStorage.removeItem('userEmail');
+          window.location.href = 'login.html';
+        });
+      }
+    }
+
+    setupMenu();
+
+    // Loan Details modal
+    function closeLoanModal() {
+      const m = document.getElementById('loanModal');
+      if (m) m.classList.remove('active');
+    }
+
+    async function submitLoanDecision(action, loanId) {
+      const reasonField = document.getElementById('adminDecisionReason');
+      const reason = (reasonField?.value || '').trim();
+      const token = localStorage.getItem('deviceToken');
+      if (!token) return window.location.href = 'login.html';
+
+      try {
+        const res = await fetch(`/loans/${loanId}/action`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-device-token': token
+          },
+          body: JSON.stringify({ action, reason })
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          document.getElementById('loanRequestMessage').textContent = data.error || 'Unable to update loan status.';
+          return;
+        }
+
+        document.getElementById('loanRequestMessage').textContent = `Loan marked as ${formatStatusLabel(action)}.`;
+        closeLoanModal();
+        await loadLoans(currentHistoryFilter);
+      } catch (err) {
+        document.getElementById('loanRequestMessage').textContent = 'Unable to update loan status.';
+      }
+    }
+
+    async function openLoanDetails(id) {
+      const token = localStorage.getItem('deviceToken');
+      if (!token) return window.location.href = 'login.html';
+      try {
+        const res = await fetch(`/loans/${id}`, {
+          headers: { 'x-device-token': token }
+        });
+        if (res.status === 403) return handleInvalidDeviceToken();
+        const data = await res.json();
+        const loan = data.loan;
+        const adminBox = document.getElementById('adminDecisionBox');
+        const hasAdminAccess = userRole === 'admin';
+        const collateralText = loan.collateralDescription || loan.collateralFront || loan.collateralBack || 'No collateral provided';
+
+        renderLoanDetailPanel(loan);
+
+        document.getElementById('modalLoanProduct').dataset.loanId = String(loan.id || '');
+        document.getElementById('modalLoanProduct').textContent = loan.product || 'Loan';
+        document.getElementById('modalLoanBorrower').textContent = loan.email || 'Unknown';
+        document.getElementById('modalLoanAmount').textContent = formatKwacha(loan.amount);
+        document.getElementById('modalLoanInterestRate').textContent = `${loan.interestRate || 0}%`;
+        document.getElementById('modalLoanInterest').textContent = formatKwacha(loan.interestAmount || 0);
+        document.getElementById('modalLoanTotal').textContent = formatKwacha(loan.totalRepayment || loan.amount || 0);
+        document.getElementById('modalLoanOutstanding').textContent = formatKwacha(loan.outstanding || 0);
+        document.getElementById('modalLoanDue').textContent = formatDateDisplay(loan.dueDate);
+        document.getElementById('modalLoanStatus').textContent = formatStatusLabel(loan.status);
+        document.getElementById('modalLoanRequested').textContent = formatDateDisplay(loan.createdAt);
+        document.getElementById('modalLoanUrgency').textContent = formatStatusLabel(loan.urgency || 'standard');
+        document.getElementById('modalLoanCollateral').textContent = collateralText;
+        document.getElementById('modalLoanDecision').textContent = loan.adminReason || 'No decision reason provided yet.';
+        document.getElementById('adminDecisionReason').value = loan.adminReason || '';
+
+        adminBox.hidden = !hasAdminAccess;
+        document.getElementById('loanModal').classList.add('active');
+      } catch (err) {
+        console.warn('Could not load loan details', err);
+      }
+    }
+
+    document.querySelectorAll('.decision-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const loanId = document.getElementById('modalLoanProduct').dataset.loanId;
+        const action = button.dataset.action;
+        if (!loanId) return;
+        submitLoanDecision(action, Number(loanId));
+      });
+    });
+  </script>
+  <!-- Loan Details Modal -->
+  <div id="loanModal" class="modal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeLoanModal()">×</button>
+      <h3 id="modalLoanProduct">Loan</h3>
+      <div class="modal-grid">
+        <p><strong>Requested by:</strong> <span id="modalLoanBorrower">-</span></p>
+        <p><strong>Amount requested:</strong> <span id="modalLoanAmount">-</span></p>
+        <p><strong>Interest rate:</strong> <span id="modalLoanInterestRate">-</span></p>
+        <p><strong>Interest amount:</strong> <span id="modalLoanInterest">-</span></p>
+        <p><strong>Total after interest:</strong> <span id="modalLoanTotal">-</span></p>
+        <p><strong>Outstanding:</strong> <span id="modalLoanOutstanding">-</span></p>
+        <p><strong>Due date:</strong> <span id="modalLoanDue">-</span></p>
+        <p><strong>Urgency:</strong> <span id="modalLoanUrgency">-</span></p>
+        <p><strong>Collateral:</strong> <span id="modalLoanCollateral">-</span></p>
+        <p><strong>Status:</strong> <span id="modalLoanStatus">-</span></p>
+        <p><strong>Requested:</strong> <span id="modalLoanRequested">-</span></p>
+        <p><strong>Decision reason:</strong> <span id="modalLoanDecision">-</span></p>
+      </div>
+
+      <div id="adminDecisionBox" class="admin-decision-box" hidden>
+        <label for="adminDecisionReason">Provide decision reason</label>
+        <textarea id="adminDecisionReason" rows="3" placeholder="Add admin notes for approval, in-progress, or decline."></textarea>
+        <div class="admin-decision-actions">
+          <button type="button" class="decision-btn" data-action="in_progress">In Progress</button>
+          <button type="button" class="decision-btn" data-action="approve">Approve</button>
+          <button type="button" class="decision-btn decline" data-action="decline">Decline</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

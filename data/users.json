@@ -1,0 +1,128 @@
+[
+  {
+    "id": 1,
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "$2b$10$p05jWn8eqGzEhDEX1KZOmuai7s0TD.YoRaQgSRzwhp8U6C7ZHDUmS",
+    "tokens": {
+      "laptop": "LAPTOP-Solojjktitazeckjomerali01",
+      "phone": "PHONE-Alimercjoezectitjjksolo01"
+    },
+    "role": "user",
+    "createdAt": "2026-06-17T23:09:03.321Z",
+    "trustedDevices": [],
+    "storeId": "buraza"
+  },
+  {
+    "id": 2,
+    "username": "Josee",
+    "email": "phirijo232@gmail.com",
+    "phone": "0962992363",
+    "password": "$2b$10$zzXNML29wTNSeVnEVHoFZuZ1McvEy4pfjNLwoWiTb0gHStoWTG0NK",
+    "tokens": {
+      "laptop": "LAPTOP-Solojjktitazeckjomerali02",
+      "phone": "PHONE-Alimercjoezectitjjksolo02"
+    },
+    "role": "user",
+    "createdAt": "2026-07-06T17:38:33.332Z",
+    "trustedDevices": [
+      {
+        "token": "d4242c20ba6f9ab20ce533d45d15d8b2695415cbae03713fff600373aef9ec12",
+        "createdAt": "2026-09-24T10:19:18.415Z",
+        "lastSeen": "2026-10-01T16:37:13.297Z",
+        "ip": "127.0.0.1"
+      }
+    ],
+    "theme": "dark",
+    "storeId": "buraza"
+  },
+  {
+    "id": 3,
+    "username": "e2euser",
+    "email": "e2e+1783423319380@example.com",
+    "phone": null,
+    "password": "$2b$10$zGf4AP4B8xq2oETkgyS41.ntSKbMIy.DjsTZTBw5R7Yey5lKpNifO",
+    "tokens": {
+      "laptop": "LAPTOP-Solojjktitazeckjomerali03",
+      "phone": "PHONE-Alimercjoezectitjjksolo03"
+    },
+    "role": "user",
+    "createdAt": "2026-07-07T11:22:03.455Z",
+    "trustedDevices": [
+      {
+        "token": "374402efe1339256300c790a2dbd06fb25dadbe3d6d67a7cfaf3b2cc07991d6f",
+        "createdAt": "2026-07-07T11:22:07.152Z",
+        "lastSeen": "2026-07-07T11:22:07.152Z",
+        "ip": "127.0.0.1"
+      }
+    ],
+    "storeId": "buraza"
+  },
+  {
+    "id": 4,
+    "username": "Admin",
+    "email": "admin@prymevertex.test",
+    "phone": null,
+    "password": "$2b$10$fsjgNUDSwvFgyQ5zwTJAjuSS62VerXfEJISUteQFNVmC6fWeZEAMa",
+    "tokens": {
+      "laptop": "LAPTOP-Solojjktitazeckjomerali05",
+      "phone": "PHONE-Alimercjoezectitjjksolo05"
+    },
+    "role": "admin",
+    "createdAt": "2026-09-24T00:00:00.000Z",
+    "trustedDevices": [
+      {
+        "token": "a861fd08dd85613ae4bc53a5a25da4534d25fe60f0c9f5330a9b73850d2ffc2a",
+        "createdAt": "2026-09-25T17:50:02.334Z",
+        "lastSeen": "2026-10-01T18:42:18.813Z",
+        "ip": "127.0.0.1"
+      }
+    ],
+    "theme": "dark",
+    "storeId": "pryme-vertex"
+  },
+  {
+    "id": 5,
+    "username": "VERTEX",
+    "email": "josephphiri2623@gmail.com",
+    "phone": "0962992363",
+    "password": "$2b$10$impn/Q8Au27AIEsO.AuhweAq.3xo.IKq0oRk2deo5oRmXRSTK4er2",
+    "tokens": {
+      "laptop": "LAPTOP-Solojjktitazeckjomerali05",
+      "phone": "PHONE-Alimercjoezectitjjksolo05"
+    },
+    "role": "user",
+    "createdAt": "2026-09-24T20:12:13.801Z",
+    "trustedDevices": [
+      {
+        "token": "d7f75440790c80f0187d0b2f0de3a09844655acd7fa4dd69c34b3910655f822a",
+        "createdAt": "2026-09-24T20:13:14.395Z",
+        "lastSeen": "2026-09-24T20:17:14.930Z",
+        "ip": "127.0.0.1"
+      }
+    ],
+    "storeId": "buraza"
+  },
+  {
+    "id": 6,
+    "username": "ZECK",
+    "email": "phirizack1@gmail.com",
+    "phone": "+260 766226023",
+    "password": "$2b$10$4AKhPgXX8e2flQiBL4tAW.fWqRng5T0JyTa2YVsnN.Zv/WGvy7gTW",
+    "tokens": {
+      "laptop": "LAPTOP-Solojjktitazeckjomerali06",
+      "phone": "PHONE-Alimercjoezectitjjksolo06"
+    },
+    "role": "user",
+    "createdAt": "2026-09-25T16:36:19.378Z",
+    "trustedDevices": [
+      {
+        "token": "776f45c446052d5d02f1ca1d117b77945a0370af5c55ddec6c85ac01f43108e9",
+        "createdAt": "2026-09-25T16:37:42.985Z",
+        "lastSeen": "2026-09-25T17:07:03.441Z",
+        "ip": "127.0.0.1"
+      }
+    ],
+    "storeId": "buraza"
+  }
+]

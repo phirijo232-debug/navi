@@ -1,0 +1,13 @@
+[
+  {
+    "id": 1,
+    "email": "phirizack1@gmail.com",
+    "category": "improvement",
+    "message": "Hello good day,\n\nI want to have a feature in the system to allow me to hover over my loan, or to be able to view more information about my loan since its some of the information is not showing. \nI want all what was requested on it be showing correctly.",
+    "status": "new",
+    "createdAt": "2026-09-25T17:05:10.778Z",
+    "reviewedBy": null,
+    "reviewNote": null,
+    "storeId": "buraza"
+  }
+]

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pryme Vertex — Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .report-header { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+    .report-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .report-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin:18px 0; }
+    .report-metric { padding:14px; border:1px solid rgba(255,255,255,0.14); border-radius:10px; }
+    body.light .report-metric { border-color:rgba(0,0,0,0.12); }
+    .report-metric strong { display:block; margin-top:6px; font-size:1.2rem; }
+  </style>
+</head>
+<body>
+  <button class="menu-toggle" id="menuBtn">⋮</button>
+  <div class="dropdown-menu" id="menuDropdown">
+    <button id="logoutBtn">Logout</button>
+  </div>
+  <div class="dashboard">
+    <div class="dash-header">
+      <h1 class="brand animated-text">Pryme Vertex</h1>
+      <button class="toggle-mode" id="modeBtn">Switch Mode</button>
+    </div>
+    <div class="panels">
+      <div class="panel">
+        <h2>Server Status</h2>
+        <div class="stat" id="status">Loading...</div>
+        <div class="stat-label">Uptime: <span id="uptime">--</span></div>
+      </div>
+      <div class="panel">
+        <h2>Memory</h2>
+        <div class="stat" id="ram">--</div>
+        <div class="stat-label">RAM Used</div>
+      </div>
+      <div class="panel">
+        <h2>CPU</h2>
+        <div class="stat" id="cpu">--</div>
+        <div class="stat-label">Processor</div>
+      </div>
+      <div class="panel">
+        <h2>Active Sessions</h2>
+        <div class="stat" id="sessions">--</div>
+        <div class="stat-label">Devices connected</div>
+      </div>
+      <div class="panel franchise-report-panel">
+        <div class="report-header">
+          <div>
+            <h2>Franchise portfolio</h2>
+            <p>Read-only consolidated view across configured subsidiaries.</p>
+          </div>
+          <div class="report-actions">
+            <button type="button" class="toggle-mode" data-franchise-export="xlsx">Download Excel</button>
+            <button type="button" class="toggle-mode" data-franchise-export="pdf">Download PDF</button>
+          </div>
+        </div>
+        <div id="franchiseMetrics" class="report-metrics"><p>Loading portfolio analytics...</p></div>
+        <p id="franchiseReportNote" class="message-text"></p>
+      </div>
+      <div class="panel">
+        <h2>Access Log</h2>
+        <ul class="log-list" id="access-log"></ul>
+      </div>
+      <div class="panel">
+        <h2>Error Log</h2>
+        <ul class="log-list" id="error-log"></ul>
+      </div>
+    </div>
+  </div>
+  <script src="dashboard.js"></script>
+  <script>
+    const deviceToken = localStorage.getItem('deviceToken');
+    localStorage.setItem('lastAppPage', 'dashboard.html');
+    const savedMode = localStorage.getItem('mode') || 'dark';
+    applyTheme(savedMode);
+
+    async function handleInvalidDeviceToken() {
+      localStorage.removeItem('deviceToken');
+      localStorage.removeItem('username');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('userRole');
+      window.location.href = 'login.html';
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.classList.remove('dark', 'light');
+      document.body.classList.remove('dark', 'light');
+      document.documentElement.classList.add(theme);
+      document.body.classList.add(theme);
+    }
+
+    document.getElementById('modeBtn').addEventListener('click', function() {
+      const body = document.body;
+      const nextMode = body.classList.contains('dark') ? 'light' : 'dark';
+      applyTheme(nextMode);
+      localStorage.setItem('mode', nextMode);
+    });
+
+    function setupMenu() {
+      const toggle = document.getElementById('menuBtn');
+      const dropdown = document.getElementById('menuDropdown');
+      const logout = document.getElementById('logoutBtn');
+      if (toggle && dropdown) {
+        toggle.addEventListener('click', () => dropdown.classList.toggle('active'));
+        window.addEventListener('click', event => {
+          if (!dropdown.contains(event.target) && event.target !== toggle) {
+            dropdown.classList.remove('active');
+          }
+        });
+      }
+      if (logout) {
+        logout.addEventListener('click', () => {
+          localStorage.removeItem('deviceToken');
+          localStorage.removeItem('username');
+          localStorage.removeItem('userEmail');
+          window.location.href = 'login.html';
+        });
+      }
+    }
+
+    setupMenu();
+  </script>
+</body>
+</html>
