@@ -121,5 +121,59 @@
     "reviewedBy": "admin@prymevertex.test",
     "reviewedAt": "2026-09-30T13:18:06.599Z",
     "storeId": "buraza"
+  },
+  {
+    "id": 3,
+    "email": "phirijo232@gmail.com",
+    "storeId": "buraza",
+    "product": "Loan request",
+    "amount": 300,
+    "tenureWeeks": 1,
+    "interestRate": 10,
+    "interestAmount": 30,
+    "totalRepayment": 330,
+    "outstanding": 330,
+    "dueDate": "2026-10-10",
+    "urgency": "emergency",
+    "paymentMode": "mobile_money",
+    "nextPayment": null,
+    "collateralDescription": "iPhone XR",
+    "collateralFront": "1790950687829-3.jpg",
+    "collateralBack": "1790950687964-wallpaperflare.com_wallpaper (3).jpg",
+    "collateralGrade": "A",
+    "collateralVerified": false,
+    "agreedToTerms": true,
+    "status": "approved",
+    "approvalDeadline": "2026-10-02T18:18:08.069Z",
+    "payments": [],
+    "statusHistory": [
+      {
+        "status": "pending",
+        "reason": "Loan request submitted by borrower.",
+        "actor": "phirijo232@gmail.com",
+        "source": "borrower",
+        "updatedAt": "2026-10-02T14:18:08.076Z"
+      },
+      {
+        "status": "approved",
+        "reason": "Approved, met all requirements",
+        "actor": "jophiri223@gmail.com",
+        "source": "admin",
+        "updatedAt": "2026-10-02T14:44:34.654Z"
+      },
+      {
+        "status": "approved",
+        "reason": "Approved, met all requirements",
+        "actor": "jophiri223@gmail.com",
+        "source": "admin",
+        "updatedAt": "2026-10-02T14:44:43.784Z"
+      }
+    ],
+    "createdAt": "2026-10-02T14:18:08.076Z",
+    "adminReason": "Approved, met all requirements",
+    "approvedAt": "2026-10-02T14:44:43.784Z",
+    "updatedAt": "2026-10-02T14:44:43.784Z",
+    "reviewedBy": "jophiri223@gmail.com",
+    "reviewedAt": "2026-10-02T14:44:43.784Z"
   }
 ]

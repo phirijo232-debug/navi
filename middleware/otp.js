@@ -101,8 +101,8 @@ async function sendOTP(purpose = 'Account Verification', targetEmail = null, for
     await transporter.sendMail({
       from: process.env.GMAIL_USER,
       to: recipient,
-      subject: `BURAZA MICRO FINANCE (BMF) — Pryme Vertex OTP for ${purpose}`,
-      text: `Your OTP code is: ${otp}\n\nThis code is for: ${purpose}\nExpires in 5 minutes.\n\nBURAZA MICRO FINANCE (BMF) is a Pryme Vertex subsidiary.\n\nIMPORTANT: This email may land in your Spam or Promotions folder. Please move it to your Primary inbox and mark it as "Not Spam" so future codes arrive on time.\n\nIf you did not request this, ignore this email.`
+      subject: `BURAZA MICRO FINANCE (BMF) OTP for ${purpose}`,
+      text: `Your OTP code is: ${otp}\n\nThis code is for: ${purpose}\nExpires in 5 minutes.\n\nBMF values your security and privacy.\n\nIMPORTANT: This email may land in your Spam or Promotions folder. Please move it to your Primary inbox and mark it as "Not Spam" so future codes arrive on time.\n\nIf you did not request this, ignore this email.`
     });
 
     return otp;

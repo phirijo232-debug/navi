@@ -2,11 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const emailService = require('./email');
 const { logError } = require('./logger');
+const dataStore = require('./dataStore');
 const { getReportData, buildDailyReportText } = require('../controllers/reportController');
 
 const DEFAULT_TIME_ZONE = process.env.DAILY_REPORT_TIMEZONE || 'Africa/Lusaka';
 const DEFAULT_SEND_TIME = process.env.DAILY_REPORT_TIME || '17:00';
-const REPORT_STATE_FILE = path.join(__dirname, '../data/dailyReportState.json');
+const REPORT_STATE_FILE = dataStore.paths.dailyReportState;
 
 function readLastSentDate() {
   try {
@@ -78,7 +79,7 @@ async function checkDailyReportSchedule(now = new Date(), sendReport = sendDaily
   if (result.ok) {
     lastSentDate = localDate;
     try {
-      fs.writeFileSync(REPORT_STATE_FILE, JSON.stringify({ lastSentDate }, null, 2));
+      dataStore.writeJson(REPORT_STATE_FILE, { lastSentDate });
     } catch (err) {
       logError(`DAILY BMF REPORT STATE WRITE FAILED: ${err.message}`);
     }

@@ -1,7 +1,6 @@
 .env
 data/dailyReportState.json
-node_modules
-node_modules
-node_modules
-node_modules
+data/*.bak
+data/*.corrupt
+data/*.tmp
 node_modules

@@ -5,7 +5,7 @@ const path = require('node:path');
 const { updateLoanStatus, getAllLoans, notifyAllOverdue, recordPayment } = require('../controllers/loanController');
 const emailService = require('../middleware/email');
 
-const LOANS_FILE = path.join(__dirname, '../data/loans.json');
+const LOANS_FILE = require('../middleware/dataStore').paths.loans;
 
 test('loan status updates create a status history and admin summary includes all decision categories', async (t) => {
   const original = fs.readFileSync(LOANS_FILE, 'utf8');

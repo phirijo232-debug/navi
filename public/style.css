@@ -375,6 +375,24 @@ body.light .dropdown-menu {
   text-align: left;
 }
 
+#requestSection {
+  width: 100%;
+}
+
+#requestSection .panel {
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  padding: clamp(16px, 2.5vw, 28px);
+}
+
+#loanRequestForm {
+  max-width: 100%;
+  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+
 .request-field-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -579,6 +597,27 @@ body.light .panel {
   .panel {
     min-height: auto;
     padding: 18px;
+  }
+
+  #requestSection .panel {
+    width: 100%;
+    max-width: none;
+    padding: 14px 10px 18px;
+  }
+
+  #loanRequestForm {
+    max-width: 100%;
+    gap: 10px;
+  }
+
+  .request-field-grid.two-up,
+  .compact-row {
+    grid-template-columns: 1fr;
+  }
+
+  .loan-estimate-box {
+    gap: 6px;
+    padding: 10px 12px;
   }
 
   .toggle-mode,

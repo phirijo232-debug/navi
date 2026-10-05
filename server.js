@@ -8,6 +8,7 @@ const { verifyOTP, sendOTP } = require('./middleware/otp');
 const { trackSession } = require('./controllers/sessionController');
 const routes = require('./routes');
 const { startDailyReportScheduler } = require('./middleware/dailyReport');
+const { ensureDataIntegrity } = require('./middleware/dataStore');
 
 const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || 'phirii26';
 
@@ -118,6 +119,12 @@ app.use((err, req, res, next) => {
   }
   res.status(500).json({ error: 'Something went wrong. Please try again.' });
 });
+
+// Repair any damaged data store (from backup) BEFORE accepting traffic.
+const startupRepairs = ensureDataIntegrity();
+if (startupRepairs.length) {
+  console.warn(`Navi Server data repair: ${startupRepairs.join('; ')}`);
+}
 
 app.listen(config.PORT, config.HOST, () => {
   console.log(`Navi Server running on port ${config.PORT}`);

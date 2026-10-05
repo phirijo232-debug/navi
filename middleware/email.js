@@ -16,15 +16,15 @@ function getCommunicationChannelNote() {
   return 'Please note that future communication may be switched to WhatsApp, SMS, or direct call. For WhatsApp updates, a valid WhatsApp number is required at signup and must be active so we can reach you promptly.';
 }
 
-function buildWelcomeMessage(email, firmName = 'Pryme Vertex') {
+function buildWelcomeMessage(email, firmName = 'BMF') {
   const greeting = getGreetingByTime();
   const subject = `Welcome to ${firmName}`;
   const body = `${greeting}, ${email || 'friend'},\n\n` +
-    `Thank you for contacting Pryme Vertex. We deeply value your association and are committed to delivering an experience worthy of your trust. Welcome to a partnership built on integrity and excellence.\n\n` +
+    `Thank you for contacting ${firmName}. We deeply value your association and are committed to delivering an experience worthy of your trust. Welcome to a partnership built on integrity and excellence.\n\n` +
     `We are delighted to have you with us and look forward to serving you with professionalism, care, and excellence.\n\n` +
     `${getCommunicationChannelNote()}\n\n` +
     'Warm regards,\n' +
-    `The ${firmName} Team`;
+    `The BMF Team`;
 
   return { subject, body };
 }
@@ -72,13 +72,13 @@ function buildRequestReceivedMessage(product, urgency, email, loanData = {}) {
   const greeting = getGreetingByTime();
   const urgencyText = String(activeUrgency).toLowerCase();
   const summary = buildLoanSummaryText({ ...loanData, product, urgency: activeUrgency });
-  const body = `${greeting}, ${email || 'valued client'},\n\n` +
+  const body = `Good day,\n\nDear valued BMF customer,\n\n` +
     `We have received your request for ${product || 'your requested loan'} and it is currently being reviewed by our team.\n\n` +
     `Your selected urgency is ${urgencyText}. We will respond and follow up according to that urgency while keeping you informed throughout the review process.\n\n` +
     summary +
     `${getCommunicationChannelNote()}\n\n` +
-    'Thank you for your patience and trust in Pryme Vertex.\n\n' +
-    'Warm regards,\nThe Pryme Vertex Team';
+    'Thank you for your patience and trust in BMF.\n\n' +
+    'Warm regards,\nThe BMF Team';
 
   return { subject, body };
 }
@@ -113,38 +113,38 @@ function buildLoanStatusNotification(action, product, reason, email, loanData = 
   if (normalizedAction.includes('approve')) {
     return {
       subject: `${product || 'Loan'} approved — ${formatCurrency(amount)} — ${urgencyLabel}`,
-      body: `${greeting}, ${email || 'valued client'},\n\n` +
+      body: `Good day,\n\nDear valued BMF customer,\n\n` +
         `We are pleased to confirm that your request for ${product || 'the loan'} has been approved. Your application has moved forward successfully, and we will contact you shortly with the next steps.\n\n` +
         summary +
         `Reason: ${reasonText}\n\n` +
         `${getCommunicationChannelNote()}\n\n` +
-        'Thank you for trusting Pryme Vertex. We value your association and look forward to serving you with the professionalism and care you deserve.\n\n' +
-        'Warm regards,\nThe Pryme Vertex Team'
+        'Thank you for trusting BMF. We value your association and look forward to serving you with the professionalism and care you deserve.\n\n' +
+        'Warm regards,\nThe BMF Team'
     };
   }
 
   if (normalizedAction.includes('decline')) {
     return {
       subject: `${product || 'Loan'} declined — ${formatCurrency(amount)} — ${urgencyLabel}`,
-      body: `${greeting}, ${email || 'valued client'},\n\n` +
+      body: `Good day,\n\nDear valued BMF customer,\n\n` +
         `We regret to inform you that your request for ${product || 'the loan'} has been declined at this time.\n\n` +
         summary +
         `Reason: ${reasonText}\n\n` +
         `${getCommunicationChannelNote()}\n\n` +
         'Please know that this decision was made after careful review, and we remain committed to supporting you in a professional and respectful way. You are welcome to reach out so we can guide you on the next steps or future opportunities.\n\n' +
-        'Warmly,\nThe Pryme Vertex Team'
+        'Warmly,\nThe BMF Team'
     };
   }
 
   return {
     subject: `${product || 'Loan'} in progress — ${formatCurrency(amount)} — ${urgencyLabel}`,
-    body: `${greeting}, ${email || 'valued client'},\n\n` +
+    body: `Good day,\n\nDear valued BMF customer,\n\n` +
       `We are pleased to let you know that your request for ${product || 'the loan'} is now in progress. Our team is actively reviewing and processing the details.\n\n` +
       summary +
       `Reason: ${reasonText}\n\n` +
       `${getCommunicationChannelNote()}\n\n` +
-      'Thank you for your patience and confidence in Pryme Vertex. We will continue to keep you informed as your request moves forward.\n\n' +
-      'Warm regards,\nThe Pryme Vertex Team'
+      'Thank you for your patience and confidence in BMF. We will continue to keep you informed as your request moves forward.\n\n' +
+      'Warm regards,\nThe BMF Team'
   };
 }
 

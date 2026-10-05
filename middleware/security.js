@@ -4,21 +4,17 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { logError } = require('./logger');
 const config = require('../config');
+const dataStore = require('./dataStore');
 
-const USERS_FILE = path.join(__dirname, '../data/users.json');
+const USERS_FILE = dataStore.paths.users;
 
 function getUsers() {
-  try {
-    return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-  } catch (err) {
-    logError(`USER LOAD FAILED: ${err.message}`);
-    return [];
-  }
+  return dataStore.readJson(USERS_FILE, [], Array.isArray);
 }
 
 function saveUsers(users) {
   try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+    dataStore.writeJson(USERS_FILE, users);
   } catch (err) {
     logError(`USER SAVE FAILED: ${err.message}`);
   }

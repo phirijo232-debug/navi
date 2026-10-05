@@ -1,10 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const path = require('node:path');
-const { requestSignup, getUsersDirectory } = require('../controllers/authController');
+const { requestSignup, getAllUsers } = require('../controllers/authController');
 
-const USERS_FILE = path.join(__dirname, '../data/users.json');
+const USERS_FILE = require('../middleware/dataStore').paths.users;
 
 test('requestSignup can recover when the users store is malformed', async () => {
   const original = fs.readFileSync(USERS_FILE, 'utf8');
@@ -73,7 +72,10 @@ test('requestSignup requires a valid WhatsApp phone number', async () => {
 
 test('admin can fetch the user directory with account summaries', async () => {
   const req = {
-    authUser: { role: 'admin' }
+    authUser: { role: 'admin' },
+    headers: {},
+    query: {},
+    body: {}
   };
 
   const res = {
@@ -88,9 +90,10 @@ test('admin can fetch the user directory with account summaries', async () => {
     }
   };
 
-  await getUsersDirectory(req, res);
+  getAllUsers(req, res);
 
   assert.equal(res.statusCode, 200);
-  assert.ok(Array.isArray(res.body.users));
-  assert.ok(res.body.users.some(user => user.email));
+  assert.ok(Array.isArray(res.body), 'directory returns a plain user array');
+  assert.ok(res.body.some(user => user.email));
+  assert.ok(res.body.every(user => user.password === undefined), 'passwords must never be exposed');
 });

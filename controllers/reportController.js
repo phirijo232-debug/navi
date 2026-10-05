@@ -4,20 +4,15 @@ const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
 const config = require('../config');
 const { logError } = require('../middleware/logger');
+const dataStore = require('../middleware/dataStore');
 const { getFeedbackData } = require('./feedbackController');
 const { getRecordStoreId, canAccessStore, isAdminRole } = require('../middleware/storeScope');
 
-const USERS_FILE = path.join(__dirname, '../data/users.json');
-const LOANS_FILE = path.join(__dirname, '../data/loans.json');
+const USERS_FILE = dataStore.paths.users;
+const LOANS_FILE = dataStore.paths.loans;
 
 function readArray(file) {
-  try {
-    const data = JSON.parse(fs.readFileSync(file, 'utf8'));
-    return Array.isArray(data) ? data : [];
-  } catch (err) {
-    logError(`REPORT DATA READ FAILED (${path.basename(file)}): ${err.message}`);
-    return [];
-  }
+  return dataStore.readJson(file, [], Array.isArray);
 }
 
 function sumPayments(loan) {

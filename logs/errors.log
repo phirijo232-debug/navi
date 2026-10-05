@@ -79,3 +79,20 @@
 [2026-10-01T19:49:38.179Z] DAILY BMF REPORT SENT to jophiri223@gmail.com.
 [2026-10-01T19:51:52.664Z] DAILY BMF REPORT SENT to jophiri223@gmail.com.
 [2026-10-01T19:54:58.725Z] BLOCKED — invalid token from IP: 127.0.0.1
+[2026-10-02T14:12:24.176Z] BLOCKED — missing token from IP: 127.0.0.1
+[2026-10-02T14:13:00.880Z] BLOCKED — missing token from IP: 127.0.0.1
+[2026-10-02T16:06:23.211Z] BLOCKED — missing token from IP: 127.0.0.1
+[2026-10-05T12:42:54.620Z] USER STORE RECOVERY: Unexpected end of JSON input. Falling back to an empty list.
+[2026-10-05T12:49:12.962Z] USER STORE RECOVERY: Unexpected end of JSON input. Falling back to an empty list.
+[2026-10-05T12:50:13.985Z] USER STORE RECOVERY: Unexpected end of JSON input. Falling back to an empty list.
+[2026-10-05T12:50:16.242Z] REPORT DATA READ FAILED (users.json): Unexpected end of JSON input
+[2026-10-05T13:10:01.843Z] REPORT DATA READ FAILED (users.json): Unexpected end of JSON input
+[2026-10-05T13:10:03.097Z] USER STORE RECOVERY: Unexpected end of JSON input. Falling back to an empty list.
+[2026-10-05T13:17:37.251Z] USER LOAD FAILED: Unexpected end of JSON input
+[2026-10-05T13:17:37.254Z] BLOCKED — invalid token from IP: 127.0.0.1
+[2026-10-05T14:32:17.834Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-05T14:35:00.503Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-05T14:35:17.888Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-05T14:39:59.043Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-05T14:41:29.923Z] STARTUP DATA REPAIR: users.json: initial backup created; loans.json: initial backup created; feedback.json: initial backup created
+[2026-10-05T15:35:37.978Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json

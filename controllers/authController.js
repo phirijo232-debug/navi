@@ -3,12 +3,13 @@ const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { logError } = require('../middleware/logger');
+const dataStore = require('../middleware/dataStore');
 const otpService = require('../middleware/otp');
 const emailService = require('../middleware/email');
 const config = require('../config');
 const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole } = require('../middleware/storeScope');
 
-const USERS_FILE = path.join(__dirname, '../data/users.json');
+const USERS_FILE = dataStore.paths.users;
 const pendingSignups = {};
 const pendingLogins = {};
 const pendingResets = {};
@@ -105,48 +106,30 @@ function normalizeTrustedDevices(user) {
 }
 
 function getUsers() {
-  try {
-    const raw = fs.readFileSync(USERS_FILE, 'utf8').trim();
-    if (!raw) {
-      return [];
+  const parsed = dataStore.readJson(USERS_FILE, [], Array.isArray);
+
+  let needsWrite = false;
+  const normalized = parsed.map((user) => {
+    const originalDevices = Array.isArray(user.trustedDevices) ? JSON.stringify(user.trustedDevices) : null;
+    const normalizedUser = normalizeTrustedDevices({ ...user });
+    const currentDevices = Array.isArray(normalizedUser.trustedDevices) ? JSON.stringify(normalizedUser.trustedDevices) : null;
+
+    if (originalDevices !== currentDevices) {
+      needsWrite = true;
     }
 
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      throw new TypeError('User store root must be an array.');
-    }
+    return normalizedUser;
+  });
 
-    let needsWrite = false;
-    const normalized = parsed.map((user) => {
-      const originalDevices = Array.isArray(user.trustedDevices) ? JSON.stringify(user.trustedDevices) : null;
-      const normalizedUser = normalizeTrustedDevices({ ...user });
-      const currentDevices = Array.isArray(normalizedUser.trustedDevices) ? JSON.stringify(normalizedUser.trustedDevices) : null;
-
-      if (originalDevices !== currentDevices) {
-        needsWrite = true;
-      }
-
-      return normalizedUser;
-    });
-
-    if (needsWrite) {
-      saveUsers(normalized);
-    }
-
-    return normalized;
-  } catch (err) {
-    logError(`USER STORE RECOVERY: ${err.message}. Falling back to an empty list.`);
-    try {
-      fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2));
-    } catch (writeErr) {
-      logError(`USER STORE RECOVERY WRITE FAILED: ${writeErr.message}`);
-    }
-    return [];
+  if (needsWrite) {
+    saveUsers(normalized);
   }
+
+  return normalized;
 }
 
 function saveUsers(users) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+  dataStore.writeJson(USERS_FILE, users);
 }
 
 function generateUserTokens(userNumber) {
@@ -318,10 +301,9 @@ async function requestLogin(req, res) {
       return res.status(400).json({ error: 'Incorrect password.' });
     }
 
-    const isStaff = isAdminRole(user.role);
-    const otpEmail = isStaff ? process.env.GMAIL_USER : user.email;
+    const otpEmail = String(user.email || '').trim();
     if (!otpEmail) {
-      return res.status(503).json({ error: 'The company OTP mailbox is not configured.' });
+      return res.status(503).json({ error: 'This account does not have a registered email address.' });
     }
 
     delete pendingLogins[email];
@@ -336,7 +318,7 @@ async function requestLogin(req, res) {
     res.json({
       message: 'OTP sent. Please verify to complete login.',
       otpSentTo: otpEmail,
-      otpChannel: isStaff ? 'company' : 'account'
+      otpChannel: 'account'
     });
 
   } catch (err) {
@@ -427,10 +409,9 @@ async function requestPasswordReset(req, res) {
       return res.status(400).json({ error: 'No admin account was found for that email.' });
     }
 
-    const isStaff = isAdminRole(user.role);
-    const otpEmail = isStaff ? process.env.GMAIL_USER : user.email;
+    const otpEmail = String(user.email || '').trim();
     if (!otpEmail) {
-      return res.status(503).json({ error: 'The company OTP mailbox is not configured.' });
+      return res.status(503).json({ error: 'This account does not have a registered email address.' });
     }
 
     await otpService.sendOTP('Password Reset', email, false, otpEmail);
@@ -442,7 +423,7 @@ async function requestPasswordReset(req, res) {
     return res.json({
       message: 'OTP sent for password reset.',
       otpSentTo: otpEmail,
-      otpChannel: isStaff ? 'company' : 'account'
+      otpChannel: 'account'
     });
 
   } catch (err) {
@@ -627,7 +608,7 @@ async function sendAdminAnnouncement(req, res) {
     const results = await Promise.all(recipients.map(to => emailService.sendCustomerEmail({
       to,
       subject: `[Buraza Micro Finance (BMF)] ${subject}`,
-      text: `Buraza Micro Finance (BMF), a Pryme Vertex subsidiary, shares this update:\n\n${message}\n\nRegards,\nBuraza Micro Finance (BMF)`
+      text: `Dear valued BMF customer,\n\n${message}\n\nRegards,\nBuraza Micro Finance (BMF)`
     })));
     const sent = results.filter(result => result?.ok).length;
     const failed = results.length - sent;

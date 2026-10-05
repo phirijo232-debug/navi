@@ -4,9 +4,141 @@ const multer = require('multer');
 const { logError } = require('../middleware/logger');
 const emailService = require('../middleware/email');
 const config = require('../config');
+const dataStore = require('../middleware/dataStore');
 const { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, isAdminRole } = require('../middleware/storeScope');
 
-const LOANS_FILE = path.join(__dirname, '../data/loans.json');
+const LOANS_FILE = dataStore.paths.loans;
+const USERS_FILE = dataStore.paths.users;
+
+// ─── Loan receipt numbers ────────────────────────────────────────────────────
+// Human-searchable reference, e.g. BMF-2026-0007. This is the "loan receipt ID"
+// borrowers and staff quote, and the key the search endpoint accepts.
+const RECEIPT_PREFIX = 'BMF';
+
+function getNextReceiptNumber(loans, date = new Date()) {
+  const year = date.getUTCFullYear();
+  const prefix = `${RECEIPT_PREFIX}-${year}-`;
+  const highest = loans.reduce((max, loan) => {
+    const raw = String(loan.receiptNumber || '');
+    if (!raw.startsWith(prefix)) return max;
+    const seq = Number(raw.slice(prefix.length));
+    return Number.isFinite(seq) && seq > max ? seq : max;
+  }, 0);
+  return `${prefix}${String(highest + 1).padStart(4, '0')}`;
+}
+
+/** Backfill receipt numbers for loans created before receipts existed. */
+function ensureReceiptNumbers(loans) {
+  let changed = false;
+  loans.forEach((loan) => {
+    if (!loan.receiptNumber) {
+      loan.receiptNumber = getNextReceiptNumber(loans, new Date(loan.createdAt || Date.now()));
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+// ─── Loan lifecycle ──────────────────────────────────────────────────────────
+// Business statuses: active | grace | defaulted | liquidated | paid
+// Legacy stored statuses (pending, approved, in_progress, declined, paid,
+// overdue) are mapped onto these so old records keep reporting correctly.
+
+const LEGACY_STATUS_MAP = {
+  pending: 'pending',
+  awaiting_approval: 'pending',
+  approved: 'active',
+  in_progress: 'active',
+  'in-progress': 'active',
+  running: 'active',
+  active: 'active',
+  grace: 'grace',
+  overdue: 'grace',
+  defaulted: 'defaulted',
+  default: 'defaulted',
+  liquidated: 'liquidated',
+  liquidation: 'liquidated',
+  recovered: 'liquidated',
+  paid: 'paid',
+  settled: 'paid',
+  closed: 'paid',
+  declined: 'declined',
+  rejected: 'declined'
+};
+
+function normalizeStatus(status) {
+  const key = String(status || '').trim().toLowerCase().replace(/\s+/g, '_');
+  return LEGACY_STATUS_MAP[key] || key || 'pending';
+}
+
+function daysBetween(fromDate, toDate) {
+  const from = new Date(`${String(fromDate).slice(0, 10)}T00:00:00Z`);
+  const to = new Date(`${String(toDate).slice(0, 10)}T00:00:00Z`);
+  return Math.round((to - from) / 86400000);
+}
+
+/**
+ * Derive the live business status from the due date, balance and any manual
+ * override (liquidated is always set by an admin decision, never by the clock).
+ */
+function deriveLoanStatus(loan, today = new Date().toISOString().slice(0, 10)) {
+  const stored = normalizeStatus(loan.status);
+  if (stored === 'liquidated') return 'liquidated';
+  if (stored === 'declined' || stored === 'pending') return stored;
+
+  const outstanding = Number(loan.outstanding || 0);
+  if (outstanding <= 0) return 'paid';
+
+  const dueDate = String(loan.dueDate || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return stored === 'paid' ? 'paid' : 'active';
+
+  const daysToDue = daysBetween(today, dueDate);
+  if (daysToDue < -config.DEFAULT_GRACE_DAYS) return 'defaulted';
+  if (daysToDue < 0) return 'grace';
+  if (daysToDue <= config.GRACE_PERIOD_DAYS) return 'grace';
+  return 'active';
+}
+
+// ─── Balances & payments ─────────────────────────────────────────────────────
+
+function sumPayments(loan) {
+  return (Array.isArray(loan.payments) ? loan.payments : [])
+    .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+}
+
+/**
+ * Replay the payment ledger so balanceBefore/balanceAfter always reconcile.
+ * Payments are applied interest-first (as is standard in micro-finance),
+ * then against principal.
+ */
+function rebuildPaymentLedger(loan) {
+  const payments = Array.isArray(loan.payments) ? loan.payments : [];
+  let running = Number(loan.totalRepayment || loan.amount || 0);
+  let interestOutstanding = Number(loan.interestAmount || 0);
+
+  payments.forEach((payment, index) => {
+    payment.balanceBefore = Number(running.toFixed(2));
+
+    const amount = Number(payment.amount) || 0;
+    const interestPortion = Math.min(amount, interestOutstanding);
+    interestOutstanding = Number((interestOutstanding - interestPortion).toFixed(2));
+
+    payment.interestPortion = Number(interestPortion.toFixed(2));
+    payment.principalPortion = Number((amount - interestPortion).toFixed(2));
+    payment.balanceAfter = Number(Math.max(0, running - amount).toFixed(2));
+
+    running = payment.balanceAfter;
+    payment.receiptNumber = payment.receiptNumber ||
+      `${loan.receiptNumber || `BMF-${loan.id}`}-P${String(index + 1).padStart(2, '0')}`;
+    payment.recordedBy = payment.recordedBy || loan.updatedBy || loan.reviewedBy || 'system';
+    payment.paymentDate = payment.paymentDate || payment.date || loan.createdAt || null;
+  });
+
+  loan.paidTotal = Number(sumPayments(loan).toFixed(2));
+  loan.interestOutstanding = interestOutstanding;
+  loan.outstanding = Number(Math.max(0, running).toFixed(2));
+  return loan;
+}
 const UPLOAD_DIR = path.join(__dirname, '../public/uploads');
 
 if (!fs.existsSync(UPLOAD_DIR)) {
@@ -20,12 +152,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 function getLoansData() {
-  try {
-    return JSON.parse(fs.readFileSync(LOANS_FILE, 'utf8'));
-  } catch (err) {
-    logError(`LOANS READ FAILED: ${err.message}`);
-    return [];
-  }
+  return dataStore.readJson(LOANS_FILE, [], Array.isArray);
 }
 
 function normalizeLoanStatus(status) {
@@ -119,7 +246,7 @@ function filterLoansByTimeframe(loans, filter) {
 
 function saveLoansData(loans) {
   try {
-    fs.writeFileSync(LOANS_FILE, JSON.stringify(loans, null, 2));
+    dataStore.writeJson(LOANS_FILE, loans);
   } catch (err) {
     logError(`LOANS WRITE FAILED: ${err.message}`);
     throw err;
