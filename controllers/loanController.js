@@ -10,29 +10,77 @@ const { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, 
 const LOANS_FILE = dataStore.paths.loans;
 const USERS_FILE = dataStore.paths.users;
 
-// ─── Loan receipt numbers ────────────────────────────────────────────────────
-// Human-searchable reference, e.g. BMF-2026-0007. This is the "loan receipt ID"
-// borrowers and staff quote, and the key the search endpoint accepts.
-const RECEIPT_PREFIX = 'BMF';
+// ─── Receipt IDs (Task 1) ────────────────────────────────────────────────────
+// Loan receipts:   BMF-YYYYMMDD-XXXX  (creation date + 4 random digits)
+// Payment receipts: PAY-YYYYMMDD-XXXX (payment date + 4 random digits)
+// Generated once when the request/payment is made; unique across the store.
 
-function getNextReceiptNumber(loans, date = new Date()) {
-  const year = date.getUTCFullYear();
-  const prefix = `${RECEIPT_PREFIX}-${year}-`;
-  const highest = loans.reduce((max, loan) => {
-    const raw = String(loan.receiptNumber || '');
-    if (!raw.startsWith(prefix)) return max;
-    const seq = Number(raw.slice(prefix.length));
-    return Number.isFinite(seq) && seq > max ? seq : max;
-  }, 0);
-  return `${prefix}${String(highest + 1).padStart(4, '0')}`;
+const LOAN_RECEIPT_PREFIX = 'BMF';
+const PAYMENT_RECEIPT_PREFIX = 'PAY';
+
+function compactDate(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}${m}${day}`;
 }
 
-/** Backfill receipt numbers for loans created before receipts existed. */
+function randomBlock() {
+  return String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+}
+
+function generateLoanReceiptId(existingIds = new Set(), date = new Date()) {
+  const stamp = compactDate(date);
+  let id;
+  do {
+    id = `${LOAN_RECEIPT_PREFIX}-${stamp}-${randomBlock()}`;
+  } while (existingIds.has(id));
+  return id;
+}
+
+function generatePaymentReceiptId(existingIds = new Set(), date = new Date()) {
+  const stamp = compactDate(date);
+  let id;
+  do {
+    id = `${PAYMENT_RECEIPT_PREFIX}-${stamp}-${randomBlock()}`;
+  } while (existingIds.has(id));
+  return id;
+}
+
+// Task 2 — canonical payment modes (BMF repayment sheet options).
+const PAYMENT_MODES = ['Airtel Money', 'MTN MoMo', 'Cash', 'Bank Transfer', 'Other'];
+
+function normalizePaymentMode(mode) {
+  const raw = String(mode || '').trim().toLowerCase().replace(/[\s_-]+/g, '_');
+  const aliases = {
+    airtel: 'Airtel Money',
+    airtel_money: 'Airtel Money',
+    airtelmoney: 'Airtel Money',
+    mtn: 'MTN MoMo',
+    mtn_momo: 'MTN MoMo',
+    mtnmomo: 'MTN MoMo',
+    momo: 'MTN MoMo',
+    mobile_money: 'MTN MoMo',
+    cash: 'Cash',
+    bank: 'Bank Transfer',
+    bank_transfer: 'Bank Transfer',
+    transfer: 'Bank Transfer',
+    other: 'Other'
+  };
+  if (!raw) return 'Cash';
+  if (PAYMENT_MODES.includes(mode)) return mode;
+  return aliases[raw] || 'Other';
+}
+
+/** Backfill receipts for loans created before the receipt system existed. */
 function ensureReceiptNumbers(loans) {
+  const used = new Set(loans.map(loan => String(loan.receiptNumber || '')).filter(Boolean));
   let changed = false;
   loans.forEach((loan) => {
     if (!loan.receiptNumber) {
-      loan.receiptNumber = getNextReceiptNumber(loans, new Date(loan.createdAt || Date.now()));
+      loan.receiptNumber = generateLoanReceiptId(used, new Date(loan.createdAt || Date.now()));
+      used.add(loan.receiptNumber);
       changed = true;
     }
   });
@@ -113,7 +161,9 @@ function sumPayments(loan) {
  */
 function rebuildPaymentLedger(loan) {
   const payments = Array.isArray(loan.payments) ? loan.payments : [];
-  let running = Number(loan.totalRepayment || loan.amount || 0);
+  // totalRepayment is authoritative; fall back to amount, then to the recorded
+  // outstanding so legacy rows without computed totals still reconcile.
+  let running = Number(loan.totalRepayment || loan.amount || loan.outstanding || 0);
   let interestOutstanding = Number(loan.interestAmount || 0);
 
   payments.forEach((payment, index) => {
@@ -128,8 +178,9 @@ function rebuildPaymentLedger(loan) {
     payment.balanceAfter = Number(Math.max(0, running - amount).toFixed(2));
 
     running = payment.balanceAfter;
-    payment.receiptNumber = payment.receiptNumber ||
-      `${loan.receiptNumber || `BMF-${loan.id}`}-P${String(index + 1).padStart(2, '0')}`;
+    payment.paymentReceiptId = payment.paymentReceiptId ||
+      generatePaymentReceiptId(undefined, payment.paymentDate || payment.date || new Date());
+    payment.receiptNumber = payment.receiptNumber || payment.paymentReceiptId;
     payment.recordedBy = payment.recordedBy || loan.updatedBy || loan.reviewedBy || 'system';
     payment.paymentDate = payment.paymentDate || payment.date || loan.createdAt || null;
   });
@@ -153,6 +204,41 @@ const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 function getLoansData() {
   return dataStore.readJson(LOANS_FILE, [], Array.isArray);
+}
+
+/** Loans enriched for reading: receipts backfilled, ledgers rebuilt, status derived. */
+function getEnrichedLoans(today = new Date().toISOString().slice(0, 10)) {
+  const loans = getLoansData();
+  return loans.map(loan => ({
+    ...rebuildPaymentLedger({ ...loan, payments: (loan.payments || []).map(p => ({ ...p })) }),
+    businessStatus: deriveLoanStatus(loan, today),
+    legacyStatus: normalizeLoanStatus(loan.status)
+  }));
+}
+
+/** One-time migration: receipts + borrowedDate + ledger balances (idempotent). */
+function migrateLoans() {
+  const loans = getLoansData();
+  let receiptsChanged = ensureReceiptNumbers(loans);
+
+  let changed = receiptsChanged;
+  loans.forEach(loan => {
+    if (!loan.borrowedDate && loan.approvedAt) {
+      loan.borrowedDate = String(loan.approvedAt).slice(0, 10);
+      changed = true;
+    }
+    const before = JSON.stringify(loan.payments || []);
+    rebuildPaymentLedger(loan);
+    if (JSON.stringify(loan.payments || []) !== before) changed = true;
+    const live = deriveLoanStatus(loan);
+    if (!['pending', 'declined', 'paid'].includes(live) &&
+        ['approved', 'in_progress'].includes(normalizeLoanStatus(loan.status))) {
+      if (loan.status !== live) { loan.status = live; changed = true; }
+    }
+  });
+
+  if (changed) saveLoansData(loans);
+  return { receiptsChanged, changed };
 }
 
 function normalizeLoanStatus(status) {
@@ -182,6 +268,65 @@ function calculateSummary(loans) {
   const total = loans.length;
   const outstanding = loans.reduce((sum, loan) => sum + (loan.outstanding || 0), 0);
   return { total, outstanding };
+}
+
+// ─── Portfolio analytics (all-users view) ────────────────────────────────────
+// total loans, total capital deployed, total interest booked, total defaults,
+// plus the overdue / paid / liquidated splits the BMF analytics sheet needs.
+function summarizeStore(loans, today = new Date().toISOString().slice(0, 10)) {
+  const enriched = loans.map(loan => ({
+    ...loan,
+    businessStatus: deriveLoanStatus(loan, today)
+  }));
+  const byStatus = status => enriched.filter(loan => loan.businessStatus === status);
+  const principal = loans => loans.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+  const interest = loans => loans.reduce((sum, l) => sum + (Number(l.interestAmount) || 0), 0);
+  const outstandingOf = loans => loans.reduce((sum, l) => sum + (Number(l.outstanding) || 0), 0);
+  const collected = loans => loans.reduce((sum, l) => sum + (Number(l.paidTotal ?? sumPayments(l)) || 0), 0);
+
+  const defaulted = byStatus('defaulted');
+  const overdueGrace = byStatus('grace');
+  const paid = byStatus('paid');
+  const active = byStatus('active');
+  const liquidated = byStatus('liquidated');
+
+  return {
+    totalLoans: enriched.length,
+    totalCapital: principal(enriched),
+    totalInterestBooked: interest(enriched),
+    totalCollected: Number(collected(enriched).toFixed(2)),
+    totalOutstanding: Number(outstandingOf(enriched).toFixed(2)),
+    active: { count: active.length, capital: principal(active), outstanding: outstandingOf(active) },
+    grace: { count: overdueGrace.length, outstanding: outstandingOf(overdueGrace) },
+    defaulted: {
+      count: defaulted.length,
+      capital: principal(defaulted),
+      outstanding: outstandingOf(defaulted),
+      possibleLoss: outstandingOf(defaulted)
+    },
+    liquidated: { count: liquidated.length, outstanding: outstandingOf(liquidated) },
+    paid: { count: paid.length, collected: Number(collected(paid).toFixed(2)) }
+  };
+}
+
+// ─── Search by loan receipt ID or payment receipt ID (Task 1) ────────────────
+function searchLoansByReceipt(loans, query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return [];
+  return loans.map(loan => ({
+    ...rebuildPaymentLedger({ ...loan, payments: (loan.payments || []).map(p => ({ ...p })) }),
+    businessStatus: deriveLoanStatus(loan),
+    legacyStatus: normalizeLoanStatus(loan.status)
+  })).filter(loan => {
+    // Prefix match on the loan receipt (BMF-YYYYMMDD-XXXX) so partial
+    // queries like "bmf-20261006" or "BMF-2026" still find their loans.
+    const receipt = String(loan.receiptNumber || '').toLowerCase();
+    if (receipt && receipt.startsWith(q)) return true;
+    if (String(loan.id) === q) return true;
+    // Payment receipt IDs (PAY-YYYYMMDD-XXXX) pull up their parent loan too.
+    return (Array.isArray(loan.payments) ? loan.payments : []).some(payment =>
+      String(payment.paymentReceiptId || payment.receiptNumber || '').toLowerCase().startsWith(q));
+  });
 }
 
 function getLoanTimeframeWindow(filter) {
@@ -329,8 +474,10 @@ async function requestLoan(req, res) {
     const nextId = loans.length ? Math.max(...loans.map(l => l.id)) + 1 : 1;
 
     const createdAt = new Date().toISOString();
+    const loanReceiptIds = new Set(loans.map(l => String(l.receiptNumber || '')).filter(Boolean));
     const newLoan = {
       id: nextId,
+      receiptNumber: generateLoanReceiptId(loanReceiptIds, new Date()),
       email,
       storeId,
       product,
@@ -457,6 +604,44 @@ function getLoans(req, res) {
   }
 }
 
+// ─── GET /loans/search?receiptId=... (Task 1: any authenticated user) ────────
+function searchByReceiptId(req, res) {
+  try {
+    const receiptId = String(req.query.receiptId || req.query.q || '').trim();
+    if (!receiptId) {
+      return res.status(400).json({ error: 'receiptId query parameter is required.' });
+    }
+
+    const loans = searchLoansByReceipt(getEnrichedLoans(), receiptId);
+    if (!loans.length) {
+      return res.status(404).json({ error: `No loan found for receipt ID "${receiptId}".` });
+    }
+
+    // Non-admins may only pull up their own loans.
+    const isAdmin = isAdminRole(req.authUser?.role);
+    const requester = String(req.authUser?.email || '').trim().toLowerCase();
+    const visible = isAdmin ? loans : loans.filter(loan =>
+      String(loan.email || '').trim().toLowerCase() === requester);
+
+    if (!visible.length) {
+      return res.status(404).json({ error: `No loan found for receipt ID "${receiptId}".` });
+    }
+
+    return res.json({
+      query: receiptId,
+      total: visible.length,
+      loans: visible,
+      payments: visible.flatMap(loan =>
+        (Array.isArray(loan.payments) ? loan.payments : [])
+          .filter(payment => String(payment.paymentReceiptId || '').toLowerCase() === receiptId.toLowerCase())
+          .map(payment => ({ loanId: loan.id, loanReceiptId: loan.receiptNumber, ...payment })))
+    });
+  } catch (err) {
+    logError(`RECEIPT SEARCH FAILED: ${err.message}`);
+    return res.status(500).json({ error: 'Unable to search receipts.' });
+  }
+}
+
 function getLoanById(req, res) {
   try {
     const id = Number(req.params.id);
@@ -518,13 +703,23 @@ async function updateLoanStatus(req, res) {
       const adjustedWeeks = Math.max(Number(loan.tenureWeeks) || 1, 1);
       const approvalWindow = approvedAt.getTime() + (adjustedWeeks * 7 + Math.max(0, approvalDelayDays)) * 24 * 60 * 60 * 1000;
       loan.approvedAt = approvedAt.toISOString();
+      // Borrowed date IS the approval date (BMF loan contract rule).
+      loan.borrowedDate = approvedAt.toISOString().slice(0, 10);
       loan.dueDate = new Date(approvalWindow).toISOString().slice(0, 10);
+      rebuildPaymentLedger(loan);
     } else if (['in_progress', 'in-progress', 'start', 'started'].includes(normalizedAction) && isAdmin) {
       loan.status = 'in_progress';
       loan.adminReason = reason || loan.adminReason || 'Loan is now in progress.';
     } else if (['decline', 'declined', 'reject', 'rejected'].includes(normalizedAction) && isAdmin) {
       loan.status = 'declined';
       loan.adminReason = reason || loan.adminReason || 'Loan declined by admin.';
+    } else if (['default', 'defaulted', 'mark_default'].includes(normalizedAction) && isAdmin) {
+      loan.status = 'defaulted';
+      loan.adminReason = reason || loan.adminReason || 'Marked as defaulted by admin.';
+    } else if (['liquidate', 'liquidated', 'recover', 'recovered'].includes(normalizedAction) && isAdmin) {
+      loan.status = 'liquidated';
+      loan.liquidatedAt = new Date().toISOString();
+      loan.adminReason = reason || loan.adminReason || 'Collateral liquidated to recover the balance.';
     } else if (action === 'record-payment') {
       const pay = Number(amount) || 0;
       loan.outstanding = Math.max(0, (loan.outstanding || 0) - pay);
@@ -619,18 +814,32 @@ function recordPayment(req, res) {
       return res.status(400).json({ error: 'Payment must be positive and cannot exceed the outstanding balance.' });
     }
 
+    if (!loans[index].payments) loans[index].payments = [];
+
+    const balanceBefore = Number(loans[index].outstanding || 0);
     const recordedAt = new Date().toISOString();
+    const usedPaymentIds = new Set(
+      loans.flatMap(l => (l.payments || []).map(p => String(p.paymentReceiptId || '')).filter(Boolean))
+    );
     const payment = {
+      // Task 2 — every field the BMF repayment tracking sheet needs.
+      paymentReceiptId: generatePaymentReceiptId(usedPaymentIds, new Date()),
       amount: paymentAmount,
-      mode: mode || 'cash',
+      paymentDate: recordedAt,
+      balanceBefore,
+      balanceAfter: Number(Math.max(0, balanceBefore - paymentAmount).toFixed(2)),
+      mode: normalizePaymentMode(mode),
       note: note || null,
+      description: note || null,
       screenshot,
-      date: recordedAt
+      date: recordedAt,
+      recordedBy: req.authUser?.email || 'admin',
+      receiptNumber: `${loans[index].receiptNumber || `BMF-${loans[index].id}`}-P${String(loans[index].payments.length + 1).padStart(2, '0')}`
     };
 
-    if (!loans[index].payments) loans[index].payments = [];
     loans[index].payments.push(payment);
-    loans[index].outstanding = Math.max(0, (loans[index].outstanding || 0) - payment.amount);
+    rebuildPaymentLedger(loans[index]);
+    loans[index].updatedBy = req.authUser?.email || 'admin';
     if (loans[index].outstanding === 0) {
       loans[index].status = 'paid';
       loans[index].settledAt = recordedAt;
@@ -748,5 +957,23 @@ module.exports = {
   calculateInterest,
   getApprovalDeadline,
   filterLoansByTimeframe,
-  getLoanTimeframeWindow
+  getLoanTimeframeWindow,
+  getLoansData,
+  saveLoansData,
+  migrateLoans,
+  getEnrichedLoans,
+  rebuildPaymentLedger,
+  sumPayments,
+  generateLoanReceiptId,
+  generatePaymentReceiptId,
+  ensureReceiptNumbers,
+  normalizeStatus,
+  deriveLoanStatus,
+  calculateSummary,
+  summarizeStore,
+  searchLoansByReceipt,
+  searchByReceiptId,
+  normalizePaymentMode,
+  PAYMENT_MODES,
+  daysBetween
 };

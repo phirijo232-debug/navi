@@ -96,3 +96,23 @@
 [2026-10-05T14:39:59.043Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
 [2026-10-05T14:41:29.923Z] STARTUP DATA REPAIR: users.json: initial backup created; loans.json: initial backup created; feedback.json: initial backup created
 [2026-10-05T15:35:37.978Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-05T16:56:53.991Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-05T16:57:33.213Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-07T11:22:18.086Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-4242 | to notified@example.test
+[2026-10-07T11:22:18.102Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-07T11:22:18.108Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-07T11:22:19.330Z] DATA RECOVERED from backup (malformed JSON): users.json
+[2026-10-07T11:48:26.630Z] BLOCKED — missing token from IP: 127.0.0.1
+[2026-10-07T11:48:26.994Z] BLOCKED — missing token from IP: 127.0.0.1
+[2026-10-07T11:48:27.013Z] BLOCKED — missing token from IP: 127.0.0.1
+[2026-10-07T11:48:27.025Z] BLOCKED — missing token from IP: 127.0.0.1
+[2026-10-07T11:48:27.035Z] BLOCKED — missing token from IP: 127.0.0.1
+[2026-10-07T11:48:27.045Z] BLOCKED — missing token from IP: 127.0.0.1
+[2026-10-07T14:54:00.619Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-4242 | to notified@example.test
+[2026-10-07T14:54:00.650Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-07T14:54:00.656Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-07T14:54:01.882Z] DATA RECOVERED from backup (malformed JSON): users.json
+[2026-10-07T14:54:39.294Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-4242 | to notified@example.test
+[2026-10-07T14:54:39.322Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-07T14:54:39.335Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-07T14:54:41.072Z] DATA RECOVERED from backup (malformed JSON): users.json

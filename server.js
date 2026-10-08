@@ -7,10 +7,11 @@ const { helmet, deviceAuth, rateLimiter } = require('./middleware/security');
 const { verifyOTP, sendOTP } = require('./middleware/otp');
 const { trackSession } = require('./controllers/sessionController');
 const routes = require('./routes');
-const { startDailyReportScheduler } = require('./middleware/dailyReport');
+const { startScheduler } = require('./scheduler');
 const { ensureDataIntegrity } = require('./middleware/dataStore');
 
 const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || 'phirii26';
+const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
 
 const app = express();
 app.disable('x-powered-by');
@@ -31,9 +32,7 @@ app.use(express.json());
 
 app.use((req, res, next) => {
   const isLocalhost = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip);
-  if (isLocalhost) {
-    return next();
-  }
+  if (isLocalhost) return next();
   rateLimiter(req, res, next);
 });
 
@@ -53,8 +52,7 @@ app.post('/vault/request', async (req, res) => {
       logError(`VAULT REQUEST BLOCKED — invalid master key from ${req.ip}`);
       return res.status(403).json({ error: 'Invalid master key.' });
     }
-
-    await sendOTP('Vault Access', process.env.GMAIL_USER);
+    await sendOTP('Vault Access', ADMIN_EMAIL);
     return res.json({ message: 'Vault OTP sent to the configured admin email.' });
   } catch (err) {
     logError(`VAULT REQUEST FAILED: ${err.message}`);
@@ -69,12 +67,10 @@ app.post('/vault/authorize', (req, res) => {
     if (!submittedKey || submittedKey !== ADMIN_KEY) {
       return res.status(403).json({ error: 'Invalid master key.' });
     }
-
-    const result = verifyOTP(otp, process.env.GMAIL_USER, 'Vault Access');
+    const result = verifyOTP(otp, ADMIN_EMAIL, 'Vault Access');
     if (!result.valid) {
       return res.status(400).json({ error: result.message });
     }
-
     return res.json({ authorized: true, message: 'Vault access approved.' });
   } catch (err) {
     logError(`VAULT AUTH FAILED: ${err.message}`);
@@ -120,7 +116,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong. Please try again.' });
 });
 
-// Repair any damaged data store (from backup) BEFORE accepting traffic.
 const startupRepairs = ensureDataIntegrity();
 if (startupRepairs.length) {
   console.warn(`Navi Server data repair: ${startupRepairs.join('; ')}`);
@@ -128,5 +123,5 @@ if (startupRepairs.length) {
 
 app.listen(config.PORT, config.HOST, () => {
   console.log(`Navi Server running on port ${config.PORT}`);
-  startDailyReportScheduler();
+  startScheduler();
 });

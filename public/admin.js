@@ -3,6 +3,11 @@ let selectedUserId = null;
 let selectedUser = null;
 let selectedLoans = [];
 let activeLoanFilter = 'all';
+// Timeframe filter for the selected customer (Option 3: approval/borrowed date,
+// falling back to the request date for loans that are not approved yet).
+let activeTimeframeFilter = 'all';
+let customTimeframeFrom = '';
+let customTimeframeTo = '';
 let storeFeedback = [];
 let activeFeedbackFilter = 'all';
 let pendingEmail = '';
@@ -277,9 +282,11 @@ function formatDate(dateValue) {
 
 function getLoanStatus(loan) {
   const status = String(loan.status || 'pending').toLowerCase().replace(/\s+/g, '_');
+  // Lifecycle statuses that must never be masked by the overdue derivation.
+  if (['declined', 'paid', 'defaulted', 'liquidated'].includes(status)) return status;
   const dueDate = String(loan.dueDate || '').slice(0, 10);
   const today = new Date().toISOString().slice(0, 10);
-  if (Number(loan.outstanding || 0) > 0 && dueDate && dueDate < today && !['declined', 'paid'].includes(status)) {
+  if (Number(loan.outstanding || 0) > 0 && dueDate && dueDate < today) {
     return 'overdue';
   }
   return status;
@@ -309,8 +316,13 @@ function renderLoanDetails(loan) {
     <a class="proof-link" href="/uploads/${encodeURIComponent(filename)}" target="_blank" rel="noopener">View collateral ${index ? 'back' : 'front'}</a>
   `).join('');
   const outstanding = Number(loan.outstanding || 0);
-  const canRecordPayment = canManageStore && outstanding > 0 && ['approved', 'in_progress', 'overdue'].includes(status);
-  const canReview = canManageStore && ['pending', 'approved', 'in_progress'].includes(status);
+  // Accept both the legacy vocabulary (approved/in_progress/overdue) and the
+  // migrated lifecycle (active/grace/defaulted) — stored statuses are 'active'
+  // after the migration, so the old list alone hid the Post payment form.
+  const canRecordPayment = canManageStore && outstanding > 0 &&
+    ['approved', 'in_progress', 'overdue', 'active', 'grace', 'defaulted'].includes(status);
+  const canReview = canManageStore &&
+    ['pending', 'approved', 'in_progress', 'active', 'grace'].includes(status);
 
   return `
     <article class="loan-item">
@@ -331,6 +343,7 @@ function renderLoanDetails(loan) {
         <p><strong>Collateral grade:</strong> ${escapeHtml(loan.collateralGrade || 'Not graded')}</p>
         <p><strong>Decision reason:</strong> ${escapeHtml(loan.adminReason || 'No decision reason yet.')}</p>
         <p><strong>Requested:</strong> ${escapeHtml(formatDate(loan.createdAt))}</p>
+        <p><strong>Borrowed (approved):</strong> ${loan.approvedAt || loan.borrowedDate ? escapeHtml(formatDate(loan.approvedAt || loan.borrowedDate)) : 'Not yet approved'}</p>
       </div>
       ${proofLinks ? `<div>${proofLinks}</div>` : ''}
       ${canReview ? `
@@ -361,11 +374,78 @@ function renderLoanDetails(loan) {
   `;
 }
 
+// ─── Timeframe filter (Option 3) ─────────────────────────────────────────────
+// Loans are grouped by approval (borrowed) date; pending loans without an
+// approval date fall back to their request date.
+const LOAN_STATUS_FILTERS = ['all', 'pending', 'approved', 'in_progress', 'active', 'grace', 'defaulted', 'overdue', 'declined', 'paid'];
+const TIMEFRAME_FILTERS = [
+  ['all', 'All time'],
+  ['today', 'Today'],
+  ['yesterday', 'Yesterday'],
+  ['7', 'Last 7 days'],
+  ['month', 'This month'],
+  ['last-month', 'Last month'],
+  ['custom', 'Custom range']
+];
+
+function getLoanPeriodDate(loan) {
+  const source = loan.approvedAt || loan.borrowedDate || loan.createdAt;
+  if (!source) return null;
+  const parsed = new Date(source);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function loanMatchesTimeframe(loan) {
+  if (activeTimeframeFilter === 'all') return true;
+  const date = getLoanPeriodDate(loan);
+  if (!date) return false;
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date(startOfToday);
+  endOfToday.setDate(endOfToday.getDate() + 1);
+
+  if (activeTimeframeFilter === 'today') {
+    return date >= startOfToday && date < endOfToday;
+  }
+  if (activeTimeframeFilter === 'yesterday') {
+    const start = new Date(startOfToday);
+    start.setDate(start.getDate() - 1);
+    return date >= start && date < startOfToday;
+  }
+  if (activeTimeframeFilter === '7') {
+    // 7 calendar days including today (e.g. Oct 1 → Oct 7 when today is Oct 7).
+    const start = new Date(startOfToday);
+    start.setDate(start.getDate() - 6);
+    return date >= start && date < endOfToday;
+  }
+  const now = new Date();
+  if (activeTimeframeFilter === 'month') {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return date >= start && date < end;
+  }
+  if (activeTimeframeFilter === 'last-month') {
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), 1);
+    return date >= start && date < end;
+  }
+  if (activeTimeframeFilter === 'custom') {
+    const from = customTimeframeFrom ? new Date(`${customTimeframeFrom}T00:00:00`) : null;
+    const to = customTimeframeTo ? new Date(`${customTimeframeTo}T23:59:59.999`) : null;
+    if (from && !Number.isNaN(from.getTime()) && date < from) return false;
+    if (to && !Number.isNaN(to.getTime()) && date > to) return false;
+    return true;
+  }
+  return true;
+}
+
 function renderSelectedUser() {
   const modalBody = document.getElementById('modalBody');
-  const visibleLoans = activeLoanFilter === 'all'
-    ? selectedLoans
-    : selectedLoans.filter(loan => getLoanStatus(loan) === activeLoanFilter);
+  const visibleLoans = selectedLoans.filter(loan =>
+    (activeLoanFilter === 'all' || getLoanStatus(loan) === activeLoanFilter) &&
+    loanMatchesTimeframe(loan)
+  );
 
   modalBody.innerHTML = `
     <h2>Customer: ${escapeHtml(selectedUser.username || 'Unknown user')}</h2>
@@ -375,12 +455,25 @@ function renderSelectedUser() {
     <hr>
     <h3>Buraza loan history (${selectedLoans.length})</h3>
     <div class="loan-filters" role="group" aria-label="Filter loans by status">
-      ${['all', 'pending', 'approved', 'in_progress', 'declined', 'overdue', 'paid'].map(status => `
+      ${LOAN_STATUS_FILTERS.map(status => `
         <button type="button" class="toggle-mode loan-filter ${activeLoanFilter === status ? 'active' : ''}" data-loan-filter="${status}">${status.replace(/_/g, ' ')}</button>
       `).join('')}
     </div>
+    <div class="loan-filters timeframe-filters" role="group" aria-label="Filter loans by time period">
+      ${TIMEFRAME_FILTERS.map(([value, label]) => `
+        <button type="button" class="toggle-mode loan-filter ${activeTimeframeFilter === value ? 'active' : ''}" data-timeframe="${value}">${label}</button>
+      `).join('')}
+    </div>
+    ${activeTimeframeFilter === 'custom' ? `
+    <div class="timeframe-custom">
+      <label for="timeframeFrom">From</label>
+      <input type="date" id="timeframeFrom" class="modal-input" value="${escapeHtml(customTimeframeFrom)}">
+      <label for="timeframeTo">To</label>
+      <input type="date" id="timeframeTo" class="modal-input" value="${escapeHtml(customTimeframeTo)}">
+    </div>` : ''}
+    <p class="timeframe-note">Showing ${visibleLoans.length} of ${selectedLoans.length} loans — grouped by approval (borrowed) date; pending loans use their request date.</p>
     <div class="loan-list">
-      ${visibleLoans.length ? visibleLoans.map(renderLoanDetails).join('') : '<p>No loans match this status.</p>'}
+      ${visibleLoans.length ? visibleLoans.map(renderLoanDetails).join('') : '<p>No loans match the selected filters.</p>'}
     </div>
   `;
 }
@@ -392,6 +485,9 @@ async function viewUserDetails(userId) {
   selectedUserId = user.id;
   selectedUser = user;
   activeLoanFilter = 'all';
+  activeTimeframeFilter = 'all';
+  customTimeframeFrom = '';
+  customTimeframeTo = '';
   document.getElementById('userModal').style.display = 'block';
   document.getElementById('modalBody').innerHTML = '<p>Loading customer loan history...</p>';
   document.getElementById('detailFeedback').textContent = '';
@@ -846,6 +942,13 @@ document.getElementById('userList').addEventListener('click', event => {
   if (button) viewUserDetails(button.dataset.userId);
 });
 document.getElementById('modalBody').addEventListener('click', event => {
+  const timeframeButton = event.target.closest('[data-timeframe]');
+  if (timeframeButton) {
+    activeTimeframeFilter = timeframeButton.dataset.timeframe;
+    renderSelectedUser();
+    return;
+  }
+
   const filterButton = event.target.closest('[data-loan-filter]');
   if (filterButton) {
     activeLoanFilter = filterButton.dataset.loanFilter;
@@ -857,6 +960,17 @@ document.getElementById('modalBody').addEventListener('click', event => {
   if (actionButton) {
     const reasonInput = document.querySelector(`[data-decision-reason="${actionButton.dataset.loanId}"]`);
     updateLoanStatus(actionButton.dataset.loanId, actionButton.dataset.loanAction, reasonInput?.value);
+  }
+});
+document.getElementById('modalBody').addEventListener('change', event => {
+  if (event.target.id === 'timeframeFrom') {
+    customTimeframeFrom = event.target.value;
+    activeTimeframeFilter = 'custom';
+    renderSelectedUser();
+  } else if (event.target.id === 'timeframeTo') {
+    customTimeframeTo = event.target.value;
+    activeTimeframeFilter = 'custom';
+    renderSelectedUser();
   }
 });
 document.getElementById('modalBody').addEventListener('submit', event => {

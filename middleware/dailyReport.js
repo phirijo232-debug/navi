@@ -3,10 +3,11 @@ const path = require('path');
 const emailService = require('./email');
 const { logError } = require('./logger');
 const dataStore = require('./dataStore');
+const config = require('../config');
 const { getReportData, buildDailyReportText } = require('../controllers/reportController');
 
-const DEFAULT_TIME_ZONE = process.env.DAILY_REPORT_TIMEZONE || 'Africa/Lusaka';
-const DEFAULT_SEND_TIME = process.env.DAILY_REPORT_TIME || '17:00';
+const DEFAULT_TIME_ZONE = config.REPORTS.TIME_ZONE;
+const DEFAULT_SEND_TIME = config.REPORTS.DAILY_SEND_TIME;
 const REPORT_STATE_FILE = dataStore.paths.dailyReportState;
 
 function readLastSentDate() {
@@ -38,11 +39,7 @@ function getLocalTimeParts(date = new Date()) {
 }
 
 async function sendDailyBmfReport(date = new Date()) {
-  const recipient = process.env.DAILY_REPORT_EMAIL ||
-    process.env.REPORT_EMAIL ||
-    process.env.ADMIN_EMAIL ||
-    process.env.ADMIN_EMAILS?.split(',')[0]?.trim() ||
-    'jophiri223@gmail.com';
+  const recipient = config.REPORTS.DAILY_ADMIN_EMAIL;
   if (!recipient) {
     logError('DAILY BMF REPORT SKIPPED: no report recipient configured.');
     return { ok: false, reason: 'No report recipient configured.' };

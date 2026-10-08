@@ -34,11 +34,7 @@ test('Excel portfolio report is generated as an XLSX workbook', async () => {
 });
 
 test('daily report is sent to the configured reporting administrator', async (t) => {
-  const expectedRecipient = process.env.DAILY_REPORT_EMAIL ||
-    process.env.REPORT_EMAIL ||
-    process.env.ADMIN_EMAIL ||
-    process.env.ADMIN_EMAILS?.split(',')[0]?.trim() ||
-    'jophiri223@gmail.com';
+  const expectedRecipient = process.env.DAILY_REPORT_EMAIL || 'jophiri232@gmail.com';
   const sendMail = t.mock.method(emailService, 'sendCustomerEmail', async () => ({ ok: true }));
 
   const result = await sendDailyBmfReport(new Date('2026-10-01T10:00:00Z'));
@@ -48,10 +44,10 @@ test('daily report is sent to the configured reporting administrator', async (t)
   assert.match(sendMail.mock.calls[0].arguments[0].subject, /Daily BMF portfolio report/);
 });
 
-test('daily report scheduler sends at 17:00 Lusaka time and sends only once that day', async (t) => {
+test('daily report scheduler sends at 23:59 Lusaka time and sends only once that day', async (t) => {
   let reportCalls = 0;
   t.mock.method(fs, 'writeFileSync', () => {});
-  const sendTime = new Date('2026-10-01T15:00:00.000Z');
+  const sendTime = new Date('2026-10-01T21:59:00.000Z');
   const sendReport = async () => {
     reportCalls += 1;
     return { ok: true };

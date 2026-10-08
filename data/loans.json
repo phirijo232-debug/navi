@@ -19,7 +19,7 @@
     "collateralGrade": "B",
     "collateralVerified": false,
     "agreedToTerms": true,
-    "status": "approved",
+    "status": "active",
     "approvalDeadline": "2026-09-26T16:51:11.956Z",
     "payments": [
       {
@@ -27,7 +27,14 @@
         "mode": "mobile_money",
         "note": "Capturing Partial payment ",
         "screenshot": "1790878922353-test bmf.png",
-        "date": "2026-10-01T18:22:02.543Z"
+        "date": "2026-10-01T18:22:02.543Z",
+        "balanceBefore": 1102,
+        "interestPortion": 152,
+        "principalPortion": 254,
+        "balanceAfter": 696,
+        "receiptNumber": "BMF-2026-0001-P01",
+        "recordedBy": "admin@prymevertex.test",
+        "paymentDate": "2026-10-01T18:22:02.543Z"
       }
     ],
     "createdAt": "2026-09-25T16:51:11.968Z",
@@ -52,7 +59,11 @@
         "updatedAt": "2026-10-01T18:22:02.544Z"
       }
     ],
-    "storeId": "buraza"
+    "storeId": "buraza",
+    "receiptNumber": "BMF-2026-0001",
+    "borrowedDate": "2026-10-01",
+    "paidTotal": 406,
+    "interestOutstanding": 0
   },
   {
     "id": 2,
@@ -120,7 +131,11 @@
     "updatedAt": "2026-09-30T13:18:06.599Z",
     "reviewedBy": "admin@prymevertex.test",
     "reviewedAt": "2026-09-30T13:18:06.599Z",
-    "storeId": "buraza"
+    "storeId": "buraza",
+    "receiptNumber": "BMF-2026-0002",
+    "borrowedDate": "2026-09-30",
+    "paidTotal": 0,
+    "interestOutstanding": 210
   },
   {
     "id": 3,
@@ -132,7 +147,7 @@
     "interestRate": 10,
     "interestAmount": 30,
     "totalRepayment": 330,
-    "outstanding": 330,
+    "outstanding": 200,
     "dueDate": "2026-10-10",
     "urgency": "emergency",
     "paymentMode": "mobile_money",
@@ -143,9 +158,26 @@
     "collateralGrade": "A",
     "collateralVerified": false,
     "agreedToTerms": true,
-    "status": "approved",
+    "status": "active",
     "approvalDeadline": "2026-10-02T18:18:08.069Z",
-    "payments": [],
+    "payments": [
+      {
+        "paymentReceiptId": "PAY-20261007-4090",
+        "amount": 130,
+        "paymentDate": "2026-10-07T15:45:38.849Z",
+        "balanceBefore": 330,
+        "balanceAfter": 200,
+        "mode": "Cash",
+        "note": "Capturing Partial payment of 330 total",
+        "description": "Capturing Partial payment of 330 total",
+        "screenshot": "1791387938516-WhatsApp Image 2026-10-06 at 08.42.21.jpeg",
+        "date": "2026-10-07T15:45:38.849Z",
+        "recordedBy": "jophiri223@gmail.com",
+        "receiptNumber": "BMF-2026-0003-P01",
+        "interestPortion": 30,
+        "principalPortion": 100
+      }
+    ],
     "statusHistory": [
       {
         "status": "pending",
@@ -167,13 +199,76 @@
         "actor": "jophiri223@gmail.com",
         "source": "admin",
         "updatedAt": "2026-10-02T14:44:43.784Z"
+      },
+      {
+        "status": "active",
+        "reason": "Payment of K 130.00 recorded.",
+        "actor": "jophiri223@gmail.com",
+        "source": "admin",
+        "updatedAt": "2026-10-07T15:45:39.248Z"
       }
     ],
     "createdAt": "2026-10-02T14:18:08.076Z",
     "adminReason": "Approved, met all requirements",
     "approvedAt": "2026-10-02T14:44:43.784Z",
-    "updatedAt": "2026-10-02T14:44:43.784Z",
+    "updatedAt": "2026-10-07T15:45:38.849Z",
     "reviewedBy": "jophiri223@gmail.com",
-    "reviewedAt": "2026-10-02T14:44:43.784Z"
+    "reviewedAt": "2026-10-02T14:44:43.784Z",
+    "receiptNumber": "BMF-2026-0003",
+    "borrowedDate": "2026-10-02",
+    "paidTotal": 130,
+    "interestOutstanding": 0,
+    "updatedBy": "jophiri223@gmail.com"
+  },
+  {
+    "id": 4,
+    "receiptNumber": "BMF-20261007-7232",
+    "email": "phirijo232@gmail.com",
+    "storeId": "buraza",
+    "product": "Testing vertex bmf",
+    "amount": 1050,
+    "tenureWeeks": 1,
+    "interestRate": 10,
+    "interestAmount": 105,
+    "totalRepayment": 1155,
+    "outstanding": 1155,
+    "dueDate": "2026-10-15",
+    "urgency": "urgent",
+    "paymentMode": "mobile_money",
+    "nextPayment": null,
+    "collateralDescription": "pixiel 6",
+    "collateralFront": "1791383516489-10.jpg",
+    "collateralBack": "1791383516659-12.jpg",
+    "collateralGrade": "C",
+    "collateralVerified": false,
+    "agreedToTerms": true,
+    "status": "approved",
+    "approvalDeadline": "2026-10-08T14:31:56.815Z",
+    "payments": [],
+    "statusHistory": [
+      {
+        "status": "pending",
+        "reason": "Loan request submitted by borrower.",
+        "actor": "phirijo232@gmail.com",
+        "source": "borrower",
+        "updatedAt": "2026-10-07T14:31:56.819Z"
+      },
+      {
+        "status": "approved",
+        "reason": "Requirements have been met",
+        "actor": "jophiri223@gmail.com",
+        "source": "admin",
+        "updatedAt": "2026-10-07T14:49:25.580Z"
+      }
+    ],
+    "createdAt": "2026-10-07T14:31:56.819Z",
+    "adminReason": "Requirements have been met",
+    "approvedAt": "2026-10-07T14:49:25.546Z",
+    "borrowedDate": "2026-10-07",
+    "paidTotal": 0,
+    "interestOutstanding": 105,
+    "updatedAt": "2026-10-07T14:49:25.580Z",
+    "reviewedBy": "jophiri223@gmail.com",
+    "reviewedAt": "2026-10-07T14:49:25.580Z"
   }
 ]

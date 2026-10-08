@@ -23,8 +23,8 @@
     <form id="signupForm" class="auth-form">
       <input type="text" id="username" placeholder="Username" required class="auth-input">
       <input type="email" id="email" placeholder="Email" required class="auth-input">
-      <input type="tel" id="phone" placeholder="WhatsApp number (required)" required class="auth-input" inputmode="tel">
-      <p class="form-note">Please provide a valid WhatsApp number so we can reach you by WhatsApp, SMS, or direct call when needed.</p>
+      <input type="tel" id="phone" placeholder="e.g. 0977123456" required class="auth-input" inputmode="tel" autocomplete="tel" aria-describedby="phoneHint">
+      <p class="form-note" id="phoneHint">Phone number is required — enter a valid Zambian mobile number (09XXXXXXXX or +2609XXXXXXXX; Airtel 095–097, MTN 076/077/057, Zamtel 026x).</p>
       <div class="input-wrap">
         <input type="password" id="password" placeholder="Password" required class="auth-input">
         <svg id="togglePass1" class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>

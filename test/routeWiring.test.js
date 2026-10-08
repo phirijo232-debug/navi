@@ -87,7 +87,10 @@ test('router registers the core authentication and data endpoints', () => {
     ['GET', '/status'], ['GET', '/sessions'],
     ['GET', '/logs/access'], ['GET', '/logs/errors'],
     ['POST', '/invites/create'],
-    ['GET', '/invites/validate/:token'], ['POST', '/invites/validate']
+    ['GET', '/invites/validate/:token'], ['POST', '/invites/validate'],
+    ['GET', '/reports/:scope/profits'], ['GET', '/reports/:scope/defaulters'],
+    ['GET', '/reports/:scope/overdue'], ['GET', '/reports/:scope/paid'],
+    ['GET', '/reports/search'], ['GET', '/reports/user/:email']
   ];
 
   for (const [method, routePath] of expected) {

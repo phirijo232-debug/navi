@@ -5,7 +5,8 @@
 //   landlines : +260 2xx xxx xxx        (Lusaka area codes start with 2)
 
 const ZAMBIA_CODE = '260';
-const MOBILE_PREFIXES = ['7', '9'];
+// Airtel 095-097, MTN 076-077 and 057, Zamtel 026x landline/mobile ranges.
+const MOBILE_PREFIXES = ['5', '7', '9'];
 const LANDLINE_PREFIXES = ['2'];
 
 /** Strip spaces, dashes, brackets and a leading 00 international prefix. */
@@ -49,6 +50,21 @@ function isValidZambianPhone(value) {
   return normalizeZambianPhone(value) !== null;
 }
 
+/**
+ * Strict BMF signup rule (Task 6):
+ *   accepted: 09XXXXXXXX / +2609XXXXXXXX (Airtel 095-097, MTN 076-077, 057),
+ *             026x (Zamtel) national formats.
+ *   exact spec regex base: /^(\+?260|0)(9[5-7]|7[6-7])\d{7}$/
+ *   extended with the 057 and 026x prefixes listed as valid MTN/Zamtel ranges.
+ */
+const ZAMBIAN_MOBILE_REGEX = /^(\+?260|0)(?:(?:9[5-7]|7[6-7]|57)\d{7}|26\d{7})$/;
+
+function isValidZambianMobile(value) {
+  if (value === null || value === undefined || value === '') return false;
+  const raw = String(value).replace(/[\s().-]/g, '');
+  return ZAMBIAN_MOBILE_REGEX.test(raw);
+}
+
 function isMobileNumber(value) {
   const e164 = normalizeZambianPhone(value);
   return Boolean(e164) && MOBILE_PREFIXES.includes(e164.charAt(ZAMBIA_CODE.length + 1));
@@ -73,8 +89,10 @@ function describePhone(value) {
 
 module.exports = {
   ZAMBIA_CODE,
+  ZAMBIAN_MOBILE_REGEX,
   normalizeZambianPhone,
   isValidZambianPhone,
+  isValidZambianMobile,
   isMobileNumber,
   formatZambianPhone,
   describePhone

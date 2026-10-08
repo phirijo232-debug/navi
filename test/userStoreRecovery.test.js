@@ -16,7 +16,7 @@ test('requestSignup can recover when the users store is malformed', async () => 
         email: 'recover@example.com',
         password: 'StrongPass1!',
         confirmPassword: 'StrongPass1!',
-        phone: '+2600000000'
+        phone: '+260977000000'
       }
     };
 
@@ -41,7 +41,7 @@ test('requestSignup can recover when the users store is malformed', async () => 
   }
 });
 
-test('requestSignup requires a valid WhatsApp phone number', async () => {
+test('requestSignup requires a valid Zambian mobile number', async () => {
   const req = {
     body: {
       username: 'WhatsApp User',
@@ -67,7 +67,7 @@ test('requestSignup requires a valid WhatsApp phone number', async () => {
   await requestSignup(req, res);
 
   assert.equal(res.statusCode, 400);
-  assert.match(res.body.error, /valid WhatsApp|phone number/i);
+  assert.equal(res.body.error, 'Please enter a valid Zambian mobile number (e.g. 0977123456)');
 });
 
 test('admin can fetch the user directory with account summaries', async () => {

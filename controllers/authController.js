@@ -7,7 +7,15 @@ const dataStore = require('../middleware/dataStore');
 const otpService = require('../middleware/otp');
 const emailService = require('../middleware/email');
 const config = require('../config');
+const { normalizeZambianPhone, isValidZambianMobile } = require('../middleware/phoneNumber');
 const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole } = require('../middleware/storeScope');
+
+const NRC_PATTERN = /^\d{6}\/\d{2}\/[12]$/;
+
+function isValidNrc(value) {
+  if (value === null || value === undefined || value === '') return true;
+  return NRC_PATTERN.test(String(value).trim());
+}
 
 const USERS_FILE = dataStore.paths.users;
 const pendingSignups = {};
@@ -145,10 +153,9 @@ function generateDeviceToken() {
 }
 
 function normalizePhoneNumber(phone) {
-  if (phone === null || phone === undefined) {
-    return '';
-  }
-
+  const normalized = normalizeZambianPhone(phone);
+  if (normalized) return normalized;
+  if (phone === null || phone === undefined) return '';
   return String(phone).replace(/[\s().-]/g, '').trim();
 }
 
@@ -163,14 +170,21 @@ function isValidWhatsAppNumber(phone) {
 
 async function requestSignup(req, res) {
   try {
-    const { username, email, password, confirmPassword, phone, inviteToken } = req.body;
+    const { username, email, password, confirmPassword, phone, nrc, inviteToken } = req.body;
 
     if (!username || !email || !password || !confirmPassword) {
       return res.status(400).json({ error: 'All required fields must be filled.' });
     }
 
-    if (!phone || !isValidWhatsAppNumber(phone)) {
-      return res.status(400).json({ error: 'Please enter a valid WhatsApp phone number that can receive messages.' });
+    // Phone is MANDATORY (Task 6): Zambia-only mobile numbers in
+    // 09XXXXXXXX or +2609XXXXXXXX form (Airtel/MTN/Zamtel ranges).
+    if (!isValidZambianMobile(phone)) {
+      return res.status(400).json({ error: 'Please enter a valid Zambian mobile number (e.g. 0977123456)' });
+    }
+    const normalizedPhone = normalizeZambianPhone(phone);
+
+    if (!isValidNrc(nrc)) {
+      return res.status(400).json({ error: 'NRC/ID number must look like 123456/78/9 (a second digit of 1 or 2).' });
     }
 
     if (password !== confirmPassword) {
@@ -194,8 +208,7 @@ async function requestSignup(req, res) {
       }
     }
 
-    const normalizedPhone = normalizePhoneNumber(phone);
-    pendingSignups[email] = { username, email, password, phone: normalizedPhone, inviteToken };
+    pendingSignups[email] = { username, email, password, phone: normalizedPhone, nrc: nrc ? String(nrc).trim() : null, inviteToken };
     await otpService.sendOTP('Account Signup Verification', email, false);
     res.json({ message: 'OTP sent to your email. Please verify to complete signup.' });
 
@@ -237,6 +250,7 @@ async function confirmSignup(req, res) {
       username: pending.username,
       email: pending.email,
       phone: pending.phone,
+      nrc: pending.nrc || null,
       password: hashedPassword,
       tokens,
       role: 'user',
