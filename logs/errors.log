@@ -116,3 +116,7 @@
 [2026-10-07T14:54:39.322Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
 [2026-10-07T14:54:39.335Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
 [2026-10-07T14:54:41.072Z] DATA RECOVERED from backup (malformed JSON): users.json
+[2026-10-08T16:00:26.749Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-08T16:00:26.790Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-08T16:00:26.801Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-08T16:00:27.995Z] DATA RECOVERED from backup (malformed JSON): users.json

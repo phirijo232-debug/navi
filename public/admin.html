@@ -283,6 +283,39 @@
     .report-metric { padding: 12px; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; }
     body.light .report-metric { border-color: rgba(0,0,0,0.12); }
     .report-metric strong { display: block; margin-top: 5px; font-size: 1.2rem; }
+    .request-badge {
+      display: inline-block;
+      min-width: 30px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(0,207,255,0.22);
+      color: inherit;
+      font-size: 0.85rem;
+      font-weight: 800;
+      text-align: center;
+    }
+    body.light .request-badge { background: rgba(0,120,180,0.14); }
+    .request-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 16px 4px;
+      border-top: 1px solid rgba(255,255,255,0.12);
+    }
+    body.light .request-row { border-color: rgba(0,0,0,0.1); }
+    .request-seq {
+      display: inline-block;
+      min-width: 34px;
+      height: 34px;
+      line-height: 34px;
+      border-radius: 50%;
+      background: rgba(123,47,255,0.25);
+      text-align: center;
+      font-weight: 800;
+    }
+    .loan-filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
     .feedback-item { padding: 14px 0; border-top: 1px solid rgba(255,255,255,0.12); }
     body.light .feedback-item { border-color: rgba(0,0,0,0.1); }
     .feedback-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
@@ -400,6 +433,20 @@
       </div>
 
       <div id="userList" class="user-grid"></div>
+
+      <section class="panel store-section" aria-labelledby="newRequestsTitle">
+        <div class="admin-topbar">
+          <div>
+            <h2 id="newRequestsTitle">New Requests <span id="newRequestsBadge" class="request-badge" aria-live="polite">0</span></h2>
+            <p>Awaiting customer loan requests for BMF — numbered, with full customer information.</p>
+          </div>
+          <div class="button-row">
+            <button type="button" class="toggle-mode" id="refreshRequestsBtn" style="max-width: 200px;">Refresh requests</button>
+          </div>
+        </div>
+        <div id="newRequestsList"><p>Loading requests...</p></div>
+        <p id="newRequestsNote" class="message-text"></p>
+      </section>
 
       <section class="panel store-section" aria-labelledby="storeReportsTitle">
         <div class="admin-topbar">

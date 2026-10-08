@@ -15,11 +15,21 @@ const dataStore = require('./middleware/dataStore');
 const { logError } = require('./middleware/logger');
 const { runDueDatePass } = require('./middleware/loanNotifications');
 const { getEnrichedLoans, deriveLoanStatus } = require('./controllers/loanController');
+const { buildPaymentsReportData, buildPaymentsExcelReport, buildPaymentsPdfReport } = require('./controllers/reportController');
 
 const TIMEZONE = process.env.DAILY_REPORT_TIMEZONE || 'Africa/Lusaka';
 // Rule 8: report recipient. Env wins; default is the admin mailbox.
 const REPORT_RECIPIENT = process.env.DAILY_REPORT_EMAIL || 'jophiri223@gmail.com';
 const STATE_FILE = dataStore.paths.dailyReportState;
+// Flexible payment tracking sheet time frame - adjust anytime via .env without code changes.
+// Example: PAYMENTS_SHEET_FROM=2026-10-01, PAYMENTS_SHEET_TO=2026-10-31 (empty = all time).
+const TRACKING_FROM = process.env.PAYMENTS_SHEET_FROM || '';
+const TRACKING_TO = process.env.PAYMENTS_SHEET_TO || '';
+const TRACKING_STATE_FILE = path.join(dataStore.DATA_DIR, 'paymentsReportState.json');
+// Flexible portfolio report frame - empty = daily (today) behaviour, as spec'd.
+// Example: PORTFOLIO_SHEET_FROM=2026-10-01, PORTFOLIO_SHEET_TO=2026-10-31
+const PORTFOLIO_FROM = process.env.PORTFOLIO_SHEET_FROM || '';
+const PORTFOLIO_TO = process.env.PORTFOLIO_SHEET_TO || '';
 
 function lusakaDate(date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE }).format(date);
@@ -39,10 +49,64 @@ function writeState(lastSentDate) {
   dataStore.writeJson(STATE_FILE, { lastSentDate });
 }
 
+function readTrackingState() {
+  return dataStore.readJson(TRACKING_STATE_FILE, {}, obj => typeof obj === 'object' && obj !== null);
+}
+
+function writeTrackingState(lastSentDate, frame) {
+  dataStore.writeJson(TRACKING_STATE_FILE, { lastSentDate, frame });
+}
+
+/** Tracking sheet data for the currently configured (env-adjustable) time frame. */
+function buildPaymentsLeadersData() {
+  return buildPaymentsReportData(TRACKING_FROM || null, TRACKING_TO || null);
+}
+
+/** Plain-text body for the payment tracking sheet email. */
+function buildPaymentsReportBody(data) {
+  const range = `${data.from || 'All time'}${data.to ? ` to ${data.to}` : ''}`;
+  const lines = [
+    'Pryme Buraza Micro Finance (BMF) - Payment Tracking Sheet',
+    `Time frame: ${range}`,
+    `Generated: ${data.generatedAt}`,
+    '',
+    `Total payments: ${data.totalPayments}`,
+    `Total amount collected: K${data.totalAmount.toFixed(2)}`,
+    `Total interest collected: K${data.totalInterest.toFixed(2)}`,
+    `Total principal collected: K${data.totalPrincipal.toFixed(2)}`,
+    `Payment modes: ${data.modes.join(', ') || 'n/a'}`,
+    `Recorded by: ${data.recordedBy.join(', ') || 'n/a'}`,
+    '',
+    'Most recent payments:'
+  ];
+  const recent = data.payments.slice(-10).reverse();
+  if (!recent.length) lines.push('- No payments in this time frame.');
+  recent.forEach(p => {
+    lines.push(
+      `- ${p.paymentReceiptId || 'n/a'} | loan ${p.loanReceiptId || 'n/a'} | ${p.email || 'n/a'} | ` +
+      `K${Number(p.amount || 0).toFixed(2)} | ${p.mode || 'Cash'} | ${String(p.paymentDate || p.date || '').slice(0, 10)} | by ${p.recordedBy || 'admin'}`
+    );
+  });
+  return lines.join('\n');
+}
+
 /** Everything the daily report email shows — single source for body/PDF/XLSX. */
 function buildDailyReportData(reportDate = lusakaDate()) {
   const loans = getEnrichedLoans();
   const today = new Date().toISOString().slice(0, 10);
+  const usePeriod = Boolean(PORTFOLIO_FROM || PORTFOLIO_TO);
+
+  // Counts a date value against the active frame: the configured period when
+  // PORTFOLIO_SHEET_FROM/TO are set, otherwise the single report day.
+  const inFrame = (value) => {
+    if (!value) return false;
+    if (!usePeriod) return String(value).slice(0, 10) === reportDate;
+    const ts = new Date(value).getTime();
+    if (Number.isNaN(ts)) return false;
+    if (PORTFOLIO_FROM && ts < new Date(`${PORTFOLIO_FROM}T00:00:00Z`).getTime()) return false;
+    if (PORTFOLIO_TO && ts > new Date(`${PORTFOLIO_TO}T23:59:59Z`).getTime()) return false;
+    return true;
+  };
 
   const active = loans.filter(loan =>
     ['active', 'grace', 'defaulted'].includes(loan.businessStatus));
@@ -50,16 +114,14 @@ function buildDailyReportData(reportDate = lusakaDate()) {
     ['grace', 'defaulted'].includes(loan.businessStatus) && Number(loan.outstanding || 0) > 0);
   const defaulted = loans.filter(loan => loan.businessStatus === 'defaulted');
 
-  const approvedToday = loans.filter(loan =>
-    String(loan.approvedAt || loan.borrowedDate || '').slice(0, 10) === reportDate);
+  const approvedToday = loans.filter(loan => inFrame(loan.approvedAt || loan.borrowedDate));
 
   let paymentsTodayAmount = 0;
   let interestToday = 0;
   let paymentsTodayCount = 0;
   loans.forEach(loan => {
     (Array.isArray(loan.payments) ? loan.payments : []).forEach(payment => {
-      const when = String(payment.paymentDate || payment.date || '').slice(0, 10);
-      if (when === reportDate) {
+      if (inFrame(payment.paymentDate || payment.date)) {
         paymentsTodayAmount += Number(payment.amount || 0);
         interestToday += Number(payment.interestPortion || 0);
         paymentsTodayCount += 1;
@@ -70,6 +132,7 @@ function buildDailyReportData(reportDate = lusakaDate()) {
   return {
     reportDate,
     generatedAt: new Date().toISOString(),
+    period: usePeriod ? { from: PORTFOLIO_FROM || null, to: PORTFOLIO_TO || null } : null,
     activeLoans: active.length,
     activeOutstanding: Number(active.reduce((sum, l) => sum + Number(l.outstanding || 0), 0).toFixed(2)),
     approvedToday: approvedToday.map(l => ({ receipt: l.receiptNumber, email: l.email, amount: l.amount })),
@@ -91,16 +154,18 @@ function buildReportBody(data) {
   const approved = data.approvedToday.length
     ? ` (${data.approvedToday.map(l => `${l.receipt} ${l.email} K${Number(l.amount || 0).toFixed(2)}`).join('; ')})`
     : '';
+  const frame = data.period ? ` (${data.period.from || 'start'} to ${data.period.to || 'today'})` : '';
+  const label = data.period ? 'in period' : 'today';
   return [
-    `Daily Loan Report — ${data.reportDate}`,
+    `Daily Loan Report — ${data.reportDate}${frame}`,
     '',
     `Total active loans: ${data.activeLoans}`,
     `Outstanding on active loans: K${data.activeOutstanding.toFixed(2)}`,
-    `New loans approved today: ${data.approvedTodayCount}${approved}`,
-    `Payments received today: ${data.paymentsTodayCount} totaling K${data.paymentsTodayAmount.toFixed(2)}`,
+    `New loans approved ${label}: ${data.approvedTodayCount}${approved}`,
+    `Payments received ${label}: ${data.paymentsTodayCount} totaling K${data.paymentsTodayAmount.toFixed(2)}`,
     `Overdue loans: ${data.overdueCount} totaling K${data.overdueTotal.toFixed(2)}`,
     `Defaulters: ${data.defaultersCount}`,
-    `Total interest earned today: K${data.interestToday.toFixed(2)}`
+    `Total interest earned ${label}: K${data.interestToday.toFixed(2)}`
   ].join('\n');
 }
 
@@ -115,18 +180,19 @@ function buildReportPdf(data) {
 
     doc.fontSize(16).text('Pryme Buraza Micro Finance — Daily Loan Report', { align: 'center' });
     doc.moveDown(0.5);
-    doc.fontSize(11).text(`Date: ${data.reportDate}`, { align: 'center' });
+    doc.fontSize(11).text(`Date: ${data.reportDate}${data.period ? ` (${data.period.from || 'start'} to ${data.period.to || 'today'})` : ''}`, { align: 'center' });
     doc.moveDown(1.5);
+    const label = data.period ? 'in period' : 'today';
 
     doc.fontSize(12).text('Portfolio Summary');
     doc.moveDown(0.5);
     doc.fontSize(10).text(`Total active loans: ${data.activeLoans}`);
     doc.text(`Outstanding on active loans: K${data.activeOutstanding.toFixed(2)}`);
-    doc.text(`New loans approved today: ${data.approvedTodayCount}`);
-    doc.text(`Payments received today: ${data.paymentsTodayCount} (K${data.paymentsTodayAmount.toFixed(2)})`);
+    doc.text(`New loans approved ${label}: ${data.approvedTodayCount}`);
+    doc.text(`Payments received ${label}: ${data.paymentsTodayCount} (K${data.paymentsTodayAmount.toFixed(2)})`);
     doc.text(`Overdue loans: ${data.overdueCount} (K${data.overdueTotal.toFixed(2)})`);
     doc.text(`Defaulters: ${data.defaultersCount}`);
-    doc.text(`Total interest earned today: K${data.interestToday.toFixed(2)}`);
+    doc.text(`Total interest earned ${label}: K${data.interestToday.toFixed(2)}`);
 
     if (data.overdueLoans.length) {
       doc.moveDown(1);
@@ -137,6 +203,8 @@ function buildReportPdf(data) {
         doc.text(`${loan.receipt || 'n/a'} | ${loan.email} | due ${loan.dueDate || 'n/a'} | outstanding K${Number(loan.outstanding || 0).toFixed(2)}`);
       });
     }
+    // Close the stream so the 'end' event fires and the Buffer resolves.
+    doc.end();
   });
 }
 
@@ -152,13 +220,13 @@ async function buildReportXlsx(data) {
     { metric: 'Report date', value: data.reportDate },
     { metric: 'Total active loans', value: data.activeLoans },
     { metric: 'Outstanding on active loans (K)', value: data.activeOutstanding },
-    { metric: 'New loans approved today', value: data.approvedTodayCount },
-    { metric: 'Payments received today (count)', value: data.paymentsTodayCount },
-    { metric: 'Payments received today (K)', value: data.paymentsTodayAmount },
+    { metric: `New loans approved ${data.period ? 'in period' : 'today'}`, value: data.approvedTodayCount },
+    { metric: `Payments received ${data.period ? 'in period' : 'today'} (count)`, value: data.paymentsTodayCount },
+    { metric: `Payments received ${data.period ? 'in period' : 'today'} (K)`, value: data.paymentsTodayAmount },
     { metric: 'Overdue loans (count)', value: data.overdueCount },
     { metric: 'Overdue total (K)', value: data.overdueTotal },
     { metric: 'Defaulters', value: data.defaultersCount },
-    { metric: 'Interest earned today (K)', value: data.interestToday }
+    { metric: `Interest earned ${data.period ? 'in period' : 'today'} (K)`, value: data.interestToday }
   ]);
   summary.getRow(1).font = { bold: true };
 
@@ -178,7 +246,7 @@ async function buildReportXlsx(data) {
 
 async function sendDailyLoanReport() {
   const data = buildDailyReportData();
-  const subject = `Pryme Buraza Micro Finance — Daily Loan Report ${data.reportDate}`;
+  const subject = `Pryme Buraza Micro Finance — Daily Loan Report ${data.reportDate}` + (data.period ? ` (${data.period.from || 'start'} to ${data.period.to || 'today'})` : '');
   const [pdf, xlsx] = await Promise.all([buildReportPdf(data), buildReportXlsx(data)]);
 
   const result = await emailService.sendCustomerEmail({
@@ -198,6 +266,59 @@ async function sendDailyLoanReport() {
   writeState(data.reportDate);
   console.log(`[scheduler] daily report sent to ${REPORT_RECIPIENT} for ${data.reportDate}`);
   return { ok: true, data };
+}
+
+/** Collect a readable stream (pdfkit doc) into a Buffer for email attachments. */
+function streamToBuffer(stream) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    stream.on('data', chunk => chunks.push(chunk));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on('error', reject);
+  });
+}
+
+/** Daily payment tracking sheet email - time frame adjustable via PAYMENTS_SHEET_FROM / PAYMENTS_SHEET_TO. */
+async function sendPaymentsTrackingEmail() {
+  const data = buildPaymentsLeadersData();
+  const range = `${data.from || 'AllTime'}${data.to ? `-${data.to}` : ''}`;
+  const subject = `Pryme Buraza Micro Finance — Daily Payment Tracking Sheet ${lusakaDate()}`;
+  const pdf = await streamToBuffer(buildPaymentsPdfReport(data));
+  const xlsx = await buildPaymentsExcelReport(data);
+
+  const result = await emailService.sendCustomerEmail({
+    to: REPORT_RECIPIENT,
+    subject,
+    text: buildPaymentsReportBody(data),
+    attachments: [
+      { filename: `BMF-Payments-${range}.pdf`, content: pdf },
+      { filename: `BMF-Payments-${range}.xlsx`, content: xlsx }
+    ]
+  });
+
+  if (!result?.ok) {
+    logError(`PAYMENTS TRACKING REPORT FAILED: ${result?.reason || 'email delivery failed'}`);
+    return { ok: false, data };
+  }
+  writeTrackingState(lusakaDate(), `${data.from || 'all'}:${data.to || 'all'}`);
+  console.log(`[scheduler] payments tracking report sent to ${REPORT_RECIPIENT}`);
+  return { ok: true, data };
+}
+
+/** Startup catch-up for the tracking sheet: send once if a scheduled day was missed (or the frame changed). */
+async function catchUpPaymentsTracking() {
+  const state = readTrackingState();
+  const today = lusakaDate();
+  const frame = `${TRACKING_FROM || 'all'}:${TRACKING_TO || 'all'}`;
+  if (!state.lastSentDate) {
+    writeTrackingState(today, frame);
+    return { ok: true, skipped: true, reason: 'first run - tracking state initialised' };
+  }
+  if (state.lastSentDate >= today && state.frame === frame) {
+    return { ok: true, skipped: true, reason: 'already sent for today' };
+  }
+  console.log(`[scheduler] tracking report ${state.lastSentDate} - catching up...`);
+  return sendPaymentsTrackingEmail();
 }
 
 /** Startup catch-up: send once if a scheduled day was missed while offline. */
@@ -228,20 +349,34 @@ function startScheduler() {
     sendDailyLoanReport().catch(err => logError(`SCHEDULER REPORT FAILED: ${err.message}`));
   }, { timezone: TIMEZONE });
 
+  // Flexible payment tracking sheet - same 23:59 slot, time frame set via env.
+  cron.schedule('59 23 * * *', () => {
+    sendPaymentsTrackingEmail().catch(err => logError(`SCHEDULER TRACKING FAILED: ${err.message}`));
+  }, { timezone: TIMEZONE });
+
   catchUpMissedReports().catch(err => logError(`SCHEDULER CATCH-UP FAILED: ${err.message}`));
+  catchUpPaymentsTracking().catch(err => logError(`SCHEDULER TRACKING CATCH-UP FAILED: ${err.message}`));
   console.log(`[scheduler] started (tz ${TIMEZONE}) — notifications 23:58, report 23:59 → ${REPORT_RECIPIENT}`);
 }
 
 module.exports = {
   lusakaDate,
   buildDailyReportData,
+  buildPaymentsLeadersData,
+  buildPaymentsReportBody,
   buildReportBody,
   buildReportPdf,
   buildReportXlsx,
   sendDailyLoanReport,
+  sendPaymentsTrackingEmail,
   catchUpMissedReports,
+  catchUpPaymentsTracking,
   startScheduler,
-  REPORT_RECIPIENT
+  REPORT_RECIPIENT,
+  TRACKING_FROM,
+  TRACKING_TO,
+  PORTFOLIO_FROM,
+  PORTFOLIO_TO
 };
 
 if (require.main === module) startScheduler();

@@ -6,7 +6,7 @@ const { getActiveSessions } = require('../controllers/sessionController');
 const {
   upload, getLoans, requestLoan, getLoanById,
   updateLoanStatus, getAllLoans, recordPayment,
-  notifyAllOverdue, searchByReceiptId, sendLoanNotification
+  notifyAllOverdue, searchByReceiptId, sendLoanNotification, notifyUser
 } = require('../controllers/loanController');
 const {
   requestSignup, confirmSignup, resendOTP,
@@ -22,7 +22,8 @@ const {
   getReportSummary, exportReport, getSingleUserReport,
   getAllUsersReport, getAnalyticsReport, getProfitAnalytics,
   getDefaulterAnalytics, getOverdueAnalytics, getPaidAnalytics,
-  getUserReport, searchReports
+  getUserReport, searchReports, getPaymentsLedger,
+  getPaymentsReportExport
 } = require('../controllers/reportController');
 
 router.get('/', (req, res) => res.send('Navi Server is running!'));
@@ -49,7 +50,10 @@ router.get('/users', getAllUsers);
 router.get('/loans', getLoans);
 router.get('/loans/all', getAllLoans);
 router.get('/loans/search', searchByReceiptId);
+router.get('/payments', getPaymentsLedger);
+router.get('/payments/export', getPaymentsReportExport);
 router.post('/loans/notify-overdue', notifyAllOverdue);
+router.post('/loans/notify-user', notifyUser);
 router.get('/loans/:id', getLoanById);
 router.post('/loans/request', upload.fields([
   { name: 'collateralFront', maxCount: 1 },

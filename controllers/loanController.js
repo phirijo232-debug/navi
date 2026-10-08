@@ -889,6 +889,65 @@ async function sendLoanNotification(req, res) {
   }
 }
 
+async function notifyUser(req, res) {
+  try {
+    const { email } = req.body || {};
+    const authRole = req.authUser?.role;
+    if (authRole !== 'admin' && authRole !== 'store_admin') {
+      return res.status(403).json({ error: 'Admin access required.' });
+    }
+    const target = String(email || '').trim().toLowerCase();
+    if (!target) {
+      return res.status(400).json({ error: 'Customer email is required.' });
+    }
+
+    const storeId = getRequestedStoreId(req);
+    if (!canAccessStore(req, storeId)) {
+      return res.status(403).json({ error: 'Access to this store is not allowed.' });
+    }
+
+    const loans = getLoansData().filter(loan =>
+      (storeId === 'all' || getRecordStoreId(loan) === storeId) &&
+      String(loan.email || '').trim().toLowerCase() === target
+    );
+    if (!loans.length) {
+      return res.status(404).json({ error: 'No loans found for that customer in this store.' });
+    }
+
+    const activeLoans = loans.filter(loan => Number(loan.outstanding || 0) > 0);
+    const outstandingTotal = activeLoans.reduce((sum, loan) => sum + Number(loan.outstanding || 0), 0);
+    const loanDetails = activeLoans.map(loan =>
+      `- ${loan.product || 'Loan'} ${loan.receiptNumber || `#${loan.id}`}: ` +
+      `outstanding ${formatCurrency(loan.outstanding)}, due ${loan.dueDate || 'date unavailable'}`
+    ).join('\n');
+
+    const subject = 'BMF Loan Reminder';
+    const text = `Hello,\n\nThis is a reminder from Buraza Micro Finance (BMF) regarding your loan account.\n\n` +
+      (activeLoans.length
+        ? `Open balance(s):\n${loanDetails}\n\nTotal outstanding: ${formatCurrency(outstandingTotal)}\n\nKindly settle the outstanding balance to continue enjoying the BMF loan service.\n`
+        : `Our records show no open balance on your account. Thank you for staying up to date.\n`) +
+      `\nRegards,\nBuraza Micro Finance (BMF), a Pryme Vertex subsidiary.`;
+
+    const result = await emailService.sendCustomerEmail({ to: target, subject, text });
+    logError(`NOTIFICATION SENT | user | to ${target} | loans ${loans.length} | outstanding ${formatCurrency(outstandingTotal)}`);
+    if (!result?.ok && !result?.skipped) {
+      return res.status(502).json({ error: result?.reason || 'Notification email could not be delivered.' });
+    }
+
+    return res.json({
+      message: `Notification sent to ${target}.`,
+      email: target,
+      loans: loans.length,
+      openLoans: activeLoans.length,
+      outstandingTotal: Number(outstandingTotal.toFixed(2)),
+      skipped: Boolean(result?.skipped)
+    });
+  } catch (err) {
+    logError(`NOTIFY USER FAILED: ${err.message}`);
+    return res.status(500).json({ error: 'Unable to send the notification.' });
+  }
+}
+
 async function notifyAllOverdue(req, res) {
   try {
     if (req.authUser?.role !== 'store_admin') {
@@ -953,6 +1012,7 @@ module.exports = {
   getAllLoans,
   recordPayment,
   sendLoanNotification,
+  notifyUser,
   notifyAllOverdue,
   calculateInterest,
   getApprovalDeadline,

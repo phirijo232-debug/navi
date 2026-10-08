@@ -124,7 +124,7 @@ async function fetchUsers() {
 
     allUsers = await response.json();
     renderUsers(allUsers);
-    await Promise.all([fetchStoreReport(), fetchStoreFeedback()]);
+    await Promise.all([fetchStoreReport(), fetchStoreFeedback(), fetchNewRequests()]);
   } catch (err) {
     console.error(err);
     setAuthMessage('Access denied or session expired. Please login again.', true);
@@ -133,6 +133,88 @@ async function fetchUsers() {
     localStorage.removeItem('userEmail');
     localStorage.removeItem('username');
     showAuthScreen();
+  }
+}
+
+// ─── New Requests (BMF store only) ───────────────────────────────────────────
+// Numbered pending loan rows with full customer information pulled from the
+// registered customer record. The badge shows how many requests await review.
+let pendingRequests = [];
+
+function findCustomerForLoan(loan) {
+  const email = String(loan.email || '').trim().toLowerCase();
+  return allUsers.find(user => String(user.email || '').trim().toLowerCase() === email) || null;
+}
+
+async function fetchNewRequests() {
+  const list = document.getElementById('newRequestsList');
+  const badge = document.getElementById('newRequestsBadge');
+  const note = document.getElementById('newRequestsNote');
+  try {
+    const response = await fetch('/loans/all', { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to load requests.');
+
+    pendingRequests = (Array.isArray(data.loans) ? data.loans : [])
+      .filter(loan => String(loan.status || '').trim().toLowerCase().replace(/\s+/g, '_') === 'pending')
+      .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    renderNewRequests();
+    if (note) note.textContent = '';
+  } catch (err) {
+    pendingRequests = [];
+    if (badge) badge.textContent = '0';
+    if (list) list.innerHTML = `<p>${escapeHtml(err.message || 'Unable to load requests.')}</p>`;
+  }
+}
+
+function renderNewRequests() {
+  const list = document.getElementById('newRequestsList');
+  const badge = document.getElementById('newRequestsBadge');
+  if (!list || !badge) return;
+
+  badge.textContent = String(pendingRequests.length);
+  if (!pendingRequests.length) {
+    list.innerHTML = '<p>No new requests awaiting review.</p>';
+    return;
+  }
+
+  list.innerHTML = pendingRequests.map((loan, index) => {
+    const customer = findCustomerForLoan(loan) || {};
+    return `
+    <div class="request-row">
+      <div>
+        <span class="request-seq">${index + 1}</span>
+        <strong style="margin-left: 8px;">${escapeHtml(loan.product || 'Loan')} — ${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</strong>
+        <p><strong>Customer:</strong> ${escapeHtml(customer.username || loan.email || 'Unknown')}</p>
+        <p><strong>Email:</strong> ${escapeHtml(customer.email || loan.email || 'N/A')}</p>
+        <p><strong>Phone:</strong> ${escapeHtml(customer.phone || 'N/A')}</p>
+        <p><strong>Amount:</strong> ${formatCurrency(loan.amount)} · <strong>Interest:</strong> ${formatCurrency(loan.interestAmount || 0)} · <strong>Total:</strong> ${formatCurrency(loan.totalRepayment || loan.amount || 0)}</p>
+        <p><strong>Tenure:</strong> ${escapeHtml(loan.tenureWeeks || 'N/A')} weeks · <strong>Urgency:</strong> ${escapeHtml(loan.urgency || 'standard')} · <strong>Requested:</strong> ${escapeHtml(formatDate(loan.createdAt))}</p>
+      </div>
+      <div class="button-row">
+        <button class="toggle-mode" type="button" data-request-user="${escapeHtml(customer.id ?? '')}" ${customer.id == null ? 'disabled' : ''}>Open customer</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function notifySelectedUser() {
+  if (!selectedUser || !selectedUser.email) {
+    document.getElementById('detailFeedback').textContent = 'Open a customer first.';
+    return;
+  }
+  try {
+    document.getElementById('detailFeedback').textContent = `Sending notification to ${selectedUser.email}...`;
+    const response = await fetch('/loans/notify-user', {
+      method: 'POST',
+      headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ email: selectedUser.email })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to send notification.');
+    document.getElementById('detailFeedback').textContent = data.message || `Notification sent to ${selectedUser.email}.`;
+  } catch (err) {
+    document.getElementById('detailFeedback').textContent = err.message || 'Unable to send notification.';
   }
 }
 
@@ -447,11 +529,17 @@ function renderSelectedUser() {
     loanMatchesTimeframe(loan)
   );
 
+  const canNotifyUser = localStorage.getItem('userRole') === 'store_admin';
+
   modalBody.innerHTML = `
     <h2>Customer: ${escapeHtml(selectedUser.username || 'Unknown user')}</h2>
     <p><strong>Email:</strong> ${escapeHtml(selectedUser.email)}</p>
     <p><strong>Phone:</strong> ${escapeHtml(selectedUser.phone || 'N/A')}</p>
     <p><strong>Role:</strong> ${escapeHtml(selectedUser.role || 'user')}</p>
+    ${canNotifyUser ? `
+    <div class="button-row" style="margin: 10px 0;">
+      <button class="toggle-mode" type="button" data-notify-user>Notify this customer</button>
+    </div>` : ''}
     <hr>
     <h3>Buraza loan history (${selectedLoans.length})</h3>
     <div class="loan-filters" role="group" aria-label="Filter loans by status">
@@ -551,6 +639,7 @@ async function updateLoanStatus(loanId, action, reason) {
     if (!response.ok) throw new Error(data.error || 'Could not update loan status.');
     document.getElementById('detailFeedback').textContent = data.message || 'Loan status updated.';
     await viewUserDetails(selectedUserId);
+    await fetchNewRequests();
   } catch (err) {
     document.getElementById('detailFeedback').textContent = err.message || 'Could not update loan status.';
   }
@@ -942,6 +1031,17 @@ document.getElementById('userList').addEventListener('click', event => {
   if (button) viewUserDetails(button.dataset.userId);
 });
 document.getElementById('modalBody').addEventListener('click', event => {
+  if (event.target.closest('[data-notify-user]')) {
+    notifySelectedUser();
+    return;
+  }
+
+  const requestButton = event.target.closest('[data-request-user]');
+  if (requestButton) {
+    if (requestButton.dataset.requestUser) viewUserDetails(requestButton.dataset.requestUser);
+    return;
+  }
+
   const timeframeButton = event.target.closest('[data-timeframe]');
   if (timeframeButton) {
     activeTimeframeFilter = timeframeButton.dataset.timeframe;
@@ -982,9 +1082,17 @@ document.getElementById('userSearch').addEventListener('input', (event) => {
   const filtered = allUsers.filter((user) => {
     const username = (user.username || '').toLowerCase();
     const email = (user.email || '').toLowerCase();
-    return username.includes(term) || email.includes(term);
+    const phone = String(user.phone || '').toLowerCase();
+    return username.includes(term) || email.includes(term) || phone.includes(term);
   });
   renderUsers(filtered);
+});
+document.getElementById('refreshRequestsBtn').addEventListener('click', fetchNewRequests);
+document.getElementById('newRequestsList').addEventListener('click', event => {
+  const requestButton = event.target.closest('[data-request-user]');
+  if (requestButton && requestButton.dataset.requestUser) {
+    viewUserDetails(requestButton.dataset.requestUser);
+  }
 });
 
 window.onload = () => {
