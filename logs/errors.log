@@ -120,3 +120,220 @@
 [2026-10-08T16:00:26.790Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
 [2026-10-08T16:00:26.801Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
 [2026-10-08T16:00:27.995Z] DATA RECOVERED from backup (malformed JSON): users.json
+[2026-10-09T16:43:20.312Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-09T16:43:20.357Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-09T16:43:20.360Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-09T16:43:20.774Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-09T16:46:05.099Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-09T16:46:05.165Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-09T16:46:05.168Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-09T16:46:05.701Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-09T16:49:50.846Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-09T16:49:51.088Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-09T16:49:51.093Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-09T16:49:51.772Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-09T17:14:00.123Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-09T17:14:00.239Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-09T17:14:00.249Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-09T17:14:01.036Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-09T17:44:34.424Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-09T17:44:34.553Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-09T17:44:34.558Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-09T17:44:35.333Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-09T17:44:45.960Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-09T17:44:46.376Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-09T17:44:46.382Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-09T17:44:47.052Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-09T17:46:18.429Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-09T17:46:18.622Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-09T17:46:18.626Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-09T17:46:18.845Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-09T17:47:42.871Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-09T17:47:43.082Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-09T17:47:43.090Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-09T17:47:43.781Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-09T19:58:26.121Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-09T19:58:26.177Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-09T19:58:26.181Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-09T19:58:26.470Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-09T20:21:40.773Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-09T20:21:40.891Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-09T20:21:40.896Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-09T20:21:41.226Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-09T21:10:18.770Z] NOTIFICATION SENT | user | to phirijo232@gmail.com | loans 3 | outstanding K 2,440.00
+[2026-10-09T21:10:21.527Z] NOTIFICATION SENT | user | to phirijo232@gmail.com | loans 3 | outstanding K 2,440.00
+[2026-10-09T21:10:26.863Z] NOTIFICATION SENT | user | to phirijo232@gmail.com | loans 3 | outstanding K 2,440.00
+[2026-10-09T21:10:28.329Z] NOTIFICATION SENT | user | to phirijo232@gmail.com | loans 3 | outstanding K 2,440.00
+[2026-10-09T21:10:28.848Z] NOTIFICATION SENT | user | to phirijo232@gmail.com | loans 3 | outstanding K 2,440.00
+[2026-10-09T21:10:29.994Z] NOTIFICATION SENT | user | to phirijo232@gmail.com | loans 3 | outstanding K 2,440.00
+[2026-10-09T21:23:20.339Z] NOTIFICATION SENT | user | to phirizack1@gmail.com | loans 1 | outstanding K 491.00
+[2026-10-09T21:58:03.850Z] NOTIFICATION SENT | REMINDER (1d) | loan BMF-2026-0003 | to phirijo232@gmail.com
+[2026-10-10T05:45:14.351Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-10T05:45:14.397Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-10T05:45:14.400Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-10T05:45:14.900Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-10T05:58:58.124Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-10T05:58:58.193Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-10T05:58:58.203Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-10T05:58:58.642Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-10T06:02:45.055Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-10T06:02:45.238Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-10T06:02:45.242Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-10T06:02:46.087Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-10T06:31:49.756Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-10T06:31:49.920Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-10T06:31:49.923Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-10T06:31:50.838Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-10T09:23:36.552Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-10T09:23:36.706Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-10T09:23:36.714Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-10T09:23:38.438Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-10T09:23:49.145Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-10T09:23:49.227Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-10T09:23:49.233Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-10T09:23:49.722Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-10T10:05:30.665Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-10T10:05:30.717Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-10T10:05:30.722Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-10T10:05:31.207Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-10T20:39:41.712Z] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-10T20:40:23.621Z] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-10T20:40:28.479Z] PASSWORD RESET CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-10T20:41:38.226Z] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-10T20:44:49.645Z] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-10T21:20:43.247Z] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-10T21:20:43.394Z] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-10T21:20:43.469Z] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-10T21:21:03.152Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-10T21:21:03.206Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-10T21:21:03.212Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-10T21:21:03.458Z] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-10T21:21:03.678Z] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-10T21:21:03.730Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-10T21:21:03.793Z] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-10T21:21:22.532Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-10T21:21:22.592Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-10T21:21:22.596Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-10T21:21:22.975Z] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-10T21:21:23.353Z] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-10T21:21:23.405Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-10T21:21:23.544Z] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-10T21:21:39.140Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-10T21:21:39.198Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-10T21:21:39.205Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-10T21:21:39.415Z] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-10T21:21:39.721Z] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-10T21:21:39.909Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-10T21:21:39.957Z] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T04:49:08.147Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T04:49:08.194Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T04:49:08.197Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T04:49:08.422Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T04:49:08.658Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T04:49:08.749Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T04:49:08.779Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T04:50:14.017Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T04:50:14.156Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T04:50:14.166Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T04:50:14.411Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T04:50:14.841Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T04:50:15.074Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T04:50:15.212Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T04:50:34.705Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T04:50:34.796Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T04:50:34.803Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T04:50:35.305Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T04:50:35.713Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T04:50:35.892Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T04:50:35.911Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T06:05:19.565Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T06:05:19.626Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T06:05:19.630Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T06:05:20.073Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T06:05:20.139Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T06:05:20.281Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T06:05:20.376Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T06:09:36.582Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T06:09:36.665Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T06:09:36.685Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T06:09:37.145Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T06:09:37.223Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T06:09:37.366Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T06:09:37.506Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T06:12:39.427Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T06:12:39.485Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T06:12:39.488Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T06:12:39.949Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T06:12:39.987Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T06:12:40.158Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T06:12:40.262Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T07:31:00.372Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T07:31:00.598Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T07:31:00.622Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T07:31:01.875Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T07:31:02.774Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T07:31:02.821Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T07:31:03.035Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T12:53:02.548Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T12:53:02.685Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T12:53:02.690Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T12:53:03.799Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T12:53:04.437Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T12:53:04.561Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T12:53:04.696Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T12:53:36.761Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T12:53:36.851Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T12:53:36.858Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T12:53:37.729Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T12:53:38.028Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T12:53:38.176Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T12:53:38.429Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T12:54:48.732Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T12:54:48.815Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T12:54:48.823Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T12:54:49.806Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T12:54:50.135Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T12:54:50.201Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T12:54:50.468Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T12:56:30.719Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T12:56:30.787Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T12:56:30.791Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T12:56:31.443Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T12:56:31.710Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T12:56:31.911Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T12:56:32.121Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T19:39:55.371Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T19:39:55.393Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T19:39:55.399Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T19:39:56.008Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T19:39:56.247Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T19:39:56.579Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T19:39:56.617Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T21:30:16.270Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T21:30:16.307Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T21:30:16.329Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T21:30:17.145Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T21:30:17.392Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T21:30:17.447Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T21:30:17.565Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T21:53:05.318Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T21:53:05.334Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T21:53:05.339Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T21:53:05.872Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T21:53:06.071Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T21:53:06.164Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T21:53:06.431Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T21:53:33.535Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T21:53:33.556Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T21:53:33.560Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T21:53:34.008Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T21:53:34.120Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T21:53:34.223Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T21:53:34.320Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-11T21:58:19.666Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-11T21:58:19.684Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-11T21:58:19.688Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-11T21:58:20.198Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-11T21:58:20.389Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-11T21:58:20.457Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-11T21:58:20.660Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465

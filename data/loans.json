@@ -8,7 +8,7 @@
     "interestRate": 16,
     "interestAmount": 152,
     "totalRepayment": 1102,
-    "outstanding": 696,
+    "outstanding": 491,
     "dueDate": "2026-10-22",
     "urgency": "urgent",
     "paymentMode": "bank_transfer",
@@ -19,7 +19,7 @@
     "collateralGrade": "B",
     "collateralVerified": false,
     "agreedToTerms": true,
-    "status": "active",
+    "status": "in_progress",
     "approvalDeadline": "2026-09-26T16:51:11.956Z",
     "payments": [
       {
@@ -34,15 +34,32 @@
         "balanceAfter": 696,
         "receiptNumber": "BMF-2026-0001-P01",
         "recordedBy": "admin@prymevertex.test",
-        "paymentDate": "2026-10-01T18:22:02.543Z"
+        "paymentDate": "2026-10-01T18:22:02.543Z",
+        "paymentReceiptId": "PAY-20261001-5384"
+      },
+      {
+        "paymentReceiptId": "PAY-20261009-6487",
+        "amount": 205,
+        "paymentDate": "2026-10-09T21:18:05.780Z",
+        "balanceBefore": 696,
+        "balanceAfter": 491,
+        "mode": "Airtel Money",
+        "note": "capturing partial payment 205",
+        "description": "capturing partial payment 205",
+        "screenshot": null,
+        "date": "2026-10-09T21:18:05.780Z",
+        "recordedBy": "admin@prymevertex.test",
+        "receiptNumber": "BMF-2026-0001-P02",
+        "interestPortion": 0,
+        "principalPortion": 205
       }
     ],
     "createdAt": "2026-09-25T16:51:11.968Z",
     "adminReason": "Approved successfully",
     "approvedAt": "2026-10-01T18:17:56.465Z",
-    "updatedAt": "2026-10-01T18:22:02.544Z",
+    "updatedAt": "2026-10-09T21:18:55.650Z",
     "reviewedBy": "admin@prymevertex.test",
-    "reviewedAt": "2026-10-01T18:17:56.472Z",
+    "reviewedAt": "2026-10-09T21:18:55.650Z",
     "statusHistory": [
       {
         "status": "approved",
@@ -57,13 +74,28 @@
         "actor": "admin@prymevertex.test",
         "source": "admin",
         "updatedAt": "2026-10-01T18:22:02.544Z"
+      },
+      {
+        "status": "active",
+        "reason": "Payment of K 205.00 recorded.",
+        "actor": "admin@prymevertex.test",
+        "source": "admin",
+        "updatedAt": "2026-10-09T21:18:05.780Z"
+      },
+      {
+        "status": "in_progress",
+        "reason": "Approved successfully",
+        "actor": "admin@prymevertex.test",
+        "source": "admin",
+        "updatedAt": "2026-10-09T21:18:55.650Z"
       }
     ],
     "storeId": "buraza",
     "receiptNumber": "BMF-2026-0001",
     "borrowedDate": "2026-10-01",
-    "paidTotal": 406,
-    "interestOutstanding": 0
+    "paidTotal": 611,
+    "interestOutstanding": 0,
+    "updatedBy": "admin@prymevertex.test"
   },
   {
     "id": 2,
@@ -147,7 +179,7 @@
     "interestRate": 10,
     "interestAmount": 30,
     "totalRepayment": 330,
-    "outstanding": 200,
+    "outstanding": 0,
     "dueDate": "2026-10-10",
     "urgency": "emergency",
     "paymentMode": "mobile_money",
@@ -158,7 +190,7 @@
     "collateralGrade": "A",
     "collateralVerified": false,
     "agreedToTerms": true,
-    "status": "active",
+    "status": "paid",
     "approvalDeadline": "2026-10-02T18:18:08.069Z",
     "payments": [
       {
@@ -176,6 +208,22 @@
         "receiptNumber": "BMF-2026-0003-P01",
         "interestPortion": 30,
         "principalPortion": 100
+      },
+      {
+        "paymentReceiptId": "PAY-20261011-6859",
+        "amount": 200,
+        "paymentDate": "2026-10-11T21:13:46.762Z",
+        "balanceBefore": 200,
+        "balanceAfter": 0,
+        "mode": "Cash",
+        "note": "capturing partial payment 200.00",
+        "description": "capturing partial payment 200.00",
+        "screenshot": null,
+        "date": "2026-10-11T21:13:46.762Z",
+        "recordedBy": "jophiri223@gmail.com",
+        "receiptNumber": "BMF-2026-0003-P02",
+        "interestPortion": 0,
+        "principalPortion": 200
       }
     ],
     "statusHistory": [
@@ -206,19 +254,27 @@
         "actor": "jophiri223@gmail.com",
         "source": "admin",
         "updatedAt": "2026-10-07T15:45:39.248Z"
+      },
+      {
+        "status": "paid",
+        "reason": "Payment of K 200.00 recorded.",
+        "actor": "jophiri223@gmail.com",
+        "source": "admin",
+        "updatedAt": "2026-10-11T21:13:46.800Z"
       }
     ],
     "createdAt": "2026-10-02T14:18:08.076Z",
     "adminReason": "Approved, met all requirements",
     "approvedAt": "2026-10-02T14:44:43.784Z",
-    "updatedAt": "2026-10-07T15:45:38.849Z",
+    "updatedAt": "2026-10-11T21:13:46.762Z",
     "reviewedBy": "jophiri223@gmail.com",
     "reviewedAt": "2026-10-02T14:44:43.784Z",
     "receiptNumber": "BMF-2026-0003",
     "borrowedDate": "2026-10-02",
-    "paidTotal": 130,
+    "paidTotal": 330,
     "interestOutstanding": 0,
-    "updatedBy": "jophiri223@gmail.com"
+    "updatedBy": "jophiri223@gmail.com",
+    "settledAt": "2026-10-11T21:13:46.762Z"
   },
   {
     "id": 4,
@@ -231,7 +287,7 @@
     "interestRate": 10,
     "interestAmount": 105,
     "totalRepayment": 1155,
-    "outstanding": 1155,
+    "outstanding": 0,
     "dueDate": "2026-10-15",
     "urgency": "urgent",
     "paymentMode": "mobile_money",
@@ -242,9 +298,26 @@
     "collateralGrade": "C",
     "collateralVerified": false,
     "agreedToTerms": true,
-    "status": "approved",
+    "status": "paid",
     "approvalDeadline": "2026-10-08T14:31:56.815Z",
-    "payments": [],
+    "payments": [
+      {
+        "paymentReceiptId": "PAY-20261011-7904",
+        "amount": 1155,
+        "paymentDate": "2026-10-11T21:14:32.722Z",
+        "balanceBefore": 1155,
+        "balanceAfter": 0,
+        "mode": "Cash",
+        "note": "capturing partial payment 1,155.00",
+        "description": "capturing partial payment 1,155.00",
+        "screenshot": null,
+        "date": "2026-10-11T21:14:32.722Z",
+        "recordedBy": "jophiri223@gmail.com",
+        "receiptNumber": "BMF-20261007-7232-P01",
+        "interestPortion": 105,
+        "principalPortion": 1050
+      }
+    ],
     "statusHistory": [
       {
         "status": "pending",
@@ -259,16 +332,70 @@
         "actor": "jophiri223@gmail.com",
         "source": "admin",
         "updatedAt": "2026-10-07T14:49:25.580Z"
+      },
+      {
+        "status": "paid",
+        "reason": "Payment of K 1,155.00 recorded.",
+        "actor": "jophiri223@gmail.com",
+        "source": "admin",
+        "updatedAt": "2026-10-11T21:14:32.722Z"
       }
     ],
     "createdAt": "2026-10-07T14:31:56.819Z",
     "adminReason": "Requirements have been met",
     "approvedAt": "2026-10-07T14:49:25.546Z",
     "borrowedDate": "2026-10-07",
-    "paidTotal": 0,
-    "interestOutstanding": 105,
-    "updatedAt": "2026-10-07T14:49:25.580Z",
+    "paidTotal": 1155,
+    "interestOutstanding": 0,
+    "updatedAt": "2026-10-11T21:14:32.722Z",
     "reviewedBy": "jophiri223@gmail.com",
-    "reviewedAt": "2026-10-07T14:49:25.580Z"
+    "reviewedAt": "2026-10-07T14:49:25.580Z",
+    "updatedBy": "jophiri223@gmail.com",
+    "settledAt": "2026-10-11T21:14:32.722Z"
+  },
+  {
+    "id": 5,
+    "receiptNumber": "BMF-20261010-5557",
+    "email": "nkunikaesther83@gmail.com",
+    "storeId": "buraza",
+    "product": "Phone",
+    "amount": 50,
+    "tenureWeeks": 2,
+    "interestRate": 16,
+    "interestAmount": 8,
+    "totalRepayment": 58,
+    "outstanding": 58,
+    "dueDate": "2026-10-17",
+    "urgency": "standard",
+    "paymentMode": "airtel",
+    "nextPayment": null,
+    "collateralDescription": "Phone",
+    "collateralFront": "1791666741171-WhatsApp Image 2026-10-10 at 15.16.28.jpeg",
+    "collateralBack": "1791666741176-Screenshot 2026-10-09 193724.png",
+    "collateralGrade": "85",
+    "collateralVerified": false,
+    "agreedToTerms": true,
+    "status": "active",
+    "adminReason": "Loan created and activated by admin.",
+    "approvalDeadline": null,
+    "approvedAt": "2026-10-10T21:12:21.195Z",
+    "borrowedDate": "2026-10-10",
+    "reviewedBy": "jophiri223@gmail.com",
+    "reviewedAt": "2026-10-10T21:12:21.195Z",
+    "updatedBy": "jophiri223@gmail.com",
+    "payments": [],
+    "statusHistory": [
+      {
+        "status": "active",
+        "reason": "Loan created and activated by admin.",
+        "actor": "jophiri223@gmail.com",
+        "source": "admin",
+        "updatedAt": "2026-10-10T21:12:21.195Z"
+      }
+    ],
+    "createdAt": "2026-10-10T21:12:21.195Z",
+    "updatedAt": "2026-10-10T21:12:21.195Z",
+    "paidTotal": 0,
+    "interestOutstanding": 8
   }
 ]
