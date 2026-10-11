@@ -17,7 +17,12 @@ function getRequestedStoreId(req) {
 function canAccessStore(req, storeId = getRequestedStoreId(req)) {
   const role = req.authUser?.role;
   if (role === 'admin') return true;
-  return role === 'store_admin' && getRecordStoreId(req.authUser) === storeId;
+  // Franchise Employee Admin and the restricted store admin are both scoped to
+  // the store they belong to; only the main admin spans every subsidiary.
+  if (role === 'franchise_admin' || role === 'store_admin') {
+    return getRecordStoreId(req.authUser) === storeId;
+  }
+  return false;
 }
 
 function canAccessRecord(req, record) {
@@ -25,7 +30,14 @@ function canAccessRecord(req, record) {
 }
 
 function isAdminRole(role) {
-  return role === 'admin' || role === 'store_admin';
+  return role === 'admin' || role === 'franchise_admin' || role === 'store_admin';
 }
 
-module.exports = { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, isAdminRole };
+// Roles permitted to perform HR / employee-management actions and to receive the
+// store-switch OTP: the main admin and the Franchise Employee Admin. The
+// restricted store_admin is deliberately excluded.
+function isFranchiseAdmin(role) {
+  return role === 'admin' || role === 'franchise_admin';
+}
+
+module.exports = { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, isAdminRole, isFranchiseAdmin };

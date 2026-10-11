@@ -3,10 +3,12 @@ const path = require('path');
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
 const config = require('../config');
-const { logError } = require('../middleware/logger');
+const { logError, logBreakage } = require('../middleware/logger');
 const dataStore = require('../middleware/dataStore');
 const { getFeedbackData } = require('./feedbackController');
 const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole } = require('../middleware/storeScope');
+const { getEnrichedLoans, summarizeStore, searchLoansByReceipt, normalizeStatus } = require('./loanController');
+const { buildTrackingSheet, persistTracking } = require('./reportTracking');
 
 const USERS_FILE = dataStore.paths.users;
 const LOANS_FILE = dataStore.paths.loans;
@@ -185,7 +187,6 @@ function analyticsScope(req) {
 }
 
 function getAnalyticsLoans(scope) {
-  const { getEnrichedLoans } = require('./loanController');
   const data = getReportData(scope);
   const enrichedById = new Map(getEnrichedLoans().map(loan => [loan.id, loan]));
   return data.loans.map(loan => ({
@@ -194,6 +195,179 @@ function getAnalyticsLoans(scope) {
     receiptNumber: loan.receiptNumber || enrichedById.get(loan.id)?.receiptNumber || null
   }));
 }
+
+// ─── Profit / loss tracking sheet (all-user portfolio) ─────────────────────────
+function getTrackingAnalytics(req, res) {
+  const scope = req.params.scope === 'franchise' ? 'all' : (req.params.scope || 'buraza');
+  if (!isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required for this report scope.' });
+
+  const { from, to, invalid } = readPeriod(req);
+  if (invalid) return res.status(400).json({ error: 'from/to must be YYYY-MM-DD dates.' });
+
+  const enriched = getEnrichedLoans(new Date().toISOString().slice(0, 10));
+  const loans = enriched.filter(loan => scope === 'all' || getRecordStoreId(loan) === scope);
+  const customersByEmail = new Map();
+  const usersData = dataStore.readJson(USERS_FILE, [], Array.isArray);
+  usersData.forEach(u => customersByEmail.set(String(u.email || '').trim().toLowerCase(), u));
+
+  const today = new Date().toISOString().slice(0, 10);
+  const storeSummary = summarizeStore(loans, today);
+
+  const netProfit = Number((storeSummary.totalInterestBooked - storeSummary.totalOutstanding).toFixed(2));
+  const netProfitMargin = storeSummary.totalInterestBooked > 0
+    ? Number(((storeSummary.totalInterestBooked - storeSummary.totalOutstanding) / storeSummary.totalInterestBooked * 100).toFixed(2))
+    : 0;
+
+  const loanRows = loans.map(loan => {
+    return {
+      receiptNumber: loan.receiptNumber,
+      customer: customersByEmail.get(String(loan.email || '').trim().toLowerCase())?.username || loan.email,
+      email: loan.email,
+      phone: customersByEmail.get(String(loan.email || '').trim().toLowerCase())?.phone || null,
+      product: loan.product,
+      amount: Number(loan.amount || 0),
+      interestBooked: Number(loan.interestAmount || 0),
+      interestCollected: Number((loan.payments || []).reduce((sum, p) => sum + (Number(p.interestPortion) || 0), 0).toFixed(2)),
+      totalCollected: Number(loan.paidTotal || 0),
+      outstanding: Number(loan.outstanding || 0),
+      interestOutstanding: Number(loan.interestOutstanding || 0),
+      dueDate: loan.dueDate,
+      status: loan.businessStatus
+    };
+  });
+
+  const grouped = {};
+  loanRows.forEach(row => {
+    const key = !grouped[row.status] ? Object.assign({}, row) : row;
+    if (!grouped[row.status]) grouped[row.status] = [];
+    grouped[row.status].push(row);
+  });
+
+  const byStatus = {
+    active: loanRows.filter(l => l.status === 'active'),
+    grace: loanRows.filter(l => l.status === 'grace'),
+    defaulted: loanRows.filter(l => l.status === 'defaulted'),
+    liquidated: loanRows.filter(l => l.status === 'liquidated'),
+    paid: loanRows.filter(l => l.status === 'paid')
+  };
+
+  return res.json({
+    scope,
+    generatedAt: new Date().toISOString(),
+    period: { from: (from || null), to: (to || null), asOf: today },
+    summary: {
+      totalLoans: storeSummary.totalLoans,
+      totalCapital: storeSummary.totalCapital,
+      totalInterestBooked: storeSummary.totalInterestBooked,
+      totalCollected: storeSummary.totalCollected,
+      totalOutstanding: storeSummary.totalOutstanding,
+      netProfit,
+      netProfitMargin: Number(netProfitMargin.toFixed(2)),
+      possibleLoss: storeSummary.defaulted.possibleLoss,
+      defaulted: storeSummary.defaulted.count,
+      grace: storeSummary.grace.count,
+      liquidated: storeSummary.liquidated.count,
+      paid: storeSummary.paid.count,
+      active: storeSummary.active.count
+    },
+    byStatus,
+    loans: loanRows
+  });
+}
+
+// ─── Tracking-sheet CSV export (all-user portfolio) ───────────────────────────
+function exportTrackingSheet(req, res) {
+  try {
+    const scope = req.params.scope === 'franchise' ? 'all' : (req.params.scope || 'buraza');
+    if (!isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required.' });
+
+    const enriched = getEnrichedLoans(new Date().toISOString().slice(0, 10));
+    const loans = enriched.filter(loan => scope === 'all' || getRecordStoreId(loan) === scope);
+    const today = new Date().toISOString().slice(0, 10);
+    const stats = summarizeStore(loans, today);
+    const netProfit = Number((stats.totalInterestBooked - stats.totalOutstanding).toFixed(2));
+    const netMargin = stats.totalInterestBooked > 0 ? Number(((stats.totalInterestBooked - stats.totalOutstanding) / stats.totalInterestBooked * 100).toFixed(2)) : 0;
+
+    const header = ['Scope','Generated At','Total Loans','Total Capital','Total Interest Booked','Total Collected','Total Outstanding','Net Profit','Net Profit Margin %','Possible Loss','Defaulted','Grace','Liquidated','Paid','Active'];
+    const rows = [
+      ['all', new Date().toISOString(), stats.totalLoans, stats.totalCapital, stats.totalInterestBooked, stats.totalCollected, stats.totalOutstanding, netProfit, netMargin, stats.defaulted.possibleLoss, stats.defaulted.count, stats.grace.count, stats.liquidated.count, stats.paid.count, stats.active.count]
+    ];
+
+    const csv = [['Tracking Sheet — All Users (Portfolio Profit & Loss)']].map(r => r.join(',')).join('\n') + '\n\n' + [header.join(',')] + '\n' + rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="bmf-portfolio-tracking-sheet.csv"');
+    res.send(csv);
+  } catch (err) {
+    logBreakage('reportController.js', 'exportTrackingSheet', err, 'TRACKING EXPORT FAILED');
+    if (!res.headersSent) return res.status(503).json({ error: 'Tracking export is temporarily unavailable. Please try again shortly.' });
+  }
+}
+
+// ─── Per-user tracking sheet (single customer) ────────────────────────────────
+function getUserTracking(req, res) {
+  const scope = req.params.scope === 'franchise' ? 'all' : (req.params.scope || 'buraza');
+  const email = String(req.params.id || '').trim().toLowerCase();
+  if (!email || !isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required.' });
+
+  const users = dataStore.readJson(USERS_FILE, [], Array.isArray);
+  const customer = users.find(u => String(u.email || '').trim().toLowerCase() === email);
+  if (!customer) return res.status(404).json({ error: 'Customer not found.' });
+
+  const enriched = getEnrichedLoans();
+  const loans = enriched.filter(loan => getRecordStoreId(loan) === scope && String(loan.email || '').trim().toLowerCase() === email);
+  const loanRows = loans.map(loan => ({
+    receiptNumber: loan.receiptNumber,
+    product: loan.product,
+    amount: Number(loan.amount || 0),
+    interestAmount: Number(loan.interestAmount || 0),
+    interestCollected: Number((loan.payments || []).reduce((sum, p) => sum + (Number(p.interestPortion) || 0), 0).toFixed(2)),
+    totalCollected: Number(loan.paidTotal || 0),
+    outstanding: Number(loan.outstanding || 0),
+    interestOutstanding: Number(loan.interestOutstanding || 0),
+    interestRate: loan.interestRate,
+    tenureWeeks: loan.tenureWeeks,
+    dueDate: loan.dueDate,
+    status: loan.businessStatus
+  }));
+
+  const principal = loanRows.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+  const interestBooked = loanRows.reduce((sum, l) => sum + (Number(l.interestAmount) || 0), 0);
+  const interestCollected = loanRows.reduce((sum, l) => sum + (Number(l.interestCollected) || 0), 0);
+  const totalCollected = loanRows.reduce((sum, l) => sum + (Number(l.totalCollected) || 0), 0);
+  const outstanding = loanRows.reduce((sum, l) => sum + (Number(l.outstanding) || 0), 0);
+  const netProfit = Number((interestBooked - outstanding).toFixed(2));
+  const netProfitMargin = interestBooked > 0 ? Number((netProfit / interestBooked * 100).toFixed(2)) : 0;
+
+  return res.json({
+    scope,
+    generatedAt: new Date().toISOString(),
+    customer: {
+      id: customer.id,
+      username: customer.username,
+      email: customer.email,
+      phone: customer.phone,
+      role: customer.role,
+      storeId: customer.storeId,
+      nrc: customer.nrc,
+      createdAt: customer.createdAt
+    },
+    loans: loanRows,
+    summary: {
+      principal,
+      interestBooked,
+      interestCollected,
+      totalCollected,
+      outstanding,
+      netProfit,
+      netProfitMargin,
+      possibleLoss: outstanding,
+      loanCount: loanRows.length
+    }
+  });
+}
+
+
 
 function getReportSummary(req, res) {
   const scope = req.params.scope === 'franchise' ? 'all' : req.params.scope;
@@ -299,7 +473,6 @@ function getPaymentsLedger(req, res) {
     return res.status(403).json({ error: 'Admin access required.' });
   }
 
-  const { getEnrichedLoans } = require('./loanController');
   const storeId = getRequestedStoreId(req);
   if (!canAccessStore(req, storeId)) {
     return res.status(403).json({ error: 'Access to this store is not allowed.' });
@@ -375,7 +548,6 @@ function getPaymentsLedger(req, res) {
 }
 
 function buildPaymentsReportData(from, to, storeId = 'all') {
-  const { getEnrichedLoans } = require('./loanController');
   const loans = getEnrichedLoans().filter(loan =>
     !storeId || storeId === 'all' || getRecordStoreId(loan) === storeId);
   let allPayments = [];
@@ -517,7 +689,7 @@ async function getPaymentsReportExport(req, res) {
     res.setHeader('Content-Disposition', `attachment; filename="BMF-Payments-${data.from || 'AllTime'}-${data.to || 'AllTime'}.xlsx"`);
     return res.send(buffer);
   } catch (err) {
-    logError(`PAYMENTS REPORT EXPORT FAILED: ${err.message}`);
+    logBreakage('reportController.js', 'getPaymentsReportExport', err, 'PAYMENTS REPORT EXPORT FAILED');
     if (!res.headersSent) return res.status(500).json({ error: 'Unable to export the payments report.' });
   }
 }
@@ -529,7 +701,6 @@ function getUserReport(req, res) {
     return res.status(403).json({ error: 'Access to this account report is not allowed.' });
   }
 
-  const { getEnrichedLoans, summarizeStore } = require('./loanController');
   const users = readArray(USERS_FILE);
   const profile = users.find(user => String(user.email || '').trim().toLowerCase() === email) || null;
   const profileSafe = profile ? { ...profile } : null;
@@ -561,7 +732,6 @@ function searchReports(req, res) {
   const storeId = getRequestedStoreId(req);
   if (!canAccessStore(req, storeId)) return res.status(403).json({ error: 'Access to this store is not allowed.' });
 
-  const { searchLoansByReceipt } = require('./loanController');
   const scoped = getAnalyticsLoans(storeId === 'all' ? 'all' : analyticsScope(req))
     .filter(loan => storeId === 'all' || getRecordStoreId(loan) === storeId);
   return res.json({
@@ -718,7 +888,7 @@ async function exportReport(req, res) {
     res.setHeader('Content-Disposition', `attachment; filename="${label}-ledger-${new Date().toISOString().slice(0, 10)}.xlsx"`);
     return res.send(Buffer.from(buffer));
   } catch (err) {
-    logError(`REPORT EXPORT FAILED: ${err.message}`);
+    logBreakage('reportController.js', 'exportReport', err, 'REPORT EXPORT FAILED');
     if (!res.headersSent) return res.status(500).json({ error: 'Unable to export the report.' });
   }
 }
@@ -759,7 +929,6 @@ function requireAdmin(req, res) {
 }
 
 function collectLoansForEmail(email) {
-  const { getEnrichedLoans } = require('./loanController');
   const target = String(email || '').trim().toLowerCase();
   return getEnrichedLoans().filter(loan =>
     String(loan.email || '').trim().toLowerCase() === target);
@@ -772,7 +941,6 @@ function interestPaidOf(loan) {
 
 /** Shape one loan exactly as the Task 4 report spec requires. */
 function shapeLoan(loan) {
-  const { normalizeStatus } = require('./loanController');
   const payments = (Array.isArray(loan.payments) ? loan.payments : []).map(payment => ({
     paymentReceiptId: payment.paymentReceiptId || payment.receiptNumber || null,
     amount: Number(payment.amount || 0),
@@ -850,7 +1018,6 @@ function getAllUsersReport(req, res) {
   const { from, to, invalid } = readPeriod(req);
   if (invalid) return res.status(400).json({ error: 'from/to must be YYYY-MM-DD dates.' });
 
-  const { getEnrichedLoans } = require('./loanController');
   const emails = [...new Set([
     ...readArray(USERS_FILE).map(user => String(user.email || '').trim().toLowerCase()),
     ...getEnrichedLoans().map(loan => String(loan.email || '').trim().toLowerCase())
@@ -877,7 +1044,6 @@ function getAllUsersReport(req, res) {
 function getAnalyticsReport(req, res) {
   if (!requireAdmin(req, res)) return;
 
-  const { getEnrichedLoans } = require('./loanController');
   const enriched = getEnrichedLoans();
   const isOverdue = loan => ['grace', 'defaulted'].includes(loan.businessStatus);
   const isPaid = loan => loan.businessStatus === 'paid';
@@ -952,6 +1118,30 @@ function getAnalyticsReport(req, res) {
   });
 }
 
+// ─── Tracking sheet builder ────────────────────────────────────────────────────
+// Admin-only. Delegates to reportTracking.buildTrackingSheet (the single source
+// of truth for the portfolio profit/loss sheet), persists it to
+// data/trackingSheet.json, and returns it. Rebuilds on every request so the
+// sheet always reflects the latest loans/payments.
+function getTrackingSheet(req, res) {
+  try {
+    const scope = req.params.scope === 'franchise' ? 'all' : (req.params.scope || 'buraza');
+    if (!isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required.' });
+
+    const { from, to, invalid } = readPeriod(req);
+    if (invalid) return res.status(400).json({ error: 'from/to must be YYYY-MM-DD dates.' });
+
+    const sheet = buildTrackingSheet(scope);
+    sheet.period = { from: from || null, to: to || null, asOf: sheet.asOf };
+    persistTracking(sheet);
+
+    return res.json(sheet);
+  } catch (err) {
+    logBreakage('reportController.js', 'getTrackingSheet', err, 'TRACKING SHEET BUILD FAILED');
+    if (!res.headersSent) return res.status(503).json({ error: 'Tracking sheet is temporarily unavailable. Please try again shortly.' });
+  }
+}
+
 module.exports = {
   categorizeLoan,
   getReportData,
@@ -973,5 +1163,9 @@ module.exports = {
   buildPaymentsReportData,
   buildPaymentsExcelReport,
   buildPaymentsPdfReport,
-  getPaymentsReportExport
+  getPaymentsReportExport,
+  getTrackingAnalytics,
+  getUserTracking,
+  getTrackingSheet,
+  exportTrackingSheet
 };

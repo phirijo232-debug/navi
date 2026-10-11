@@ -222,7 +222,7 @@ body.light .tagline {
 
 .enter-btn:hover {
   opacity: 0.95;
-  transform: translateY(-1px);
+  box-shadow: 0 20px 44px rgba(59, 26, 94, 0.26);
 }
 
 .toggle-mode {
@@ -240,7 +240,7 @@ body.light .tagline {
   display: block;
 }
 
-.toggle-mode:hover { border-color: #7b2fff; transform: translateY(-1px); background: rgba(255,255,255,0.12); }
+.toggle-mode:hover { border-color: #7b2fff; background: rgba(255,255,255,0.12); }
 
 .animated-text {
   display: inline-block;
@@ -470,7 +470,9 @@ body.light .dropdown-menu {
   cursor: not-allowed;
 }
 
-select.auth-input option {
+select.auth-input option,
+select.modal-input option,
+select.search-box option {
   background: #ffffff;
   color: #18181b;
 }
@@ -494,7 +496,9 @@ body.light .auth-input {
   color: #1a1a2e;
 }
 
-body.light select.auth-input option {
+body.light select.auth-input option,
+body.light select.modal-input option,
+body.light select.search-box option {
   color: #18181b;
   background: #ffffff;
 }
@@ -1198,12 +1202,33 @@ body.light .panel {
 }
 
 .loan-badge.in_progress,
-.loan-badge.running {
+.loan-badge.running,
+.loan-badge.active {
   background: rgba(0,183,255,0.16);
   color: #00d4ff;
 }
 
 .loan-badge.approved {
+  background: rgba(76,175,80,0.16);
+  color: #8bc34a;
+}
+
+.loan-badge.grace {
+  background: rgba(255,193,7,0.16);
+  color: #ffd54f;
+}
+
+.loan-badge.defaulted {
+  background: rgba(244,67,54,0.16);
+  color: #ff7a6c;
+}
+
+.loan-badge.liquidated {
+  background: rgba(111,76,255,0.20);
+  color: #c9beff;
+}
+
+.loan-badge.paid {
   background: rgba(76,175,80,0.16);
   color: #8bc34a;
 }

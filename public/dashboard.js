@@ -6,8 +6,19 @@ function getUrgencyPriority(loan) {
   return order[urgency] ?? 2;
 }
 
-function getLoanStatusKey(status) {
-  return String(status || '').trim().toLowerCase().replace(/\s+/g, '_');
+const CANONICAL_STATUSES = ['pending', 'active', 'grace', 'defaulted', 'liquidated', 'paid', 'declined'];
+const LEGACY_STATUS_MAP = {
+  awaiting_approval: 'pending', approved: 'active', in_progress: 'active',
+  'in-progress': 'active', running: 'active', overdue: 'grace',
+  default: 'defaulted', liquidation: 'liquidated', recovered: 'liquidated',
+  settled: 'paid', closed: 'paid', completed: 'paid', rejected: 'declined'
+};
+// Canonical lifecycle only — prefer the server's live businessStatus.
+function getLoanStatusKey(loan) {
+  const canonical = String(loan?.businessStatus || '').trim().toLowerCase();
+  if (CANONICAL_STATUSES.includes(canonical)) return canonical;
+  const raw = String(loan?.status || '').trim().toLowerCase().replace(/\s+/g, '_');
+  return LEGACY_STATUS_MAP[raw] || (CANONICAL_STATUSES.includes(raw) ? raw : 'pending');
 }
 
 function getAdminLoanTimeline(loan) {
@@ -80,7 +91,7 @@ function renderAdminLoanList() {
 
   const filtered = adminState.loans
     .filter(loan => {
-      const currentStatus = getLoanStatusKey(loan.status);
+      const currentStatus = getLoanStatusKey(loan);
       if (statusFilter === 'all') return true;
       return currentStatus === statusFilter;
     })
@@ -93,8 +104,8 @@ function renderAdminLoanList() {
   }
 
   container.innerHTML = filtered.map(loan => {
-    const statusKey = getLoanStatusKey(loan.status);
-    const badgeClass = statusKey === 'in_progress' ? 'in_progress' : statusKey;
+    const statusKey = getLoanStatusKey(loan);
+    const badgeClass = statusKey;
     return `
       <button type="button" class="admin-loan-card ${adminState.selectedId === loan.id ? 'selected' : ''}" data-id="${loan.id}">
         <div class="admin-loan-head">
@@ -132,8 +143,8 @@ function renderAdminReviewDetail(loan) {
   const backName = loan.collateralBack ? loan.collateralBack.replace(/^[^\-]+-/, '') : '';
   const frontLink = loan.collateralFront ? `<a href="/uploads/${loan.collateralFront}" target="_blank" rel="noreferrer" class="attachment-btn">View front image</a>` : '<span class="attachment-empty">No front image</span>';
   const backLink = loan.collateralBack ? `<a href="/uploads/${loan.collateralBack}" target="_blank" rel="noreferrer" class="attachment-btn">View back image</a>` : '<span class="attachment-empty">No back image</span>';
-  const statusKey = getLoanStatusKey(loan.status);
-  const statusLabel = formatStatus(loan.status || 'pending');
+  const statusKey = getLoanStatusKey(loan);
+  const statusLabel = formatStatus(loan.businessStatus || loan.status || 'pending');
   const activityLog = Array.isArray(loan.statusHistory) && loan.statusHistory.length
     ? loan.statusHistory.map(entry => `
         <li>

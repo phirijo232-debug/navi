@@ -479,12 +479,18 @@
       const container = document.getElementById('paymentSummary');
       if (!container) return;
 
-      const active = allLoans.filter(loan => ['running', 'approved', 'active', 'in_progress', 'in-progress'].includes(loan.status));
-      const settled = allLoans.filter(loan => ['paid', 'completed', 'closed'].includes(loan.status));
+      const active = allLoans.filter(loan => ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan)));
+      const settled = allLoans.filter(loan => loanStatusOf(loan) === 'paid');
       const totalActive = active.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
       const totalSettled = settled.reduce((sum, loan) => sum + (Number(loan.totalRepayment) || Number(loan.amount) || 0), 0);
+      const totalPaid = allLoans.reduce((sum, loan) => sum + (Number(loan.paidTotal) || 0), 0);
 
       container.innerHTML = `
+        <div class="summary-inline-card">
+          <h3>Paid so far</h3>
+          <p>${allLoans.filter(loan => (Number(loan.paidTotal) || 0) > 0).length}</p>
+          <span>${formatKwacha(totalPaid)}</span>
+        </div>
         <div class="summary-inline-card">
           <h3>Active loans</h3>
           <p>${active.length}</p>
@@ -509,9 +515,9 @@
 
       const totalRequested = loans.reduce((sum, loan) => sum + (Number(loan.amount) || 0), 0);
       const totalOutstanding = loans.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
-      const pending = loans.filter(loan => loan.status === 'pending').length;
-      const active = loans.filter(loan => ['running', 'approved', 'active', 'in_progress', 'in-progress'].includes(loan.status)).length;
-      const closed = loans.filter(loan => ['paid', 'closed', 'completed', 'declined'].includes(loan.status)).length;
+      const pending = loans.filter(loan => loanStatusOf(loan) === 'pending').length;
+      const active = loans.filter(loan => ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan))).length;
+      const closed = loans.filter(loan => ['paid', 'declined'].includes(loanStatusOf(loan))).length;
 
       container.innerHTML = `
         <div class="summary-inline-card">
@@ -574,11 +580,27 @@
       return String(status).replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
     }
 
+    // Canonical lifecycle only (config.LOAN_STATUSES): prefer the server's live
+    // businessStatus; map legacy stored values so old records render correctly.
+    const CANONICAL_STATUSES = ['pending', 'active', 'grace', 'defaulted', 'liquidated', 'paid', 'declined'];
+    const LEGACY_STATUS_MAP = {
+      awaiting_approval: 'pending', approved: 'active', in_progress: 'active',
+      'in-progress': 'active', running: 'active', overdue: 'grace',
+      default: 'defaulted', liquidation: 'liquidated', recovered: 'liquidated',
+      settled: 'paid', closed: 'paid', completed: 'paid', rejected: 'declined'
+    };
+    function loanStatusOf(loan) {
+      const canonical = String(loan?.businessStatus || '').trim().toLowerCase();
+      if (CANONICAL_STATUSES.includes(canonical)) return canonical;
+      const raw = String(loan?.status || 'pending').trim().toLowerCase().replace(/\s+/g, '_');
+      return LEGACY_STATUS_MAP[raw] || (CANONICAL_STATUSES.includes(raw) ? raw : 'pending');
+    }
+
     function countLoanStatus(loans) {
       return {
-        pending: loans.filter(loan => loan.status === 'pending').length,
-        running: loans.filter(loan => ['running', 'approved', 'active', 'in_progress', 'in-progress'].includes(loan.status)).length,
-        closed: loans.filter(loan => ['paid', 'closed', 'completed', 'declined'].includes(loan.status)).length
+        pending: loans.filter(loan => loanStatusOf(loan) === 'pending').length,
+        running: loans.filter(loan => ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan))).length,
+        closed: loans.filter(loan => ['paid', 'declined'].includes(loanStatusOf(loan))).length
       };
     }
 
@@ -593,9 +615,9 @@
     function renderLoanList() {
       const loanList = document.getElementById('loan-list');
       const filtered = allLoans.filter(loan => {
-        if (currentLoanFilter === 'pending') return loan.status === 'pending';
-        if (currentLoanFilter === 'running') return ['running', 'approved', 'active', 'in_progress', 'in-progress'].includes(loan.status);
-        if (currentLoanFilter === 'closed') return ['paid', 'closed', 'completed', 'declined'].includes(loan.status);
+        if (currentLoanFilter === 'pending') return loanStatusOf(loan) === 'pending';
+        if (currentLoanFilter === 'running') return ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan));
+        if (currentLoanFilter === 'closed') return ['paid', 'declined'].includes(loanStatusOf(loan));
         return true;
       });
 
@@ -604,10 +626,10 @@
             <li class="loan-card" title="Product: ${loan.product || 'Loan'}\nRequested: ${formatKwacha(loan.amount)}\nInterest: ${formatKwacha(loan.interestAmount || 0)}\nTotal: ${formatKwacha(loan.totalRepayment || loan.amount || 0)}\nTenure: ${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'}\nUrgency: ${formatStatusLabel(loan.urgency || 'standard')}\nDue: ${formatDateDisplay(loan.dueDate)}\nDecision: ${loan.adminReason || 'No decision reason yet.'}" onclick="openLoanDetails(${loan.id})">
               <div class="loan-card-heading">
                 <strong>${loan.product}</strong>
-                <span class="loan-badge ${loan.status || 'pending'}">${formatStatusLabel(loan.status).toUpperCase()}</span>
+                <span class="loan-badge ${loanStatusOf(loan)}">${formatStatusLabel(loanStatusOf(loan)).toUpperCase()}</span>
               </div>
               <div class="loan-meta">
-                Amount: ${formatKwacha(loan.amount)} • Due: ${formatDateDisplay(loan.dueDate)} • Balance: ${formatKwacha(loan.outstanding)}
+                Amount: ${formatKwacha(loan.amount)} • Paid: ${formatKwacha(loan.paidTotal || 0)} • Balance: ${formatKwacha(loan.outstanding)}
               </div>
               <div class="loan-meta">
                 Requested: ${formatDateDisplay(loan.createdAt || loan.dueDate)} • Interest: ${formatKwacha(loan.interestAmount || 0)} • Total: ${formatKwacha(loan.totalRepayment || loan.amount || 0)}
@@ -630,7 +652,7 @@
         <div class="loan-detail-card">
           <div class="loan-detail-header">
             <h3>${loan.product || 'Loan Request'}</h3>
-            <span class="loan-badge ${loan.status || 'pending'}">${formatStatusLabel(loan.status).toUpperCase()}</span>
+            <span class="loan-badge ${loanStatusOf(loan)}">${formatStatusLabel(loanStatusOf(loan)).toUpperCase()}</span>
           </div>
           <div class="loan-detail-grid">
             <p><strong>Requested by:</strong> ${loan.email || 'Unknown'}</p>
@@ -638,12 +660,23 @@
             <p><strong>Interest rate:</strong> ${loan.interestRate || 0}%</p>
             <p><strong>Interest amount:</strong> ${formatKwacha(loan.interestAmount || 0)}</p>
             <p><strong>Total after interest:</strong> ${formatKwacha(loan.totalRepayment || loan.amount || 0)}</p>
+            <p><strong>Amount paid:</strong> ${formatKwacha(loan.paidTotal || 0)}</p>
             <p><strong>Outstanding:</strong> ${formatKwacha(loan.outstanding || 0)}</p>
             <p><strong>Due date:</strong> ${formatDateDisplay(loan.dueDate)}</p>
             <p><strong>Urgency:</strong> ${formatStatusLabel(loan.urgency || 'standard')}</p>
             <p><strong>Collateral:</strong> ${collateralText}</p>
             <p><strong>Requested:</strong> ${formatDateDisplay(loan.createdAt)}</p>
             <p class="loan-detail-full"><strong>Decision reason:</strong> ${decisionText}</p>
+          </div>
+          <div class="loan-payment-history">
+            <h4>Payment history</h4>
+            ${(Array.isArray(loan.payments) && loan.payments.length)
+              ? `<ul>${loan.payments.map(payment => `
+                  <li>
+                    ${formatKwacha(payment.amount)} • ${payment.mode || 'payment'} • ${formatDateDisplay(payment.paymentDate || payment.date)}
+                    ${payment.receiptNumber || payment.paymentReceiptId ? ` • Ref: ${payment.receiptNumber || payment.paymentReceiptId}` : ''}
+                  </li>`).join('')}</ul>`
+              : '<p>No payments recorded yet.</p>'}
           </div>
         </div>
       `;
@@ -861,7 +894,10 @@
         const data = await res.json();
         const loan = data.loan;
         const adminBox = document.getElementById('adminDecisionBox');
-        const hasAdminAccess = userRole === 'admin';
+        // Loan DECISIONS are store_admin-only (backend returns 403 for role
+        // 'admin' per tested franchise-scoping policy) — match that gate here so
+        // the buttons we show are exactly the ones the API will accept.
+        const hasAdminAccess = userRole === 'store_admin';
         const collateralText = loan.collateralDescription || loan.collateralFront || loan.collateralBack || 'No collateral provided';
 
         renderLoanDetailPanel(loan);

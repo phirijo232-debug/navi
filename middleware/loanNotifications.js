@@ -2,7 +2,8 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const dataStore = require('./dataStore');
 const emailService = require('./email');
-const { logError } = require('./logger');
+const { logError, logBreakage } = require('./logger');
+const { getLoansData, deriveLoanStatus } = require('../controllers/loanController');
 
 // ─── Automated borrower notifications (Task 7 — email channel) ───────────────
 // Daily check at 23:58 (driven by scheduler.js), for each active loan:
@@ -121,7 +122,6 @@ async function sendTemplatedMessage({ loan, messageKey, days, day, context = 'sc
 
 /** Task 7 pass: countdown 3 → 2 → 1 → 0 → overdue for every active loan. */
 async function runDueDatePass(today = new Date().toISOString().slice(0, 10)) {
-  const { getLoansData, deriveLoanStatus } = require('../controllers/loanController');
   const summary = { date: today, sent: 0, reminders: 0, overdue: 0, skipped: 0, failed: 0 };
 
   for (const loan of getLoansData()) {
@@ -156,7 +156,7 @@ async function runDueDatePass(today = new Date().toISOString().slice(0, 10)) {
 
 function startLoanNotificationScheduler(intervalMs = 60 * 60 * 1000) {
   const timer = setInterval(() => {
-    runDueDatePass().catch(err => logError(`LOAN NOTIFICATION SCHEDULER FAILED: ${err.message}`));
+    runDueDatePass().catch(err => logBreakage('loanNotifications.js', 'startLoanNotificationScheduler', err, 'LOAN NOTIFICATION SCHEDULER FAILED'));
   }, intervalMs);
   timer.unref?.();
   return timer;

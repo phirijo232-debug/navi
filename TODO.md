@@ -14,13 +14,19 @@
 ## Additional items that bring clear project value
 
 - [ ] Add stronger server-side validation for all loan submissions and updates so invalid data cannot slip through.
-- [ ] Add explicit audit trail fields for loan actions, timestamps, and who changed what.
-- [ ] Add overdue detection and repayment reminders to reduce manual follow-up.
-- [ ] Add admin reporting exports (CSV or PDF) for loans, totals, and outstanding balances.
-- [ ] Add notification hooks for approval, payment, and overdue events using the email path already in place.
+- [x] Add explicit audit trail fields for loan actions, timestamps, and who changed what.
+- [x] Add overdue detection and repayment reminders to reduce manual follow-up.
+- [x] Add admin reporting exports (CSV or PDF) for loans, totals, and outstanding balances.
+- [x] Add notification hooks for approval, payment, and overdue events using the email path already in place.
 - [ ] Add backup/restore handling for users and loan records to protect project data.
+- [x] Notify the admin inbox when a server breakage trips a circuit breaker (logError notify path with 15-minute flood protection per incident).
+- [x] Enrich breakage alerts with [file → handler] prefixes, expand notify coverage to every money/silence-critical circuit (auth, loans, reports, schedulers), and queue unsent alerts to logs/pending-alerts.log when Gmail is down.
 - [ ] Add UI polish for status badges, summary cards, and error messages for faster admin use.
 - [ ] Add a strict release checklist before deployment: env checks, login flow, invite checks, and data integrity checks.
+
+## Operations / infrastructure
+
+- [ ] Run the Navi server hidden in the background with Windows auto-start (Task Scheduler at logon, or a proper Windows service) so no terminal window has to stay open; interim option is the double-click `start-server.cmd`. Decide the account/rights (user logon vs system service) and confirm the daily 23:58/23:59 Lusaka jobs fire reliably while no one is logged in.
 
 ## Why these are important
 

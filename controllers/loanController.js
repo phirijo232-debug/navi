@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
-const { logError } = require('../middleware/logger');
+const { logError, logBreakage } = require('../middleware/logger');
 const emailService = require('../middleware/email');
 const config = require('../config');
 const dataStore = require('../middleware/dataStore');
@@ -137,14 +137,104 @@ function deriveLoanStatus(loan, today = new Date().toISOString().slice(0, 10)) {
   const outstanding = Number(loan.outstanding || 0);
   if (outstanding <= 0) return 'paid';
 
+  // Manual "verify overdue" is a durable admin decision — the clock must not undo it.
+  if (stored === 'defaulted' && loan.verifiedOverdueAt) return 'defaulted';
+
   const dueDate = String(loan.dueDate || '').slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return stored === 'paid' ? 'paid' : 'active';
+
+  // An agreed manual grace window wins over the default clock window.
+  const agreedGraceUntil = String(loan.graceUntil || '').slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(agreedGraceUntil)) {
+    return today <= agreedGraceUntil ? 'grace' : 'defaulted';
+  }
 
   const daysToDue = daysBetween(today, dueDate);
   if (daysToDue < -config.DEFAULT_GRACE_DAYS) return 'defaulted';
   if (daysToDue < 0) return 'grace';
   if (daysToDue <= config.GRACE_PERIOD_DAYS) return 'grace';
   return 'active';
+}
+
+// ─── Grace penalty (agreed 1.8%/day) ─────────────────────────────────────────
+const GRACE_DAILY_RATE = 0.018;
+const PENALTY_CAP_RATIO = 0.5; // cap: 50% additional on the original principal
+
+/** Accepts YYYY-MM-DD or DD/MM/YYYY; returns YYYY-MM-DD or null. */
+function parseDateInput(value) {
+  const raw = String(value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+  return null;
+}
+
+/**
+ * Accrue the agreed 1.8%/day grace penalty idempotently. The base is pinned the
+ * first time accrual runs (no retroactive penalties), then 1.8% x elapsed days
+ * is added to the interest/repayment totals so rebuildPaymentLedger pushes it
+ * onto the outstanding. Capped at 50% of the original principal (BMF cap).
+ * Pure mutator: the scheduler persists daily; read-only callers re-derive the
+ * same value on every load, so un-persisted reads stay idempotent.
+ */
+function applyGraceAccrual(loan, today = new Date().toISOString().slice(0, 10)) {
+  try {
+    if (!loan || Number(loan.outstanding || 0) <= 0) return loan;
+    if (normalizeStatus(loan.status) === 'liquidated') return loan;
+
+    const live = deriveLoanStatus(loan, today);
+    if (live !== 'grace' && live !== 'defaulted') return loan;
+
+    const rate = Number(loan.graceDailyRate) > 0 ? Number(loan.graceDailyRate) : GRACE_DAILY_RATE;
+
+    // First pass pins the accrual window — nothing is charged before today.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(loan.graceAccrualStart || ''))) {
+      loan.graceDailyRate = rate;
+      loan.graceAccrualBase = Number(loan.outstanding || 0);
+      loan.graceAccrualStart = today;
+      loan.graceLastAccrual = today;
+      loan.graceAccrued = Number(loan.graceAccrued || 0);
+      return loan;
+    }
+
+    const anchor = /^\d{4}-\d{2}-\d{2}$/.test(String(loan.graceLastAccrual || ''))
+      ? String(loan.graceLastAccrual).slice(0, 10)
+      : String(loan.graceAccrualStart).slice(0, 10);
+    const days = daysBetween(anchor, today);
+    if (days <= 0) return loan;
+
+    const base = Number(loan.graceAccrualBase || 0);
+    if (base <= 0) return loan;
+
+    const cap = Number(loan.amount || base) * PENALTY_CAP_RATIO;
+    const already = Number(loan.graceAccrued || 0);
+    const add = Number(Math.min(days * base * rate, Math.max(0, cap - already)).toFixed(2));
+    loan.graceDailyRate = rate;
+    loan.graceLastAccrual = today;
+    if (add <= 0) return loan;
+
+    loan.graceAccrued = Number((already + add).toFixed(2));
+    loan.interestAmount = Number((Number(loan.interestAmount || 0) + add).toFixed(2));
+    loan.totalRepayment = Number((Number(loan.totalRepayment || loan.amount || 0) + add).toFixed(2));
+    return loan;
+  } catch (err) {
+    logError(`GRACE ACCRUAL SKIPPED | loan ${loan?.receiptNumber || loan?.id || '?'} | ${err.message}`);
+    return loan;
+  }
+}
+
+/** Persist grace accrual across every grace/defaulted loan (idempotent). */
+function accrueAllGrace(today = new Date().toISOString().slice(0, 10)) {
+  const loans = getLoansData();
+  let changedCount = 0;
+  loans.forEach(loan => {
+    const before = `${Number(loan.graceAccrued || 0)}|${loan.graceLastAccrual || ''}`;
+    applyGraceAccrual(loan, today);
+    const after = `${Number(loan.graceAccrued || 0)}|${loan.graceLastAccrual || ''}`;
+    if (before !== after) changedCount += 1;
+  });
+  if (changedCount) saveLoansData(loans);
+  return { changed: changedCount, total: loans.length };
 }
 
 // ─── Balances & payments ─────────────────────────────────────────────────────
@@ -209,11 +299,16 @@ function getLoansData() {
 /** Loans enriched for reading: receipts backfilled, ledgers rebuilt, status derived. */
 function getEnrichedLoans(today = new Date().toISOString().slice(0, 10)) {
   const loans = getLoansData();
-  return loans.map(loan => ({
-    ...rebuildPaymentLedger({ ...loan, payments: (loan.payments || []).map(p => ({ ...p })) }),
-    businessStatus: deriveLoanStatus(loan, today),
-    legacyStatus: normalizeLoanStatus(loan.status)
-  }));
+  return loans.map(loan => {
+    const copy = { ...loan, payments: (loan.payments || []).map(p => ({ ...p })) };
+    applyGraceAccrual(copy, today); // read-only view: un-persisted accrual re-derives identically
+    rebuildPaymentLedger(copy);
+    return {
+      ...copy,
+      businessStatus: deriveLoanStatus(copy, today),
+      legacyStatus: normalizeLoanStatus(loan.status)
+    };
+  });
 }
 
 /** One-time migration: receipts + borrowedDate + ledger balances (idempotent). */
@@ -383,9 +478,21 @@ function filterLoansByTimeframe(loans, filter) {
   if (!window) return loans;
 
   return loans.filter(loan => {
-    const createdAt = new Date(loan?.createdAt || 0);
-    if (Number.isNaN(createdAt.getTime())) return false;
-    return createdAt >= window.start && createdAt <= window.end;
+    // A settled loan is grouped by its settlement date (settledAt, else the
+    // latest payment date); everything else by the borrowed/approval date. Keeps
+    // the portfolio endpoint consistent with the admin modal timeframe filter.
+    const payments = Array.isArray(loan?.payments) ? loan.payments : [];
+    const lastPayment = payments
+      .map(p => p.paymentDate || p.date)
+      .filter(Boolean)
+      .sort()
+      .at(-1) || null;
+    const source = deriveLoanStatus(loan) === 'paid'
+      ? (loan?.settledAt || lastPayment)
+      : (loan?.approvedAt || loan?.createdAt);
+    const ts = new Date(source || 0).getTime();
+    if (Number.isNaN(ts)) return false;
+    return ts >= window.start.getTime() && ts <= window.end.getTime();
   });
 }
 
@@ -550,7 +657,7 @@ async function requestLoan(req, res) {
       }
     });
   } catch (err) {
-    logError(`LOANS REQUEST FAILED: ${err.message}`);
+    logBreakage('loanController.js', 'requestLoan', err, 'LOANS REQUEST FAILED');
     res.status(500).json({ error: 'Unable to submit loan request.' });
   }
 }
@@ -583,6 +690,11 @@ function getLoans(req, res) {
     if (filter && filter !== 'all') {
       loans = filterLoansByTimeframe(loans, filter);
     }
+
+    // Always present payments with a reconciled ledger (paidTotal, outstanding,
+    // balance before/after) so recorded payments show up identically for users
+    // and admins — never depend on stale persisted balances.
+    loans = loans.map(loan => rebuildPaymentLedger({ ...loan, payments: (loan.payments || []).map(p => ({ ...p })) }));
 
     const summary = calculateSummary(loans);
     const totalRequested = loans.reduce((sum, l) => sum + (l.amount || 0), 0);
@@ -664,7 +776,14 @@ function getLoanById(req, res) {
       return res.status(403).json({ error: 'Access to this store is not allowed.' });
     }
 
-    res.json({ loan });
+    // Rebuild the ledger here too (not just in getLoans) so the single-loan
+    // detail view can never show stale paidTotal/outstanding — recorded
+    // payments must appear identically on the list and the detail panel.
+    const today = new Date().toISOString().slice(0, 10);
+    const detail = { ...loan, payments: (loan.payments || []).map(p => ({ ...p })) };
+    applyGraceAccrual(detail, today); // read-only; same value re-derives on every load
+    rebuildPaymentLedger(detail);
+    res.json({ loan: { ...detail, businessStatus: deriveLoanStatus(detail, today) } });
   } catch (err) {
     logError(`GET LOAN FAILED: ${err.message}`);
     res.status(500).json({ error: 'Unable to load loan.' });
@@ -673,11 +792,13 @@ function getLoanById(req, res) {
 
 async function updateLoanStatus(req, res) {
   try {
+    // Loan DECISIONS stay restricted to the assigned store admin (tested
+    // franchise-scoping policy); payments/notifications use isAdminRole instead.
     if (req.authUser?.role !== 'store_admin') {
       return res.status(403).json({ error: 'Loan decisions are restricted to the assigned store admin.' });
     }
     const id = Number(req.params.id);
-    const { action, amount, collateralGrade, collateralVerified, nextPayment, reason } = req.body;
+    const { action, amount, collateralGrade, collateralVerified, nextPayment, reason, graceUntil } = req.body;
     const authEmail = req.authUser?.email;
     const isAdmin = req.authUser?.role === 'store_admin';
     const normalizedAction = String(action || '').trim().toLowerCase().replace(/\s+/g, '_');
@@ -696,7 +817,9 @@ async function updateLoanStatus(req, res) {
     }
 
     if (['approve', 'approved'].includes(normalizedAction) && isAdmin) {
-      loan.status = 'approved';
+      // Canonical status is 'active' — 'approved' is a legacy value that only
+      // exists in LEGACY_STATUS_MAP for old records (AGENTS.md canonical list).
+      loan.status = 'active';
       loan.adminReason = reason || loan.adminReason || 'Approved by admin.';
       const approvedAt = new Date();
       const approvalDelayDays = Math.max(0, Math.ceil((approvedAt - new Date(loan.createdAt || Date.now())) / (1000 * 60 * 60 * 24)));
@@ -708,22 +831,46 @@ async function updateLoanStatus(req, res) {
       loan.dueDate = new Date(approvalWindow).toISOString().slice(0, 10);
       rebuildPaymentLedger(loan);
     } else if (['in_progress', 'in-progress', 'start', 'started'].includes(normalizedAction) && isAdmin) {
-      loan.status = 'in_progress';
+      loan.status = 'active'; // canonical — 'in_progress' is legacy-mapped only
       loan.adminReason = reason || loan.adminReason || 'Loan is now in progress.';
     } else if (['decline', 'declined', 'reject', 'rejected'].includes(normalizedAction) && isAdmin) {
       loan.status = 'declined';
       loan.adminReason = reason || loan.adminReason || 'Loan declined by admin.';
+    } else if (['enter_grace', 'enter-grace', 'start_grace', 'grace'].includes(normalizedAction) && isAdmin) {
+      const agreed = parseDateInput(graceUntil);
+      if (!agreed) {
+        return res.status(400).json({ error: 'Entering grace requires an agreed grace-until date (YYYY-MM-DD or DD/MM/YYYY).' });
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      if (agreed <= today) {
+        return res.status(400).json({ error: 'The agreed grace date must be in the future.' });
+      }
+      loan.status = 'grace';
+      loan.graceUntil = agreed;
+      loan.graceDailyRate = GRACE_DAILY_RATE;
+      loan.adminReason = reason ||
+        `Grace entered by admin — agreed until ${agreed}; 1.8% per day accrues on the outstanding balance.`;
+    } else if (['verify_overdue', 'verify-overdue', 'mark_overdue', 'confirm_overdue'].includes(normalizedAction) && isAdmin) {
+      if (Number(loan.outstanding || 0) <= 0) {
+        return res.status(400).json({ error: 'Loan is already settled — nothing to verify.' });
+      }
+      loan.status = 'defaulted';
+      loan.verifiedOverdueAt = new Date().toISOString();
+      loan.verifiedOverdueBy = req.authUser?.email || 'admin';
+      loan.adminReason = reason || 'Overdue verified by admin — loan moved to defaulted.';
     } else if (['default', 'defaulted', 'mark_default'].includes(normalizedAction) && isAdmin) {
       loan.status = 'defaulted';
+      // Stamp the manual decision so the clock cannot flip the loan back.
+      loan.verifiedOverdueAt = loan.verifiedOverdueAt || new Date().toISOString();
+      loan.verifiedOverdueBy = loan.verifiedOverdueBy || req.authUser?.email || 'admin';
       loan.adminReason = reason || loan.adminReason || 'Marked as defaulted by admin.';
     } else if (['liquidate', 'liquidated', 'recover', 'recovered'].includes(normalizedAction) && isAdmin) {
+      if (!String(reason || '').trim()) {
+        return res.status(400).json({ error: 'Liquidation requires a reason — confirm what happened to the collateral.' });
+      }
       loan.status = 'liquidated';
       loan.liquidatedAt = new Date().toISOString();
-      loan.adminReason = reason || loan.adminReason || 'Collateral liquidated to recover the balance.';
-    } else if (action === 'record-payment') {
-      const pay = Number(amount) || 0;
-      loan.outstanding = Math.max(0, (loan.outstanding || 0) - pay);
-      if (loan.outstanding === 0) loan.status = 'paid';
+      loan.adminReason = reason;
     } else if (action === 'grade' && isAdmin) {
       loan.collateralGrade = collateralGrade;
       loan.collateralVerified = collateralVerified === 'true';
@@ -767,7 +914,7 @@ async function updateLoanStatus(req, res) {
 
     res.json({ message: 'Loan updated.', loan });
   } catch (err) {
-    logError(`UPDATE LOAN FAILED: ${err.message}`);
+    logBreakage('loanController.js', 'updateLoanStatus', err, 'UPDATE LOAN FAILED');
     res.status(500).json({ error: 'Unable to update loan.' });
   }
 }
@@ -780,15 +927,18 @@ function getAllLoans(req, res) {
     const storeId = getRequestedStoreId(req);
     if (!canAccessStore(req, storeId)) return res.status(403).json({ error: 'Access to this store is not allowed.' });
     const loans = getLoansData().filter(loan => storeId === 'all' || getRecordStoreId(loan) === storeId);
+    // Canonical buckets only (pending/active/grace/defaulted/liquidated/paid/
+    // declined). Legacy stored values (approved, in_progress, overdue…) are
+    // counted under the live status deriveLoanStatus maps them onto.
     const summary = {
       total: loans.length,
-      pending: loans.filter(l => normalizeLoanStatus(l.status) === 'pending').length,
-      in_progress: loans.filter(l => normalizeLoanStatus(l.status) === 'in_progress').length,
-      approved: loans.filter(l => normalizeLoanStatus(l.status) === 'approved').length,
-      declined: loans.filter(l => normalizeLoanStatus(l.status) === 'declined').length,
-      active: loans.filter(l => ['running', 'approved', 'active', 'in_progress', 'in-progress'].includes(normalizeLoanStatus(l.status))).length,
-      overdue: loans.filter(l => normalizeLoanStatus(l.status) === 'overdue').length,
-      paid: loans.filter(l => normalizeLoanStatus(l.status) === 'paid').length,
+      pending: loans.filter(l => deriveLoanStatus(l) === 'pending').length,
+      active: loans.filter(l => deriveLoanStatus(l) === 'active').length,
+      grace: loans.filter(l => deriveLoanStatus(l) === 'grace').length,
+      defaulted: loans.filter(l => deriveLoanStatus(l) === 'defaulted').length,
+      liquidated: loans.filter(l => deriveLoanStatus(l) === 'liquidated').length,
+      paid: loans.filter(l => deriveLoanStatus(l) === 'paid').length,
+      declined: loans.filter(l => deriveLoanStatus(l) === 'declined').length,
       totalOutstanding: loans.reduce((sum, l) => sum + (l.outstanding || 0), 0)
     };
     res.json({ summary, loans });
@@ -801,7 +951,7 @@ function getAllLoans(req, res) {
 function recordPayment(req, res) {
   try {
     const { id, amount, mode, note } = req.body;
-    if (req.authUser?.role !== 'store_admin') return res.status(403).json({ error: 'BMF store admin access required.' });
+    if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'BMF store admin access required.' });
 
     const screenshot = req.files?.screenshot?.[0]?.filename || null;
     const loans = getLoansData();
@@ -850,7 +1000,7 @@ function recordPayment(req, res) {
     saveLoansData(loans);
     res.json({ message: 'Payment recorded.', outstanding: loans[index].outstanding, payment });
   } catch (err) {
-    logError(`PAYMENT RECORD ERROR: ${err.message}`);
+    logBreakage('loanController.js', 'recordPayment', err, 'PAYMENT RECORD ERROR');
     res.status(500).json({ error: 'Could not record payment.' });
   }
 }
@@ -859,7 +1009,7 @@ async function sendLoanNotification(req, res) {
   try {
     const id = Number(req.params.id);
     const { messageType } = req.body; // e.g., 'overdue', 'reminder'
-    if (req.authUser?.role !== 'store_admin') return res.status(403).json({ error: 'BMF store admin access required.' });
+    if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'BMF store admin access required.' });
 
     const loans = getLoansData();
     const loan = loans.find(l => l.id === id);
@@ -876,15 +1026,19 @@ async function sendLoanNotification(req, res) {
       text = `Hello,\n\nThis is a reminder regarding your loan for ${loan.product}.\n\nOutstanding Amount: ${formatCurrency(loan.outstanding)}\nDue Date: ${loan.dueDate}\n\nThank you.`;
     }
 
-    await emailService.sendCustomerEmail({
+    const result = await emailService.sendCustomerEmail({
       to: loan.email,
       subject,
       text
     });
+    logError(`NOTIFICATION SENT | loan ${loan.receiptNumber || `#${loan.id}`} | ${messageType || 'reminder'} | to ${loan.email} | result ${result?.ok ? 'ok' : (result?.skipped ? 'skipped' : (result?.reason || 'failed'))}`);
+    if (!result?.ok && !result?.skipped) {
+      return res.status(502).json({ error: result?.reason || 'Notification email could not be delivered.' });
+    }
 
     res.json({ message: 'Notification sent successfully.' });
   } catch (err) {
-    logError(`NOTIFICATION SEND ERROR: ${err.message}`);
+    logBreakage('loanController.js', 'sendLoanNotification', err, 'NOTIFICATION SEND ERROR');
     res.status(500).json({ error: 'Could not send notification.' });
   }
 }
@@ -950,8 +1104,11 @@ async function notifyUser(req, res) {
 
 async function notifyAllOverdue(req, res) {
   try {
-    if (req.authUser?.role !== 'store_admin') {
+    if (!isAdminRole(req.authUser?.role)) {
       return res.status(403).json({ error: 'BMF store admin access required.' });
+    }
+    if (Array.isArray(req.authUser?.restrictions) && req.authUser.restrictions.includes('notifyAll')) {
+      return res.status(403).json({ error: 'You are not permitted to send notifications to all customers. Ask the franchise admin to lift this restriction.' });
     }
 
     const storeId = getRequestedStoreId(req);
@@ -962,7 +1119,9 @@ async function notifyAllOverdue(req, res) {
       const outstanding = Number(loan.outstanding || 0);
       const dueDate = String(loan.dueDate || '');
       const pastDue = /^\d{4}-\d{2}-\d{2}$/.test(dueDate) && dueDate < today;
-      return outstanding > 0 && !['declined', 'paid'].includes(status) && (status === 'overdue' || pastDue);
+      // Liquidated (and its legacy 'recovered' wording) is closed-off via
+      // collateral — never chase those customers for an overdue balance.
+      return outstanding > 0 && !['declined', 'paid', 'liquidated', 'recovered'].includes(status) && (status === 'overdue' || pastDue);
     });
 
     const loansByEmail = new Map();
@@ -998,8 +1157,137 @@ async function notifyAllOverdue(req, res) {
       customers: loansByEmail.size
     });
   } catch (err) {
-    logError(`BULK OVERDUE NOTIFICATION FAILED: ${err.message}`);
+    logBreakage('loanController.js', 'notifyAllOverdue', err, 'BULK OVERDUE NOTIFICATION FAILED');
     return res.status(500).json({ error: 'Unable to send overdue notices.' });
+  }
+}
+
+// Admin manual loan entry — creates an already-disbursed (active) loan for a
+// registered customer, bypassing the borrower-only guard on requestLoan. No
+// customer email is sent (admin is recording an agreed, in-person loan).
+async function createAdminLoan(req, res) {
+  try {
+    if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'Admin access required to create loans.' });
+
+    const {
+      email, product, amount, dueDate, tenureWeeks,
+      urgency, paymentMode, collateralDescription, collateralGrade, adminReason
+    } = req.body;
+
+    const storeId = getRequestedStoreId(req);
+    if (!canAccessStore(req, storeId)) return res.status(403).json({ error: 'Access to this store is not allowed.' });
+
+    if (!email || !product || !amount) {
+      return res.status(400).json({ error: 'Customer email, product, and loan amount are required.' });
+    }
+
+    const users = dataStore.readJson(USERS_FILE, [], Array.isArray);
+    const customer = users.find(u => String(u.email || '').trim().toLowerCase() === String(email).trim().toLowerCase());
+    if (!customer) return res.status(400).json({ error: 'No registered customer matches that email.' });
+
+    const requestedAmount = Number(amount);
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+      return res.status(400).json({ error: 'Loan amount must be a positive number.' });
+    }
+
+    const weeks = parseInt(tenureWeeks, 10) || 1;
+    if (![1, 2, 3, 4].includes(weeks)) {
+      return res.status(400).json({ error: 'Tenure must be between 1 and 4 weeks.' });
+    }
+
+    const normalizedUrgency = (urgency || 'standard').toLowerCase();
+    if (!['low', 'standard', 'urgent', 'emergency'].includes(normalizedUrgency)) {
+      return res.status(400).json({ error: 'Urgency must be low, standard, urgent, or emergency.' });
+    }
+
+    const { rate, interest, total } = calculateInterest(requestedAmount, weeks);
+    const now = new Date();
+    const approvedAt = now.toISOString();
+    const borrowedDate = approvedAt.slice(0, 10);
+    const computedDueDate = dueDate
+      ? String(dueDate).slice(0, 10)
+      : new Date(now.getTime() + weeks * 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const files = req.files || {};
+    const collateralFront = files.collateralFront?.[0]?.filename || null;
+    const collateralBack = files.collateralBack?.[0]?.filename || null;
+
+    const loans = getLoansData();
+    const nextId = loans.length ? Math.max(...loans.map(l => l.id)) + 1 : 1;
+    const loanReceiptIds = new Set(loans.map(l => String(l.receiptNumber || '')).filter(Boolean));
+
+    const activatingAdmin = req.authUser?.email || 'admin';
+    const reason = adminReason || `Loan created and activated by ${activatingAdmin}.`;
+    const newLoan = {
+      id: nextId,
+      receiptNumber: generateLoanReceiptId(loanReceiptIds, now),
+      email: String(email).trim().toLowerCase(),
+      storeId,
+      product,
+      amount: requestedAmount,
+      tenureWeeks: weeks,
+      interestRate: rate,
+      interestAmount: interest,
+      totalRepayment: total,
+      outstanding: total || requestedAmount,
+      dueDate: computedDueDate,
+      urgency: normalizedUrgency,
+      paymentMode: paymentMode || null,
+      nextPayment: null,
+      collateralDescription: collateralDescription || null,
+      collateralFront,
+      collateralBack,
+      collateralGrade: collateralGrade || null,
+      collateralVerified: false,
+      agreedToTerms: true,
+      status: 'active',
+      adminReason: reason,
+      graceUntil: null,
+      graceDailyRate: GRACE_DAILY_RATE,
+      graceAccrued: 0,
+      graceAccrualBase: null,
+      graceAccrualStart: null,
+      graceLastAccrual: null,
+      verifiedOverdueAt: null,
+      verifiedOverdueBy: null,
+      approvalDeadline: null,
+      approvedAt,
+      borrowedDate,
+      reviewedBy: req.authUser?.email || 'admin',
+      reviewedAt: approvedAt,
+      updatedBy: req.authUser?.email || 'admin',
+      payments: [],
+      statusHistory: [{
+        status: 'active',
+        reason,
+        actor: req.authUser?.email || 'admin',
+        source: 'admin',
+        updatedAt: approvedAt
+      }],
+      createdAt: approvedAt,
+      updatedAt: approvedAt
+    };
+
+    rebuildPaymentLedger(newLoan);
+    loans.push(newLoan);
+    saveLoansData(loans);
+
+    res.status(201).json({
+      message: 'Loan created and marked active.',
+      loan: {
+        id: newLoan.id,
+        receiptNumber: newLoan.receiptNumber,
+        amount: requestedAmount,
+        interestRate: rate,
+        interestAmount: interest,
+        totalRepayment: total,
+        outstanding: newLoan.outstanding,
+        status: newLoan.status
+      }
+    });
+  } catch (err) {
+    logBreakage('loanController.js', 'createAdminLoan', err, 'ADMIN LOAN CREATE FAILED');
+    res.status(500).json({ error: 'Unable to create the loan.' });
   }
 }
 
@@ -1014,6 +1302,7 @@ module.exports = {
   sendLoanNotification,
   notifyUser,
   notifyAllOverdue,
+  createAdminLoan,
   calculateInterest,
   getApprovalDeadline,
   filterLoansByTimeframe,
@@ -1029,6 +1318,10 @@ module.exports = {
   ensureReceiptNumbers,
   normalizeStatus,
   deriveLoanStatus,
+  applyGraceAccrual,
+  accrueAllGrace,
+  GRACE_DAILY_RATE,
+  parseDateInput,
   calculateSummary,
   summarizeStore,
   searchLoansByReceipt,

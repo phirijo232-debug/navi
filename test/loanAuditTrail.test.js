@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { updateLoanStatus, getAllLoans, notifyAllOverdue, recordPayment } = require('../controllers/loanController');
+const { updateLoanStatus, getAllLoans, notifyAllOverdue, recordPayment, getLoans, getLoanById } = require('../controllers/loanController');
 const emailService = require('../middleware/email');
 
 const LOANS_FILE = require('../middleware/dataStore').paths.loans;
@@ -56,11 +56,11 @@ test('loan status updates create a status history and admin summary includes all
     await getAllLoans(summaryReq, summaryRes);
 
     const updated = JSON.parse(fs.readFileSync(LOANS_FILE, 'utf8'))[0];
-    assert.equal(updated.status, 'approved');
+    assert.equal(updated.status, 'active');
     assert.ok(Array.isArray(updated.statusHistory), 'statusHistory should be recorded');
-    assert.ok(updated.statusHistory.some(entry => entry.status === 'approved'), 'statusHistory should include the approved status');
-    assert.equal(summaryRes.body.summary.approved, 1, 'approved count should be present in admin summary');
-    assert.equal(summaryRes.body.summary.in_progress, 0, 'in progress count should be present in admin summary');
+    assert.ok(updated.statusHistory.some(entry => entry.status === 'active'), 'statusHistory should record the canonical active status after approval');
+    assert.equal(summaryRes.body.summary.active, 1, 'active count should be present in admin summary');
+    assert.equal(summaryRes.body.summary.pending, 0, 'pending count should be present in admin summary');
     assert.equal(summaryRes.body.summary.declined, 0, 'declined count should be present in admin summary');
   } finally {
     fs.writeFileSync(LOANS_FILE, original);
@@ -125,6 +125,62 @@ test('payment recording stores proof and adds an audit history entry', () => {
     assert.equal(loan.outstanding, 75);
     assert.equal(loan.payments[0].screenshot, 'proof-25.png');
     assert.ok(loan.statusHistory.some(entry => /K 25\.00/.test(entry.reason)));
+  } finally {
+    fs.writeFileSync(LOANS_FILE, original);
+  }
+});
+
+// Regression guard for "recorded payment does not show up for the user":
+// both the list (getLoans) and the single-loan detail (getLoanById) endpoints
+// must return the RECONCILED paidTotal/outstanding derived from the payments
+// ledger — never a stale persisted balance. If either endpoint regresses to
+// returning raw stored rows, this test fails.
+test('recorded payments are reconciled in both the loan list and the loan detail view', () => {
+  const original = fs.readFileSync(LOANS_FILE, 'utf8');
+  // Deliberately store a STALE outstanding (1000) alongside two payments that
+  // already total 200 — the enriched reads must ignore the stale value.
+  fs.writeFileSync(LOANS_FILE, JSON.stringify([
+    {
+      id: 7001,
+      email: 'borrower@example.com',
+      status: 'active',
+      amount: 1000,
+      interestAmount: 0,
+      totalRepayment: 1000,
+      outstanding: 1000, // stale on purpose
+      payments: [
+        { amount: 100, paymentDate: '2026-10-01', mode: 'cash' },
+        { amount: 100, paymentDate: '2026-10-02', mode: 'cash' }
+      ]
+    }
+  ], null, 2));
+
+  try {
+    const borrower = { email: 'borrower@example.com', role: 'user', storeId: 'buraza' };
+    const makeRes = () => ({
+      statusCode: 200,
+      status(code) { this.statusCode = code; return this; },
+      json(payload) { this.body = payload; return this; }
+    });
+
+    // --- list view (GET /loans?email=) ---
+    const listRes = makeRes();
+    getLoans({ query: { email: 'borrower@example.com' }, authUser: borrower }, listRes);
+    assert.equal(listRes.statusCode, 200);
+    const listLoan = listRes.body.loans[0];
+    assert.equal(listLoan.paidTotal, 200, 'list view: paidTotal must equal the sum of recorded payments');
+    assert.equal(listLoan.outstanding, 800, 'list view: outstanding must be recomputed, not the stale stored value');
+
+    // --- detail view (GET /loans/:id) ---
+    const detailRes = makeRes();
+    getLoanById({ params: { id: 7001 }, authUser: borrower }, detailRes);
+    assert.equal(detailRes.statusCode, 200);
+    const detailLoan = detailRes.body.loan;
+    assert.equal(detailLoan.paidTotal, 200, 'detail view: paidTotal must equal the sum of recorded payments');
+    assert.equal(detailLoan.outstanding, 800, 'detail view: outstanding must be recomputed, not the stale stored value');
+    assert.equal(detailLoan.payments.length, 2, 'detail view: payment history must be present');
+    assert.equal(detailLoan.payments[0].balanceBefore, 1000, 'detail view: ledger must reconcile balanceBefore');
+    assert.equal(detailLoan.payments[1].balanceAfter, 800, 'detail view: ledger must reconcile balanceAfter');
   } finally {
     fs.writeFileSync(LOANS_FILE, original);
   }

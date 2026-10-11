@@ -34,7 +34,7 @@ test('Excel portfolio report is generated as an XLSX workbook', async () => {
 });
 
 test('daily report is sent to the configured reporting administrator', async (t) => {
-  const expectedRecipient = process.env.DAILY_REPORT_EMAIL || 'jophiri232@gmail.com';
+  const expectedRecipient = process.env.DAILY_REPORT_EMAIL || 'jophiri223@gmail.com';
   const sendMail = t.mock.method(emailService, 'sendCustomerEmail', async () => ({ ok: true }));
 
   const result = await sendDailyBmfReport(new Date('2026-10-01T10:00:00Z'));

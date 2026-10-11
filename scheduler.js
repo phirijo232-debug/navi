@@ -12,9 +12,9 @@ const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const emailService = require('./middleware/email');
 const dataStore = require('./middleware/dataStore');
-const { logError } = require('./middleware/logger');
+const { logError, logBreakage } = require('./middleware/logger');
 const { runDueDatePass } = require('./middleware/loanNotifications');
-const { getEnrichedLoans, deriveLoanStatus } = require('./controllers/loanController');
+const { getEnrichedLoans, deriveLoanStatus, accrueAllGrace } = require('./controllers/loanController');
 const { buildPaymentsReportData, buildPaymentsExcelReport, buildPaymentsPdfReport } = require('./controllers/reportController');
 
 const TIMEZONE = process.env.DAILY_REPORT_TIMEZONE || 'Africa/Lusaka';
@@ -260,7 +260,7 @@ async function sendDailyLoanReport() {
   });
 
   if (!result?.ok) {
-    logError(`DAILY LOAN REPORT FAILED: ${result?.reason || 'email delivery failed'}`);
+    logBreakage('scheduler.js', 'sendDailyLoanReport', result?.reason || 'email delivery failed', 'DAILY LOAN REPORT FAILED');
     return { ok: false, data };
   }
   writeState(data.reportDate);
@@ -297,7 +297,7 @@ async function sendPaymentsTrackingEmail() {
   });
 
   if (!result?.ok) {
-    logError(`PAYMENTS TRACKING REPORT FAILED: ${result?.reason || 'email delivery failed'}`);
+    logBreakage('scheduler.js', 'sendPaymentsTrackingEmail', result?.reason || 'email delivery failed', 'PAYMENTS TRACKING REPORT FAILED');
     return { ok: false, data };
   }
   writeTrackingState(lusakaDate(), `${data.from || 'all'}:${data.to || 'all'}`);
@@ -337,25 +337,53 @@ async function catchUpMissedReports() {
 }
 
 function startScheduler() {
+  // Grace penalty — 1.8%/day accrual on grace/defaulted loans, once per day.
+  // Idempotent (loanController accrues by graceLastAccrual), so a restart or a
+  // missed day never double-charges; it simply catches up on the next run.
+  cron.schedule('5 0 * * *', () => {
+    try {
+      const result = accrueAllGrace(lusakaDate());
+      if (result.changed) {
+        console.log(`[scheduler] grace accrual applied to ${result.changed} loan(s)`);
+      }
+    } catch (err) {
+      logBreakage('scheduler.js', 'grace-accrual', err, 'GRACE ACCRUAL ERROR');
+    }
+  }, { timezone: TIMEZONE });
+
   // Task 7 — notifications first, one minute before the report.
   cron.schedule('58 23 * * *', () => {
     runDueDatePass()
       .then(summary => console.log(`[scheduler] notifications: ${JSON.stringify(summary)}`))
-      .catch(err => logError(`SCHEDULER NOTIFICATIONS FAILED: ${err.message}`));
+      .catch(err => logBreakage('scheduler.js', 'cron:notifications', err, 'SCHEDULER NOTIFICATIONS FAILED'));
   }, { timezone: TIMEZONE });
 
-  // Task 5 — daily report at 23:59.
+  // Task 5 — daily report at 23:59. Guarded so a morning catch-up + evening
+  // cron never double-sends the same day's report.
   cron.schedule('59 23 * * *', () => {
-    sendDailyLoanReport().catch(err => logError(`SCHEDULER REPORT FAILED: ${err.message}`));
+    const today = lusakaDate();
+    if (readState().lastSentDate >= today) {
+      console.log(`[scheduler] daily report for ${today} already sent — skipping duplicate run`);
+      return;
+    }
+    sendDailyLoanReport().catch(err => logBreakage('scheduler.js', 'cron:dailyReport', err, 'SCHEDULER REPORT FAILED'));
   }, { timezone: TIMEZONE });
 
   // Flexible payment tracking sheet - same 23:59 slot, time frame set via env.
+  // Same once-per-day guard as the daily report above.
   cron.schedule('59 23 * * *', () => {
-    sendPaymentsTrackingEmail().catch(err => logError(`SCHEDULER TRACKING FAILED: ${err.message}`));
+    const today = lusakaDate();
+    const frame = `${TRACKING_FROM || 'all'}:${TRACKING_TO || 'all'}`;
+    const state = readTrackingState();
+    if (state.lastSentDate >= today && state.frame === frame) {
+      console.log(`[scheduler] payments tracking sheet for ${today} already sent — skipping duplicate run`);
+      return;
+    }
+    sendPaymentsTrackingEmail().catch(err => logBreakage('scheduler.js', 'cron:paymentsTracking', err, 'SCHEDULER TRACKING FAILED'));
   }, { timezone: TIMEZONE });
 
-  catchUpMissedReports().catch(err => logError(`SCHEDULER CATCH-UP FAILED: ${err.message}`));
-  catchUpPaymentsTracking().catch(err => logError(`SCHEDULER TRACKING CATCH-UP FAILED: ${err.message}`));
+  catchUpMissedReports().catch(err => logBreakage('scheduler.js', 'catchUpMissedReports', err, 'SCHEDULER CATCH-UP FAILED'));
+  catchUpPaymentsTracking().catch(err => logBreakage('scheduler.js', 'catchUpPaymentsTracking', err, 'SCHEDULER TRACKING CATCH-UP FAILED'));
   console.log(`[scheduler] started (tz ${TIMEZONE}) — notifications 23:58, report 23:59 → ${REPORT_RECIPIENT}`);
 }
 

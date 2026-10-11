@@ -1,5 +1,5 @@
 module.exports = {
-  PORT: 3000,
+  PORT: Number(process.env.PORT) || 3000,
   HOST: '0.0.0.0',
   FRANCHISE_ID: 'pryme-vertex',
   DEFAULT_STORE_ID: process.env.DEFAULT_STORE_ID || 'buraza',
@@ -23,7 +23,7 @@ module.exports = {
   REMINDER_DAYS_BEFORE: 3,
 
   REPORTS: {
-    DAILY_ADMIN_EMAIL: process.env.DAILY_REPORT_EMAIL || 'jophiri232@gmail.com',
+    DAILY_ADMIN_EMAIL: process.env.DAILY_REPORT_EMAIL || 'jophiri223@gmail.com',
     DAILY_SEND_TIME: process.env.DAILY_REPORT_TIME || '23:59',
     TIME_ZONE: process.env.DAILY_REPORT_TIMEZONE || 'Africa/Lusaka'
   },

@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const config = require('./config');
-const { logError, logAccess } = require('./middleware/logger');
+const { logError, logAccess, replayPendingAlerts } = require('./middleware/logger');
 const { helmet, deviceAuth, rateLimiter } = require('./middleware/security');
 const { verifyOTP, sendOTP } = require('./middleware/otp');
 const { trackSession } = require('./controllers/sessionController');
@@ -124,4 +124,6 @@ if (startupRepairs.length) {
 app.listen(config.PORT, config.HOST, () => {
   console.log(`Navi Server running on port ${config.PORT}`);
   startScheduler();
+  // Retry any breakage alerts queued during a prior SMTP outage (fire-and-forget).
+  replayPendingAlerts().catch(() => {});
 });

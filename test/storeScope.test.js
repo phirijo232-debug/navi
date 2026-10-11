@@ -129,6 +129,7 @@ test('franchise admins can provision BMF store admins but store admins cannot el
         email: 'operator@example.test',
         password: 'StrongPass1!',
         confirmPassword: 'StrongPass1!',
+        nrc: '123456/78/1',
         role: 'store_admin'
       }
     }, franchiseResponse);
@@ -145,6 +146,7 @@ test('franchise admins can provision BMF store admins but store admins cannot el
         email: 'newcustomer@example.test',
         password: 'StrongPass1!',
         confirmPassword: 'StrongPass1!',
+        nrc: '123456/78/1',
         role: 'store_admin'
       }
     }, storeResponse);

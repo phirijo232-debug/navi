@@ -95,7 +95,7 @@ function buildRequestReceivedMessage(product, urgency, email, loanData = {}) {
 }
 
 function getNotificationRecipients(primaryEmail, extraEmails = []) {
-  const configured = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || 'phirijo232@gmail.com')
+  const configured = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || 'jophiri223@gmail.com')
     .split(',')
     .map(item => String(item).trim())
     .filter(Boolean);

@@ -2,19 +2,34 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const { logError } = require('../middleware/logger');
+const { logError, logHr, logBreakage } = require('../middleware/logger');
 const dataStore = require('../middleware/dataStore');
 const otpService = require('../middleware/otp');
 const emailService = require('../middleware/email');
 const config = require('../config');
 const { normalizeZambianPhone, isValidZambianMobile } = require('../middleware/phoneNumber');
-const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole } = require('../middleware/storeScope');
+const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole, isFranchiseAdmin } = require('../middleware/storeScope');
 
-const NRC_PATTERN = /^\d{6}\/\d{2}\/[12]$/;
+const NRC_PATTERN = /^\d{6}\/\d{2}\/\d$/;
 
 function isValidNrc(value) {
   if (value === null || value === undefined || value === '') return true;
   return NRC_PATTERN.test(String(value).trim());
+}
+
+// Decide which role a newly-created account actually receives, so nobody can
+// elevate beyond their own level:
+//   - main admin (admin)            → may create franchise_admin, store_admin, user
+//   - franchise_admin               → may create store_admin, user
+//   - store_admin (restricted)      → may only create customer (user)
+function resolveAssignedRole(requestedRole, actorRole) {
+  if (requestedRole === 'franchise_admin') {
+    return actorRole === 'admin' ? 'franchise_admin' : 'user';
+  }
+  if (requestedRole === 'store_admin') {
+    return actorRole === 'admin' || actorRole === 'franchise_admin' ? 'store_admin' : 'user';
+  }
+  return 'user';
 }
 
 const USERS_FILE = dataStore.paths.users;
@@ -183,8 +198,8 @@ async function requestSignup(req, res) {
     }
     const normalizedPhone = normalizeZambianPhone(phone);
 
-    if (!isValidNrc(nrc)) {
-      return res.status(400).json({ error: 'NRC/ID number must look like 123456/78/9 (a second digit of 1 or 2).' });
+    if (!nrc || !isValidNrc(nrc)) {
+      return res.status(400).json({ error: 'NRC/ID number is required and must look like 123456/78/1.' });
     }
 
     if (password !== confirmPassword) {
@@ -213,7 +228,7 @@ async function requestSignup(req, res) {
     res.json({ message: 'OTP sent to your email. Please verify to complete signup.' });
 
   } catch (err) {
-    logError(`SIGNUP CIRCUIT TRIPPED: ${err.message}`);
+    logBreakage('authController.js', 'requestSignup', err, 'SIGNUP CIRCUIT TRIPPED');
     res.status(503).json({ error: 'Signup is temporarily unavailable. Please try again shortly.' });
   }
 }
@@ -272,7 +287,7 @@ async function confirmSignup(req, res) {
     res.json({ message: 'Account created successfully.', username: newUser.username });
 
   } catch (err) {
-    logError(`SIGNUP CONFIRM CIRCUIT TRIPPED: ${err.message}`);
+    logBreakage('authController.js', 'confirmSignup', err, 'SIGNUP CONFIRM CIRCUIT TRIPPED');
     res.status(503).json({ error: 'Signup verification is temporarily unavailable. Please try again shortly.' });
   }
 }
@@ -290,9 +305,30 @@ async function resendOTP(req, res) {
     res.json({ message: `OTP resent to ${email}` });
 
   } catch (err) {
-    logError(`RESEND OTP CIRCUIT TRIPPED: ${err.message}`);
+    logBreakage('authController.js', 'resendOTP', err, 'RESEND OTP CIRCUIT TRIPPED');
     res.status(503).json({ error: 'Resend is temporarily unavailable. Please try again shortly.' });
   }
+}
+
+// Classify mail-send failures so the client sees an honest message instead of
+// one generic "check credentials" line: Gmail auth rejections point at the app
+// password, DNS/network faults say the mail server is unreachable, and missing
+// env says email is not configured.
+function classifyMailError(err, action = 'send the OTP') {
+  const message = String(err?.message || err || '');
+  const authRejected = /535|5\.7\.8|invalid login|username and password not accepted|authentication failed/i.test(message);
+  const unreachable = /ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ESOCKETTIMEDOUT|ECONNREFUSED|EHOSTUNREACH|ENETUNREACH|ENETDOWN|socket hang up|timed out|timeout/i.test(message);
+  const notConfigured = /configuration is incomplete|credentials are not configured|missing email recipients/i.test(message);
+  if (authRejected) {
+    return { status: 503, error: `Unable to ${action}. The company mailbox rejected our credentials — an admin needs to check the email app password.` };
+  }
+  if (unreachable) {
+    return { status: 503, error: `Unable to ${action}. The mail server is unreachable right now — please try again shortly.` };
+  }
+  if (notConfigured) {
+    return { status: 503, error: `Unable to ${action}. Outgoing email is not configured on the server.` };
+  }
+  return { status: 503, error: `Unable to ${action}. Please try again shortly.` };
 }
 
 async function requestLogin(req, res) {
@@ -336,8 +372,9 @@ async function requestLogin(req, res) {
     });
 
   } catch (err) {
-    logError(`LOGIN CIRCUIT TRIPPED: ${err.message}`);
-    res.status(503).json({ error: 'Unable to send the login OTP. Check the configured company email credentials and try again.' });
+    const { status, error } = classifyMailError(err, 'send the login OTP');
+    logBreakage('authController.js', 'requestLogin', err, 'LOGIN CIRCUIT TRIPPED');
+    res.status(status).json({ error });
   }
 }
 
@@ -402,7 +439,7 @@ async function confirmLogin(req, res) {
     });
 
   } catch (err) {
-    logError(`LOGIN CONFIRM CIRCUIT TRIPPED: ${err.message}`);
+    logBreakage('authController.js', 'confirmLogin', err, 'LOGIN CONFIRM CIRCUIT TRIPPED');
     res.status(503).json({ error: 'Login verification is temporarily unavailable. Please try again shortly.' });
   }
 }
@@ -441,8 +478,9 @@ async function requestPasswordReset(req, res) {
     });
 
   } catch (err) {
-    logError(`PASSWORD RESET CIRCUIT TRIPPED: ${err.message}`);
-    return res.status(503).json({ error: 'Unable to send the password reset OTP. Please check the configured email service and try again.' });
+    const { status, error } = classifyMailError(err, 'send the password reset OTP');
+    logBreakage('authController.js', 'requestPasswordReset', err, 'PASSWORD RESET CIRCUIT TRIPPED');
+    return res.status(status).json({ error });
   }
 }
 
@@ -490,7 +528,7 @@ async function confirmPasswordReset(req, res) {
     res.json({ message: 'Password reset successfully. You can now login.' });
 
   } catch (err) {
-    logError(`PASSWORD RESET CONFIRM CIRCUIT TRIPPED: ${err.message}`);
+    logBreakage('authController.js', 'confirmPasswordReset', err, 'PASSWORD RESET CONFIRM CIRCUIT TRIPPED');
     res.status(503).json({ error: 'Password reset verification is temporarily unavailable. Please try again shortly.' });
   }
 }
@@ -508,7 +546,7 @@ async function createInvite(req, res) {
     const token = generateInviteToken(email);
     return res.json({ message: 'Invite generated.', inviteToken: token, signupUrl: `/signup.html?invite=${token}` });
   } catch (err) {
-    logError(`INVITE GENERATION FAILED: ${err.message}`);
+    logBreakage('authController.js', 'createInvite', err, 'INVITE GENERATION FAILED');
     res.status(500).json({ error: 'Unable to generate invite token.' });
   }
 }
@@ -519,10 +557,14 @@ async function createAdminUser(req, res) {
       return res.status(403).json({ error: 'Admin access required.' });
     }
 
-    const { username, email, password, confirmPassword, phone, role } = req.body || {};
+    const { username, email, password, confirmPassword, phone, role, nrc } = req.body || {};
 
     if (!username || !email || !password || !confirmPassword) {
       return res.status(400).json({ error: 'Username, email, password, and confirmation are required.' });
+    }
+
+    if (!nrc || !isValidNrc(nrc)) {
+      return res.status(400).json({ error: 'NRC/ID number is required and must look like 123456/78/1.' });
     }
 
     if (password !== confirmPassword) {
@@ -539,12 +581,17 @@ async function createAdminUser(req, res) {
     }
 
     const normalizedPhone = normalizePhoneNumber(phone || '');
-    const assignedRole = role === 'store_admin' && req.authUser.role === 'admin' ? 'store_admin' : 'user';
-    const storeId = assignedRole === 'store_admin'
-      ? config.DEFAULT_STORE_ID
-      : req.authUser.role === 'store_admin'
-        ? getRecordStoreId(req.authUser)
-        : getRequestedStoreId(req);
+    const assignedRole = resolveAssignedRole(role, req.authUser.role);
+    let storeId;
+    if (assignedRole === 'store_admin' || assignedRole === 'franchise_admin') {
+      storeId = req.authUser.role === 'admin'
+        ? getRequestedStoreId(req)
+        : getRecordStoreId(req.authUser);
+    } else if (req.authUser.role === 'store_admin') {
+      storeId = getRecordStoreId(req.authUser);
+    } else {
+      storeId = getRequestedStoreId(req);
+    }
     const nextId = users.length ? Math.max(...users.map(user => Number(user.id) || 0)) + 1 : 1;
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = {
@@ -552,10 +599,12 @@ async function createAdminUser(req, res) {
       username: String(username).trim(),
       email: String(email).trim().toLowerCase(),
       phone: normalizedPhone,
+      nrc: String(nrc).trim(),
       password: hashedPassword,
       tokens: generateUserTokens(nextId),
       role: assignedRole,
       storeId,
+      restrictions: [],
       createdAt: new Date().toISOString(),
       trustedDevices: []
     };
@@ -574,7 +623,7 @@ async function createAdminUser(req, res) {
       }
     });
   } catch (err) {
-    logError(`ADMIN USER CREATION FAILED: ${err.message}`);
+    logBreakage('authController.js', 'createAdminUser', err, 'ADMIN USER CREATION FAILED');
     return res.status(500).json({ error: 'Unable to create the user.' });
   }
 }
@@ -601,8 +650,14 @@ function getAllUsers(req, res) {
 
 async function sendAdminAnnouncement(req, res) {
   try {
-    if (req.authUser?.role !== 'store_admin') {
+    const role = req.authUser?.role;
+    // Tested franchise policy (test/notificationFlow.test.js): only the BMF
+    // store-operator level may broadcast — role 'admin' is refused with 403.
+    if (role !== 'store_admin' && role !== 'franchise_admin') {
       return res.status(403).json({ error: 'BMF store admin access required.' });
+    }
+    if (isRestricted(req.authUser, 'notifyAll')) {
+      return res.status(403).json({ error: 'You are not permitted to send notifications to all customers. Ask the franchise admin to lift this restriction.' });
     }
 
     const storeId = getRequestedStoreId(req);
@@ -615,7 +670,7 @@ async function sendAdminAnnouncement(req, res) {
     }
 
     const recipients = [...new Set(getUsers()
-      .filter(user => user.role !== 'admin' && user.role !== 'store_admin' && user.email &&
+      .filter(user => !['admin', 'franchise_admin', 'store_admin'].includes(user.role) && user.email &&
         (storeId === 'all' || getRecordStoreId(user) === storeId))
       .map(user => String(user.email).trim().toLowerCase())
       .filter(Boolean))];
@@ -634,7 +689,7 @@ async function sendAdminAnnouncement(req, res) {
       total: recipients.length
     });
   } catch (err) {
-    logError(`ADMIN ANNOUNCEMENT FAILED: ${err.message}`);
+    logBreakage('authController.js', 'sendAdminAnnouncement', err, 'ADMIN ANNOUNCEMENT FAILED');
     return res.status(500).json({ error: 'Unable to send the announcement.' });
   }
 }
@@ -654,4 +709,229 @@ function validateInvite(req, res) {
   }
 }
 
-module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement };
+function listInvites(req, res) {
+  try {
+    if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'Admin access required.' });
+
+    cleanupExpiredInvites();
+    const invites = Object.entries(pendingInvites)
+      .map(([token, invite]) => ({
+        token,
+        email: invite.email,
+        createdAt: invite.createdAt,
+        expiresAt: new Date(invite.expiresAt).toISOString(),
+        used: Boolean(invite.used),
+        signupUrl: `/signup.html?invite=${token}`
+      }))
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+
+    res.json({ invites });
+  } catch (err) {
+    logError(`INVITE LIST FAILED: ${err.message}`);
+    res.status(500).json({ error: 'Unable to load invites.' });
+  }
+}
+
+// ─── HR / Employee Securities ────────────────────────────────────────────────
+// Only the main admin (admin) and the Franchise Employee Admin (franchise_admin)
+// may manage employees. The restricted store_admin is refused with a clear
+// message. Every mutation is written to the HR audit log with the acting admin.
+
+const RESTRICTABLE_ACTIONS = ['notifyAll'];
+
+function isRestricted(user, key) {
+  return Array.isArray(user?.restrictions) && user.restrictions.includes(key);
+}
+
+function findStoreAuthority(storeId) {
+  const users = getUsers();
+  const franchise = users.find(u => u.role === 'franchise_admin' && getRecordStoreId(u) === storeId);
+  if (franchise) return franchise;
+  return users.find(u => u.role === 'admin') || null;
+}
+
+function publicEmployee(user) {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    phone: user.phone,
+    nrc: user.nrc || null,
+    role: user.role,
+    storeId: getRecordStoreId(user),
+    restrictions: Array.isArray(user.restrictions) ? user.restrictions : [],
+    createdAt: user.createdAt
+  };
+}
+
+function listEmployees(req, res) {
+  try {
+    if (!isFranchiseAdmin(req.authUser?.role)) {
+      return res.status(403).json({ error: 'Only the main admin or a Franchise Employee Admin can manage employees.' });
+    }
+
+    const storeId = getRequestedStoreId(req);
+    if (!canAccessStore(req, storeId)) {
+      return res.status(403).json({ error: 'Access to this store is not allowed.' });
+    }
+
+    const employees = getUsers()
+      .filter(user => ['admin', 'franchise_admin', 'store_admin'].includes(user.role))
+      .filter(user => req.authUser.role === 'admin' || storeId === 'all' || getRecordStoreId(user) === storeId)
+      .map(publicEmployee);
+
+    res.json({ employees });
+  } catch (err) {
+    logError(`HR LIST EMPLOYEES FAILED: ${err.message}`);
+    res.status(500).json({ error: 'Unable to load employees.' });
+  }
+}
+
+async function editEmployee(req, res) {
+  try {
+    if (!isFranchiseAdmin(req.authUser?.role)) {
+      return res.status(403).json({ error: 'Only the main admin or a Franchise Employee Admin can edit employees.' });
+    }
+
+    const targetId = Number(req.params.id);
+    const { username, email, phone, nrc, password } = req.body || {};
+    const users = getUsers();
+    const index = users.findIndex(user => Number(user.id) === targetId);
+    if (index < 0) return res.status(404).json({ error: 'Employee not found.' });
+
+    const target = users[index];
+    if (!canAccessStore(req, getRecordStoreId(target))) {
+      return res.status(403).json({ error: 'Access to this employee is not allowed.' });
+    }
+    // A Franchise Employee Admin may not edit the main admin account.
+    if (target.role === 'admin' && req.authUser.role !== 'admin') {
+      return res.status(403).json({ error: 'You cannot edit the main admin account.' });
+    }
+
+    if (email && users.some((u, i) => i !== index && String(u.email).toLowerCase() === String(email).trim().toLowerCase())) {
+      return res.status(400).json({ error: 'Another account already uses that email.' });
+    }
+    if (nrc && !isValidNrc(nrc)) {
+      return res.status(400).json({ error: 'NRC/ID number must look like 123456/78/1.' });
+    }
+
+    if (username) target.username = String(username).trim();
+    if (email) target.email = String(email).trim().toLowerCase();
+    if (phone !== undefined) target.phone = normalizePhoneNumber(phone || '');
+    if (nrc) target.nrc = String(nrc).trim();
+    if (password) {
+      if (!isStrongPassword(password)) return res.status(400).json({ error: passwordRequirementsText() });
+      target.password = await bcrypt.hash(password, 10);
+      target.trustedDevices = []; // force re-login on the changed account
+    }
+
+    users[index] = target;
+    saveUsers(users);
+    logHr(`EDIT EMPLOYEE id=${targetId}`, req.authUser);
+
+    res.json({ message: 'Employee updated successfully.', employee: publicEmployee(target) });
+  } catch (err) {
+    logBreakage('authController.js', 'editEmployee', err, 'HR EDIT EMPLOYEE FAILED');
+    res.status(500).json({ error: 'Unable to update the employee.' });
+  }
+}
+
+function setEmployeeRestriction(req, res) {
+  try {
+    if (!isFranchiseAdmin(req.authUser?.role)) {
+      return res.status(403).json({ error: 'Only the main admin or a Franchise Employee Admin can change permissions.' });
+    }
+
+    const targetId = Number(req.params.id);
+    const { action, restricted } = req.body || {};
+    if (!RESTRICTABLE_ACTIONS.includes(action)) {
+      return res.status(400).json({ error: 'Unknown permission.' });
+    }
+
+    const users = getUsers();
+    const index = users.findIndex(user => Number(user.id) === targetId);
+    if (index < 0) return res.status(404).json({ error: 'Employee not found.' });
+
+    const target = users[index];
+    if (target.role === 'admin') {
+      return res.status(400).json({ error: 'The main admin cannot be restricted.' });
+    }
+    if (!canAccessStore(req, getRecordStoreId(target))) {
+      return res.status(403).json({ error: 'Access to this employee is not allowed.' });
+    }
+
+    const restrictions = new Set(Array.isArray(target.restrictions) ? target.restrictions : []);
+    if (restricted) restrictions.add(action);
+    else restrictions.delete(action);
+    target.restrictions = [...restrictions];
+
+    users[index] = target;
+    saveUsers(users);
+    logHr(`${restricted ? 'RESTRICT' : 'UNRESTRICT'} ${action} on employee id=${targetId}`, req.authUser);
+
+    res.json({ message: 'Permissions updated.', employee: publicEmployee(target) });
+  } catch (err) {
+    logBreakage('authController.js', 'setEmployeeRestriction', err, 'HR SET RESTRICTION FAILED');
+    res.status(500).json({ error: 'Unable to update permissions.' });
+  }
+}
+
+// Store switching is OTP-gated: a store-scoped admin cannot switch to a store
+// they don't own until the OTP sent to that store's Franchise Employee Admin (or
+// the main admin) is verified. Codes expire after 5 minutes (shared OTP service).
+async function requestStoreSwitch(req, res) {
+  try {
+    if (!isAdminRole(req.authUser?.role)) {
+      return res.status(403).json({ error: 'Admin access required.' });
+    }
+
+    const targetStore = getRequestedStoreId(req);
+    if (req.authUser.role === 'admin' || canAccessStore(req, targetStore)) {
+      return res.json({ otpRequired: false, storeId: targetStore, message: 'Switch approved.' });
+    }
+
+    const authority = findStoreAuthority(targetStore);
+    if (!authority || !authority.email) {
+      return res.status(400).json({ error: 'No franchise admin is available to approve this switch.' });
+    }
+    try {
+      await otpService.sendOTP('Store Switch', authority.email, true);
+    } catch (mailErr) {
+      logBreakage('authController.js', 'requestStoreSwitch', mailErr, 'STORE SWITCH OTP FAILED');
+      return res.status(502).json({ error: 'Could not send the approval code. Please try again.' });
+    }
+    return res.json({
+      otpRequired: true,
+      otpSentTo: authority.email,
+      storeId: targetStore,
+      message: 'Approval code sent to the franchise admin. Enter it to switch stores.'
+    });
+  } catch (err) {
+    logBreakage('authController.js', 'requestStoreSwitch', err, 'HR STORE SWITCH REQUEST FAILED');
+    res.status(500).json({ error: 'Unable to start the store switch.' });
+  }
+}
+
+function verifyStoreSwitch(req, res) {
+  try {
+    if (!isAdminRole(req.authUser?.role)) {
+      return res.status(403).json({ error: 'Admin access required.' });
+    }
+
+    const { otp, storeId } = req.body || {};
+    const targetStore = String(storeId || getRequestedStoreId(req)).trim().toLowerCase();
+    const authority = findStoreAuthority(targetStore);
+    if (!authority) return res.status(400).json({ error: 'No franchise admin is available to approve this switch.' });
+
+    const result = otpService.verifyOTP(otp, authority.email, 'Store Switch');
+    if (!result.valid) return res.status(400).json({ error: result.message });
+
+    logHr(`STORE SWITCH APPROVED to ${targetStore}`, req.authUser);
+    res.json({ authorized: true, storeId: targetStore, message: 'Store switch approved.' });
+  } catch (err) {
+    logBreakage('authController.js', 'verifyStoreSwitch', err, 'HR STORE SWITCH VERIFY FAILED');
+    res.status(500).json({ error: 'Unable to verify the store switch.' });
+  }
+}
+
+module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError };

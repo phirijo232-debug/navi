@@ -16,7 +16,8 @@ test('requestSignup can recover when the users store is malformed', async () => 
         email: 'recover@example.com',
         password: 'StrongPass1!',
         confirmPassword: 'StrongPass1!',
-        phone: '+260977000000'
+        phone: '+260977000000',
+        nrc: '123456/78/1'
       }
     };
 
@@ -68,6 +69,35 @@ test('requestSignup requires a valid Zambian mobile number', async () => {
 
   assert.equal(res.statusCode, 400);
   assert.equal(res.body.error, 'Please enter a valid Zambian mobile number (e.g. 0977123456)');
+});
+
+test('requestSignup requires a valid NRC number', async () => {
+  const req = {
+    body: {
+      username: 'NRC User',
+      email: 'nrc@example.com',
+      password: 'StrongPass1!',
+      confirmPassword: 'StrongPass1!',
+      phone: '+260977000000'
+    }
+  };
+
+  const res = {
+    statusCode: 200,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    }
+  };
+
+  await requestSignup(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error, /NRC/i);
 });
 
 test('admin can fetch the user directory with account summaries', async () => {
