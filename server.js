@@ -6,6 +6,7 @@ const { logError, logAccess, replayPendingAlerts } = require('./middleware/logge
 const { helmet, deviceAuth, rateLimiter, authRateLimiter } = require('./middleware/security');
 const { verifyOTP, sendOTP } = require('./middleware/otp');
 const { trackSession } = require('./controllers/sessionController');
+const { serveFile } = require('./controllers/fileController');
 const routes = require('./routes');
 const { startScheduler } = require('./scheduler');
 const { ensureDataIntegrity } = require('./middleware/dataStore');
@@ -51,6 +52,13 @@ app.use((req, res, next) => {
   if (isLocalhost) return next();
   rateLimiter(req, res, next);
 });
+
+// Uploaded KYC / proof-of-payment images: served ONLY through the authenticated,
+// ownership-checked handler below — NOT via the public static mount. Registered
+// before express.static so a raw /uploads/<file> request never bypasses auth.
+// (Auth lives here, ahead of deviceAuth, because static is also ahead of it;
+// the handler resolves the user from the header or a scoped ?token=.)
+app.get('/uploads/:filename', serveFile);
 
 app.use(express.static(path.join(__dirname, 'public')));
 

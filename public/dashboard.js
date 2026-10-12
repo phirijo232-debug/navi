@@ -141,8 +141,12 @@ function renderAdminReviewDetail(loan) {
 
   const frontName = loan.collateralFront ? loan.collateralFront.replace(/^[^\-]+-/, '') : '';
   const backName = loan.collateralBack ? loan.collateralBack.replace(/^[^\-]+-/, '') : '';
-  const frontLink = loan.collateralFront ? `<a href="/uploads/${loan.collateralFront}" target="_blank" rel="noreferrer" class="attachment-btn">View front image</a>` : '<span class="attachment-empty">No front image</span>';
-  const backLink = loan.collateralBack ? `<a href="/uploads/${loan.collateralBack}" target="_blank" rel="noreferrer" class="attachment-btn">View back image</a>` : '<span class="attachment-empty">No back image</span>';
+  const fileUrl = (name) => {
+    const token = localStorage.getItem('deviceToken') || '';
+    return `/uploads/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}`;
+  };
+  const frontLink = loan.collateralFront ? `<a href="${fileUrl(loan.collateralFront)}" target="_blank" rel="noreferrer" class="attachment-btn">View front image</a>` : '<span class="attachment-empty">No front image</span>';
+  const backLink = loan.collateralBack ? `<a href="${fileUrl(loan.collateralBack)}" target="_blank" rel="noreferrer" class="attachment-btn">View back image</a>` : '<span class="attachment-empty">No back image</span>';
   const statusKey = getLoanStatusKey(loan);
   const statusLabel = formatStatus(loan.businessStatus || loan.status || 'pending');
   const activityLog = Array.isArray(loan.statusHistory) && loan.statusHistory.length

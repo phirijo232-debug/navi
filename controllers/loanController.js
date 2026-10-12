@@ -288,9 +288,23 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+  filename: (req, file, cb) => {
+    const safe = path.basename(String(file.originalname || 'upload'))
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .replace(/_{2,}/g, '_')
+      .slice(-60);
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`);
+  }
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+const ALLOWED_UPLOAD_MIME = /^image\/(jpeg|jpg|png|webp|gif)$/i;
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_UPLOAD_MIME.test(file.mimetype)) return cb(null, true);
+    cb(new Error('Only image files (JPG, PNG, WEBP, GIF) are allowed.'));
+  }
+});
 
 function getLoansData() {
   return dataStore.readJson(LOANS_FILE, [], Array.isArray);

@@ -52,3 +52,17 @@
 [2026-10-11T21:58:19.952Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
 [2026-10-12T08:37:03.867Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
 [2026-10-12T08:37:04.344Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-12T09:12:38.438Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-12T09:12:38.939Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-12T09:13:58.260Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-12T09:13:58.540Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-12T09:14:26.183Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-12T09:14:26.516Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-12T09:15:33.982Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-12T09:15:34.809Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-12T09:16:06.217Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-12T09:16:06.750Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-12T09:16:43.852Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-12T09:16:44.398Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-12T09:18:25.186Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-12T09:18:25.543Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown

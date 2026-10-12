@@ -158,4 +158,4 @@ const authRateLimiter = rateLimit({
   }
 });
 
-module.exports = { helmet, deviceAuth, rateLimiter, authRateLimiter, checkMasterPassword };
+module.exports = { helmet, deviceAuth, rateLimiter, authRateLimiter, checkMasterPassword, findUserByDeviceToken };

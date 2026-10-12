@@ -503,15 +503,19 @@ function renderLoanDetails(loan) {
       `).join('')
     : '<li>No status history.</li>';
   const payments = Array.isArray(loan.payments) ? loan.payments : [];
+  const fileUrl = (name) => {
+    const token = localStorage.getItem('deviceToken') || '';
+    return `/uploads/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}`;
+  };
   const paymentHistory = payments.length ? payments.map(payment => `
     <li>
       ${formatCurrency(payment.amount)} · ${escapeHtml(payment.mode || 'payment')} · ${escapeHtml(formatDate(payment.date))}
       ${payment.note ? `<div>${escapeHtml(payment.note)}</div>` : ''}
-      ${payment.screenshot ? `<a class="proof-link" href="/uploads/${encodeURIComponent(payment.screenshot)}" target="_blank" rel="noopener">View proof of payment</a>` : '<span>No proof attached</span>'}
+      ${payment.screenshot ? `<a class="proof-link" href="${fileUrl(payment.screenshot)}" target="_blank" rel="noopener">View proof of payment</a>` : '<span>No proof attached</span>'}
     </li>
   `).join('') : '<li>No payments recorded.</li>';
   const proofLinks = [loan.collateralFront, loan.collateralBack].filter(Boolean).map((filename, index) => `
-    <a class="proof-link" href="/uploads/${encodeURIComponent(filename)}" target="_blank" rel="noopener">View collateral ${index ? 'back' : 'front'}</a>
+    <a class="proof-link" href="${fileUrl(filename)}" target="_blank" rel="noopener">View collateral ${index ? 'back' : 'front'}</a>
   `).join('');
   const outstanding = Number(loan.outstanding || 0);
   // Payments: admin or store_admin (both may record money). Decisions: the
