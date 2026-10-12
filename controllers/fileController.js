@@ -60,6 +60,13 @@ function serveFile(req, res) {
       logError(`FILE ACCESS DENIED: ${filename} for ${user?.email || 'unknown'} from ${req.ip}`);
       return res.status(403).send('Access denied.');
     }
+    // Mitigate URL leakage of the scoped ?token=: never cache the response and
+    // don't leak the URL via Referer. (Full fix = signed URLs before public deploy.)
+    res.set('Cache-Control', 'private, no-store');
+    res.set('Referrer-Policy', 'no-referrer');
+    if (req.query?.token) {
+      logError(`FILE ACCESS VIA URL TOKEN: ${filename} for ${user?.email || 'unknown'} from ${req.ip} (LAN-only mitigation; replace ?token= with signed URLs before public deploy)`);
+    }
     return res.sendFile(abs);
   } catch (err) {
     logError(`FILE SERVE FAILED: ${err.message}`);

@@ -14,6 +14,16 @@ const { ensureDataIntegrity } = require('./middleware/dataStore');
 const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || 'phirii26';
 const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
 
+// DEPLOYMENT GATE (blocking): public deployment is forbidden until the ?token=
+// image fallback is replaced with short-lived signed URLs. Set PUBLIC_DEPLOY=true
+// ONLY after that hardening is done — until then the server refuses to boot so an
+// insecure config can never go live. (See TODO.md + docs/plans/kyc-hardening.md.)
+if (String(process.env.PUBLIC_DEPLOY).toLowerCase() === 'true') {
+  console.error('Refusing to start: PUBLIC_DEPLOY=true requires signed-URL image serving (the ?token= fallback is LAN-only).');
+  console.error('Complete the signed-URL hardening and full security pass before enabling public mode.');
+  process.exit(1);
+}
+
 const app = express();
 app.disable('x-powered-by');
 

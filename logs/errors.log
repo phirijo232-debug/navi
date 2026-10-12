@@ -455,3 +455,10 @@
 [2026-10-12T09:18:26.163Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
 [2026-10-12T09:18:26.406Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
 [2026-10-12T09:18:26.580Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-12T09:27:13.296Z] NOTIFICATION SENT | OVERDUE | loan BMF-20261006-4242 | to notified@example.test
+[2026-10-12T09:27:13.320Z] NOTIFICATION SENT | REMINDER (3d) | loan BMF-2026-9001 | to three-days@example.test
+[2026-10-12T09:27:13.329Z] NOTIFICATION SENT | OVERDUE | loan BMF-2026-9002 | to late@example.test
+[2026-10-12T09:27:14.586Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: getaddrinfo ENOTFOUND smtp.gmail.com
+[2026-10-12T09:27:15.065Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
+[2026-10-12T09:27:15.365Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
+[2026-10-12T09:27:15.487Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json

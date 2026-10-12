@@ -165,7 +165,11 @@ function logAccess(req, res, next) {
   const skip = ['/status', '/sessions', '/logs/access', '/logs/errors'];
   if (!skip.includes(req.url)) {
     const time = new Date().toISOString();
-    const entry = `[${time}] ${req.method} ${req.url} - ${req.ip}\n`;
+    // Redact any device token in the query string so it never lands in the
+    // access log (KYC/payment image links carry a scoped ?token= that plain
+    // <a> navigation needs). LAN mitigation only — full fix is signed URLs.
+    const safeUrl = String(req.url).replace(/([?&])token=[^&]*/gi, '$1token=REDACTED');
+    const entry = `[${time}] ${req.method} ${safeUrl} - ${req.ip}\n`;
     fs.appendFileSync(config.LOGS.ACCESS, entry);
   }
   next();
