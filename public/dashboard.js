@@ -352,24 +352,35 @@ async function fetchData() {
   try {
     const token = localStorage.getItem('deviceToken') || '';
     const headers = { 'x-device-token': token };
+    const isAdmin = localStorage.getItem('userRole') === 'admin';
 
     const status = await fetch('/status', { headers }).then(r => r.json());
-    const sessions = await fetch('/sessions', { headers }).then(r => r.json());
-    const accessLogs = await fetch('/logs/access', { headers }).then(r => r.json());
-    const errorLogs = await fetch('/logs/errors', { headers }).then(r => r.json());
-
     document.getElementById('status').textContent = status.status.toUpperCase();
     document.getElementById('uptime').textContent = status.uptime;
     document.getElementById('ram').textContent = status.ram.used;
     document.getElementById('cpu').textContent = status.cpu.cores + ' Cores';
-    document.getElementById('sessions').textContent = sessions.total;
 
+    // Active sessions + logs are admin-only now; non-admins see a notice instead
+    // of a broken panel (and never trigger a 403 fetch loop).
+    const sessionsEl = document.getElementById('sessions');
+    if (!isAdmin) {
+      sessionsEl.textContent = '—';
+      document.getElementById('access-log').innerHTML = '<li>Admin only</li>';
+      document.getElementById('error-log').innerHTML = '<li class="threat">Admin only</li>';
+      return;
+    }
+
+    const sessions = await fetch('/sessions', { headers }).then(r => r.json());
+    sessionsEl.textContent = sessions.total;
+
+    const accessLogs = await fetch('/logs/access', { headers }).then(r => r.json());
     const accessList = document.getElementById('access-log');
-    accessList.innerHTML = accessLogs.logs.slice(-10).reverse()
+    accessList.innerHTML = (accessLogs.logs || []).slice(-10).reverse()
       .map(l => `<li>${l}</li>`).join('');
 
+    const errorLogs = await fetch('/logs/errors', { headers }).then(r => r.json());
     const errorList = document.getElementById('error-log');
-    errorList.innerHTML = errorLogs.logs.slice(-10).reverse()
+    errorList.innerHTML = (errorLogs.logs || []).slice(-10).reverse()
       .map(l => `<li class="threat">${l}</li>`).join('');
 
   } catch (err) {

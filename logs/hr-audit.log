@@ -50,3 +50,5 @@
 [2026-10-11T21:53:33.801Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
 [2026-10-11T21:58:19.639Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
 [2026-10-11T21:58:19.952Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-12T08:37:03.867Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-12T08:37:04.344Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown

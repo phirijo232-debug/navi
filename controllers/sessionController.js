@@ -1,4 +1,5 @@
 const { logError } = require('../middleware/logger');
+const { isAdminRole } = require('../middleware/storeScope');
 
 const activeSessions = {};
 const failureTracker = {};
@@ -61,6 +62,9 @@ function trackSession(req, res, next) {
 }
 
 const getActiveSessions = circuitBreaker('getActiveSessions', async (req, res) => {
+  if (!isAdminRole(req.authUser?.role)) {
+    return res.status(403).json({ error: 'Admin access required.' });
+  }
   res.json({
     total: Object.keys(activeSessions).length,
     sessions: activeSessions

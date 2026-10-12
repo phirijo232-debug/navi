@@ -95,9 +95,6 @@ const PUBLIC_PATHS = new Set([
   '/password-reset',
   '/password-reset/confirm',
   '/status',
-  '/sessions',
-  '/logs/access',
-  '/logs/errors',
   '/favicon.ico'
 ]);
 
@@ -146,4 +143,19 @@ const rateLimiter = rateLimit({
   }
 });
 
-module.exports = { helmet, deviceAuth, rateLimiter, checkMasterPassword };
+// Strict limiter for brute-force-sensitive endpoints (login, signup, password
+// reset, vault OTP). Applied to EVERY source IP — including localhost — so a
+// local process cannot hammer these flows unchecked. Kept separate from the
+// global limiter so the dashboard's frequent status polling is never throttled.
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logError(`AUTH RATE LIMIT HIT: ${req.method} ${req.path} from ${req.ip}`);
+    res.status(429).json({ error: 'Too many attempts. Please wait a few minutes and try again.' });
+  }
+});
+
+module.exports = { helmet, deviceAuth, rateLimiter, authRateLimiter, checkMasterPassword };

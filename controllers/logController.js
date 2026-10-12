@@ -1,6 +1,7 @@
 const fs = require('fs');
 const config = require('../config');
 const { logError } = require('../middleware/logger');
+const { isAdminRole } = require('../middleware/storeScope');
 
 const failureTracker = {};
 
@@ -36,12 +37,18 @@ function circuitBreaker(name, fn) {
 }
 
 const getAccessLogs = circuitBreaker('getAccessLogs', async (req, res) => {
+  if (!isAdminRole(req.authUser?.role)) {
+    return res.status(403).json({ error: 'Admin access required.' });
+  }
   const logs = fs.readFileSync(config.LOGS.ACCESS, 'utf8');
   const lines = logs.trim().split('\n').filter(Boolean);
   res.json({ total: lines.length, logs: lines });
 });
 
 const getErrorLogs = circuitBreaker('getErrorLogs', async (req, res) => {
+  if (!isAdminRole(req.authUser?.role)) {
+    return res.status(403).json({ error: 'Admin access required.' });
+  }
   const logs = fs.readFileSync(config.LOGS.ERRORS, 'utf8');
   const lines = logs.trim().split('\n').filter(Boolean);
   res.json({ total: lines.length, logs: lines });

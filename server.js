@@ -3,7 +3,7 @@ const express = require('express');
 const path = require('path');
 const config = require('./config');
 const { logError, logAccess, replayPendingAlerts } = require('./middleware/logger');
-const { helmet, deviceAuth, rateLimiter } = require('./middleware/security');
+const { helmet, deviceAuth, rateLimiter, authRateLimiter } = require('./middleware/security');
 const { verifyOTP, sendOTP } = require('./middleware/otp');
 const { trackSession } = require('./controllers/sessionController');
 const routes = require('./routes');
@@ -30,6 +30,22 @@ app.use(helmet({
 
 app.use(express.json());
 
+// Brute-force-sensitive endpoints (auth + vault OTP) get a strict limiter for
+// EVERY source IP — including localhost — so a local process can't hammer them.
+const AUTH_SENSITIVE_PATHS = new Set([
+  '/login', '/login/confirm', '/signup', '/signup/confirm', '/signup/resend',
+  '/password-reset', '/password-reset/confirm', '/vault/request', '/vault/authorize'
+]);
+
+app.use((req, res, next) => {
+  if (AUTH_SENSITIVE_PATHS.has(req.path)) {
+    return authRateLimiter(req, res, next);
+  }
+  next();
+});
+
+// General limiter still skips localhost so the dashboard's frequent status
+// polling (every 5s) is never throttled.
 app.use((req, res, next) => {
   const isLocalhost = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip);
   if (isLocalhost) return next();
