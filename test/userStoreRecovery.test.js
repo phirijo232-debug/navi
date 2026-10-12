@@ -1,9 +1,30 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const { requestSignup, getAllUsers } = require('../controllers/authController');
+const { requestSignup, getAllUsers, createInvite } = require('../controllers/authController');
 
 const USERS_FILE = require('../middleware/dataStore').paths.users;
+
+function makeRes() {
+  return {
+    statusCode: 200,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    }
+  };
+}
+
+async function createInviteToken(email) {
+  const res = makeRes();
+  await createInvite({ body: { email }, authUser: { role: 'admin' } }, res);
+  assert.equal(res.statusCode, 200, `invite generation failed: ${JSON.stringify(res.body)}`);
+  return res.body.inviteToken;
+}
 
 test('requestSignup can recover when the users store is malformed', async () => {
   const original = fs.readFileSync(USERS_FILE, 'utf8');
@@ -17,21 +38,13 @@ test('requestSignup can recover when the users store is malformed', async () => 
         password: 'StrongPass1!',
         confirmPassword: 'StrongPass1!',
         phone: '+260977000000',
-        nrc: '123456/78/1'
+        nrc: '123456/78/1',
+        // Signup is invite-only now — the recovery path must still work with a valid token.
+        inviteToken: await createInviteToken('recover@example.com')
       }
     };
 
-    const res = {
-      statusCode: 200,
-      status(code) {
-        this.statusCode = code;
-        return this;
-      },
-      json(payload) {
-        this.body = payload;
-        return this;
-      }
-    };
+    const res = makeRes();
 
     await requestSignup(req, res);
 

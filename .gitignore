@@ -3,4 +3,6 @@ data/dailyReportState.json
 data/*.bak
 data/*.corrupt
 data/*.tmp
+data/invites.json
+data/backups/
 node_modules

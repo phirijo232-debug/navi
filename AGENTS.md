@@ -99,6 +99,9 @@ GET  /invites/validate/:token
 POST /invites/validate
 POST /admin/users
 POST /admin/announcements
+POST /admin/backup
+GET  /admin/backups
+POST /admin/restore
 POST /feedback
 GET  /feedback
 POST /feedback/:id/status

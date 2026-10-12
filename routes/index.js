@@ -22,6 +22,9 @@ const {
   submitFeedback, getFeedback, updateFeedbackStatus
 } = require('../controllers/feedbackController');
 const {
+  createBackup, listBackups, restoreBackup
+} = require('../controllers/backupController');
+const {
   getReportSummary, exportReport, getSingleUserReport,
   getAllUsersReport, getAnalyticsReport, getProfitAnalytics,
   getDefaulterAnalytics, getOverdueAnalytics, getPaidAnalytics,
@@ -88,6 +91,9 @@ router.post('/admin/loans', upload.fields([
   { name: 'collateralBack', maxCount: 1 }
 ]), createAdminLoan);
 router.post('/admin/announcements', sendAdminAnnouncement);
+router.post('/admin/backup', createBackup);
+router.get('/admin/backups', listBackups);
+router.post('/admin/restore', restoreBackup);
 router.get('/hr/employees', listEmployees);
 router.patch('/hr/employees/:id', editEmployee);
 router.post('/hr/employees/:id/restrictions', setEmployeeRestriction);

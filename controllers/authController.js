@@ -32,41 +32,71 @@ function resolveAssignedRole(requestedRole, actorRole) {
   return 'user';
 }
 
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 const USERS_FILE = dataStore.paths.users;
 const pendingSignups = {};
 const pendingLogins = {};
 const pendingResets = {};
-const pendingInvites = {};
+// Invites are persisted to data/invites.json so a server restart can never
+// silently invalidate a link already shared with a customer. Reads/writes go
+// through dataStore (atomic write + .bak recovery) — dataStore.js untouched.
+const INVITES_FILE = path.join(dataStore.DATA_DIR, 'invites.json');
 const INVITE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
+function loadInvites() {
+  return dataStore.readJson(INVITES_FILE, {}, (v) => v && typeof v === 'object' && !Array.isArray(v));
+}
+
+function saveInvites(invites) {
+  dataStore.writeJson(INVITES_FILE, invites);
+}
+
 function cleanupExpiredInvites() {
+  const invites = loadInvites();
   const now = Date.now();
-  Object.keys(pendingInvites).forEach((token) => {
-    if (pendingInvites[token].expiresAt <= now) {
-      delete pendingInvites[token];
+  let changed = false;
+  Object.keys(invites).forEach((token) => {
+    if (invites[token].expiresAt <= now) {
+      delete invites[token];
+      changed = true;
     }
   });
+  if (changed) saveInvites(invites);
 }
 
 function generateInviteToken(email) {
+  const invites = loadInvites();
   const token = crypto.randomBytes(16).toString('hex');
-  pendingInvites[token] = {
+  invites[token] = {
     email,
     createdAt: new Date().toISOString(),
     expiresAt: Date.now() + INVITE_EXPIRY_MS,
     used: false
   };
+  saveInvites(invites);
   return token;
 }
 
 function getInviteByToken(token) {
   if (!token) return null;
-  cleanupExpiredInvites();
-  const invite = pendingInvites[token];
+  const invites = loadInvites();
+  const invite = invites[String(token).trim()];
   if (!invite || invite.used || invite.expiresAt <= Date.now()) {
     return null;
   }
   return invite;
+}
+
+function markInviteUsed(token) {
+  const invites = loadInvites();
+  const key = String(token).trim();
+  if (invites[key]) {
+    invites[key].used = true;
+    saveInvites(invites);
+  }
 }
 
 function isStrongPassword(password) {
@@ -210,17 +240,22 @@ async function requestSignup(req, res) {
       return res.status(400).json({ error: passwordRequirementsText() });
     }
 
+    // Invite enforcement: signup is closed to the public. A customer may only
+    // register through an admin-generated link bound to their exact email.
+    // Checked BEFORE the email-exists probe so an uninvited caller cannot
+    // enumerate which emails are already registered.
+    if (!inviteToken) {
+      return res.status(400).json({ error: 'Signup requires an invitation. Ask the administrator for your invite link.' });
+    }
+    const invite = getInviteByToken(inviteToken);
+    if (!invite || normalizeEmail(invite.email) !== normalizeEmail(email)) {
+      return res.status(400).json({ error: 'Invalid or expired signup token.' });
+    }
+
     const users = getUsers();
     const exists = users.find(u => u.email === email);
     if (exists) {
       return res.status(400).json({ error: 'Email already registered.' });
-    }
-
-    if (inviteToken) {
-      const invite = getInviteByToken(inviteToken);
-      if (!invite || invite.email !== email) {
-        return res.status(400).json({ error: 'Invalid or expired signup token.' });
-      }
     }
 
     pendingSignups[email] = { username, email, password, phone: normalizedPhone, nrc: nrc ? String(nrc).trim() : null, inviteToken };
@@ -247,13 +282,11 @@ async function confirmSignup(req, res) {
       return res.status(400).json({ error: result.message });
     }
 
-    if (pending.inviteToken) {
-      const invite = getInviteByToken(pending.inviteToken);
-      if (!invite || invite.email !== email) {
-        return res.status(400).json({ error: 'Invalid signup invitation token.' });
-      }
-      invite.used = true;
+    const invite = getInviteByToken(pending.inviteToken);
+    if (!invite || normalizeEmail(invite.email) !== normalizeEmail(email)) {
+      return res.status(400).json({ error: 'Invalid signup invitation token.' });
     }
+    markInviteUsed(pending.inviteToken);
 
     const users = getUsers();
     const hashedPassword = await bcrypt.hash(pending.password, 10);
@@ -714,7 +747,7 @@ function listInvites(req, res) {
     if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'Admin access required.' });
 
     cleanupExpiredInvites();
-    const invites = Object.entries(pendingInvites)
+    const invites = Object.entries(loadInvites())
       .map(([token, invite]) => ({
         token,
         email: invite.email,

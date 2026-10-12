@@ -6,7 +6,7 @@
 - [ ] Finalize the desktop-only UX and keep the dark theme untouched while adding light-mode clarity where required.
 - [ ] Extend the user loan request form with timeframe/urgency fields and the matching interest calculation.
 - [ ] Add a complete user loan history area with filters for recent periods and computed totals/interest.
-- [ ] Implement invite-based onboarding so a customer can only sign up for the intended loan flow.
+- [x] Implement invite-based onboarding so a customer can only sign up for the intended loan flow.
 - [ ] Build the admin loan review workflow: create invite, approve/start/close/pay actions, and summary reporting.
 - [ ] Validate the backend loan status logic against real user actions and repayment events.
 - [ ] Run an end-to-end desktop QA pass for signup -> login -> dashboard -> loan request -> history -> admin review.
@@ -18,7 +18,7 @@
 - [x] Add overdue detection and repayment reminders to reduce manual follow-up.
 - [x] Add admin reporting exports (CSV or PDF) for loans, totals, and outstanding balances.
 - [x] Add notification hooks for approval, payment, and overdue events using the email path already in place.
-- [ ] Add backup/restore handling for users and loan records to protect project data.
+- [x] Add backup/restore handling for users and loan records to protect project data.
 - [x] Notify the admin inbox when a server breakage trips a circuit breaker (logError notify path with 15-minute flood protection per incident).
 - [x] Enrich breakage alerts with [file → handler] prefixes, expand notify coverage to every money/silence-critical circuit (auth, loans, reports, schedulers), and queue unsent alerts to logs/pending-alerts.log when Gmail is down.
 - [ ] Add UI polish for status badges, summary cards, and error messages for faster admin use.
