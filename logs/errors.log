@@ -685,3 +685,16 @@
 [2026-10-13T11:50:33.061Z] [authController.js → requestLogin] LOGIN CIRCUIT TRIPPED: Invalid login: 535-5.7.8 Username and Password not accepted
 [2026-10-13T11:50:33.348Z] [authController.js → requestPasswordReset] PASSWORD RESET CIRCUIT TRIPPED: connect ETIMEDOUT 74.125.0.0:465
 [2026-10-13T11:50:34.165Z] DATA RECOVERED with empty fallback, no backup available (malformed JSON): users.json
+[2026-10-13T12:50:11.794Z] DB RECONCILE (JSON newer, copied to SQLite): users.json
+[2026-10-13T12:50:12.064Z] [healthWatch.js → detectOutageOnBoot] SERVER OUTAGE DETECTED: server was offline from 2026-10-13T12:12:06.563Z to 2026-10-13T12:50:12.063Z (~38 min)
+[2026-10-13T12:55:25.320Z] [../Users/phiri/AppData/Local/Temp/ea-validate.js:10 inner] GLOBAL SAFETY NET: Error: boom-from-inner
+    at inner (C:\Users\phiri\AppData\Local\Temp\ea-validate.js:10:27)
+    at outer (C:\Users\phiri\AppData\Local\Temp\ea-validate.js:11:27)
+    at Object.<anonymous> (C:\Users\phiri\AppData\Local\Temp\ea-validate.js:12:13)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+    at Module.load (node:internal/modules/cjs/loader:1651:32)
+    at Module._load (node:internal/modules/cjs/loader:1443:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 on POST /probe

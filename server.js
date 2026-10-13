@@ -11,6 +11,7 @@ const routes = require('./routes');
 const { startScheduler } = require('./scheduler');
 const { ensureDataIntegrity } = require('./middleware/dataStore');
 const { startHealthWatch } = require('./middleware/healthWatch');
+const { errorAudit, captureOrigin, appendAudit } = require('./middleware/errorAudit');
 
 const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || 'phirii26';
 const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
@@ -130,7 +131,9 @@ app.use(trackSession);
 app.use('/', routes);
 
 process.on('uncaughtException', (err) => {
-  logError(`UNCAUGHT ERROR: ${err.stack || err.message}`, true);
+  const origin = captureOrigin(err);
+  logError(`[${origin}] UNCAUGHT ERROR: ${err.stack || err.message}`, true);
+  appendAudit(origin, err?.message || String(err), { source: 'uncaughtException' });
 });
 
 app.use((req, res) => {
@@ -142,14 +145,10 @@ app.use((req, res) => {
   res.status(404).send('Route not found');
 });
 
-app.use((err, req, res, next) => {
-  try {
-    logError(`GLOBAL SAFETY NET: ${err.stack || err.message} on ${req.method} ${req.url}`, true);
-  } catch {
-    console.error(`GLOBAL SAFETY NET: ${err.stack || err.message}`);
-  }
-  res.status(500).json({ error: 'Something went wrong. Please try again.' });
-});
+// IMMUNE + provenance: every failure that reaches the error pipeline is logged
+// with its origin (file:line handler) and a dedicated audit line, then returns
+// the same user-facing 500. Registered last so it only catches unhandled errors.
+app.use(errorAudit);
 
 const startupRepairs = ensureDataIntegrity();
 if (startupRepairs.length) {
