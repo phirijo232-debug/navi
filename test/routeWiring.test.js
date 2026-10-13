@@ -84,7 +84,7 @@ test('router registers the core authentication and data endpoints', () => {
     ['GET', '/users'], ['POST', '/admin/users'], ['POST', '/admin/announcements'],
     ['GET', '/feedback'], ['POST', '/feedback'], ['POST', '/feedback/:id/status'],
     ['GET', '/reports/:scope/summary'], ['GET', '/reports/:scope/export'],
-    ['GET', '/status'], ['GET', '/sessions'],
+    ['GET', '/status'], ['GET', '/health'], ['GET', '/sessions'],
     ['GET', '/logs/access'], ['GET', '/logs/errors'],
     ['POST', '/invites/create'],
     ['POST', '/admin/backup'], ['GET', '/admin/backups'], ['POST', '/admin/restore'],

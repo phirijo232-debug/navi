@@ -1,5 +1,9 @@
 const os = require('os');
 const { logError } = require('../middleware/logger');
+const { findUserByDeviceToken } = require('../middleware/security');
+const { isAdminRole } = require('../middleware/storeScope');
+const dataStore = require('../middleware/dataStore');
+const { heartbeatInfo } = require('../middleware/healthWatch');
 
 const failureTracker = {};
 
@@ -40,24 +44,59 @@ const getStatus = circuitBreaker('getStatus', async (req, res) => {
   const minutes = Math.floor((uptime % 3600) / 60);
   const seconds = Math.floor(uptime % 60);
 
+  // LEAK TIGHTENING: /status is a PUBLIC path (no deviceAuth), so it must not
+  // expose machine identity. Hostname/platform/CPU model were removed — the
+  // dashboard only renders status, uptime, ram.used and cpu.cores.
   const status = {
     server: 'Navi Server',
     status: 'running',
     uptime: `${hours}h ${minutes}m ${seconds}s`,
     cpu: {
-      model: os.cpus()[0].model,
       cores: os.cpus().length
     },
     ram: {
       total: `${Math.round(os.totalmem() / 1024 / 1024)}MB`,
       free: `${Math.round(os.freemem() / 1024 / 1024)}MB`,
       used: `${Math.round((os.totalmem() - os.freemem()) / 1024 / 1024)}MB`
-    },
-    platform: os.platform(),
-    hostname: os.hostname()
+    }
   };
 
   res.json(status);
 });
 
-module.exports = { getStatus };
+// ─── IMMUNE: GET /health ─────────────────────────────────────────────────────
+// Public tier (no token): {status, uptime} only — safe for uptime monitors.
+// Admin tier (valid admin device token): adds memory, db mode/health and the
+// heartbeat age. The token is resolved in-handler because /health lives in
+// PUBLIC_PATHS (deviceAuth skips it), so req.authUser is never populated here.
+const getHealth = circuitBreaker('getHealth', async (req, res) => {
+  const base = {
+    status: 'ok',
+    uptime: `${Math.round(process.uptime())}s`
+  };
+
+  const token = req.headers['x-device-token'];
+  const user = token ? findUserByDeviceToken(token) : null;
+  if (!user || !isAdminRole(user.role)) {
+    return res.json(base);
+  }
+
+  const dbHealth = dataStore.db.isHealthy();
+  res.json({
+    ...base,
+    memory: {
+      usedMB: Math.round((process.memoryUsage().rss) / 1024 / 1024),
+      heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+    },
+    db: {
+      mode: dataStore.db.getMode(),
+      // Boolean (or null when in json mode) — never the file path.
+      healthy: dbHealth,
+      documents: dataStore.db.stats()?.documents ?? null
+    },
+    heartbeat: heartbeatInfo(),
+    pid: process.pid
+  });
+});
+
+module.exports = { getStatus, getHealth };

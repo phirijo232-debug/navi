@@ -2,6 +2,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { logError } = require('./logger');
+// HEART delegate: SQLite mirror behind DB_MODE (json|dual|sqlite). All logic
+// lives in db.js — this file keeps its exact API and JSON-first behaviour.
+const db = require('./db');
 
 // ─── Single source of truth for where the JSON data lives ───────────────────
 // Production: <repo>/data
@@ -43,6 +46,10 @@ function resolveDataDir() {
 
 const DATA_DIR = resolveDataDir();
 
+// HEART: open the SQLite mirror (no-op in json mode / tests). The db file lives
+// next to the data it mirrors so the test sandbox gets its own private db too.
+db.init(path.join(DATA_DIR, 'navi.db'));
+
 const paths = {
   users: path.join(DATA_DIR, 'users.json'),
   loans: path.join(DATA_DIR, 'loans.json'),
@@ -77,6 +84,14 @@ function writeJson(file, data) {
   } catch (err) {
     logError(`BACKUP WRITE FAILED for ${path.basename(file)}: ${err.message}`);
   }
+  // HEART dual-write: JSON is written FIRST (source of truth, .bak refreshed),
+  // then mirrored to SQLite. A mirror failure only drops the db health flag —
+  // reads then keep serving the JSON truth (degrade, never lose).
+  try {
+    db.setDocument(path.basename(file), data);
+  } catch (err) {
+    logError(`DB MIRROR FAILED for ${path.basename(file)}: ${err.message}`);
+  }
 }
 
 // ─── Corruption recovery (non-destructive):                                   ───
@@ -105,6 +120,16 @@ function recover(file, fallback, reason) {
 }
 
 function readJson(file, fallback, validate = () => true) {
+  // HEART sqlite mode: read the mirrored document first; fall through to the
+  // JSON path whenever the DB has no row, fails validation, or went unhealthy —
+  // so JSON files remain a complete, always-usable fallback.
+  if (db.getMode() === 'sqlite') {
+    const mirrored = db.getDocument(path.basename(file));
+    if (mirrored !== null && validate(mirrored)) {
+      return mirrored;
+    }
+  }
+
   let raw;
   try {
     raw = fs.readFileSync(file, 'utf8');
@@ -161,7 +186,16 @@ function ensureDataIntegrity() {
   if (report.length) {
     logError(`STARTUP DATA REPAIR: ${report.join('; ')}`);
   }
+  // HEART boot reconcile (JSON wins): copy any JSON file newer than its kv row
+  // into SQLite so a crash between the two writes can never serve stale data.
+  try {
+    const mirrorFiles = [...CORE_DATA_FILES, 'invites.json', 'notifications.json', 'dailyReportState.json']
+      .map(name => ({ key: name, file: path.join(DATA_DIR, name) }));
+    db.reconcileFromJson(readJson, mirrorFiles);
+  } catch (err) {
+    logError(`DB RECONCILE FAILED (JSON remains source of truth): ${err.message}`);
+  }
   return report;
 }
 
-module.exports = { DATA_DIR, paths, readJson, writeJson, ensureDataIntegrity };
+module.exports = { DATA_DIR, paths, readJson, writeJson, ensureDataIntegrity, db };

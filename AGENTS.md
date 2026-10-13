@@ -63,6 +63,7 @@ async function myFunction(req, res) {
 
 ## CONFIRMED WORKING ROUTES — DO NOT CHANGE PATHS
 GET  /status
+GET  /health
 GET  /logs/access
 GET  /logs/errors
 GET  /sessions
@@ -132,6 +133,9 @@ C:\NaviServer\
 ├── logs\access.log
 ├── logs\errors.log
 ├── middleware\dataStore.js
+├── middleware\db.js
+├── middleware\healthWatch.js
+├── middleware\kidneys.js
 ├── middleware\email.js
 ├── middleware\logger.js
 ├── middleware\loanNotifications.js
@@ -162,10 +166,10 @@ Spine         — routes/index.js and all middleware (DONE)
 Nervous system — middleware/security.js (DONE)
 Brain         — all controllers (DONE)
 Skin          — all public HTML/JS/CSS files (IN PROGRESS)
-Heart         — data/*.json files (future: SQLite database)
+Heart         — SQLite via middleware/db.js behind dataStore (DONE — better-sqlite3, DB_MODE json|dual|sqlite, JSON mirror + crash fallback, scripts/import-json-to-sqlite.js)
 Liver         — middleware/dataStore.js (DONE — atomic writes, backup, recovery)
-Kidneys       — session cleanup (NOT YET BUILT)
-Immune system — monitoring and alerts (DONE — logBreakage admin alerts, 15-min flood protection, pending-alerts.log fallback)
+Kidneys       — middleware/kidneys.js hourly sweep (DONE — expired OTPs, dead pending-auth, stale sessions/devices; cron '20 * * * *' + boot sweep)
+Immune system — monitoring and alerts (DONE — logBreakage admin alerts, 15-min flood protection, pending-alerts.log fallback, GET /health two-tier, healthWatch heartbeat + outage alerts)
 Lungs         — API flow and schedulers (DONE — dailyReport, loanNotifications)
 
 ## LOAN STATUS VALUES — USE THESE EXACT STRINGS FROM config.LOAN_STATUSES

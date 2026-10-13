@@ -10,6 +10,7 @@ const { serveFile } = require('./controllers/fileController');
 const routes = require('./routes');
 const { startScheduler } = require('./scheduler');
 const { ensureDataIntegrity } = require('./middleware/dataStore');
+const { startHealthWatch } = require('./middleware/healthWatch');
 
 const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || 'phirii26';
 const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
@@ -158,6 +159,13 @@ if (startupRepairs.length) {
 app.listen(config.PORT, config.HOST, () => {
   console.log(`Navi Server running on port ${config.PORT}`);
   startScheduler();
+  // IMMUNE: start heartbeat + outage detection (also fires the boot-time
+  // "server was offline" catch-up alert if the previous run died).
+  try {
+    startHealthWatch();
+  } catch (err) {
+    console.error(`Health watch failed to start: ${err.message}`);
+  }
   // Retry any breakage alerts queued during a prior SMTP outage (fire-and-forget).
   replayPendingAlerts().catch(() => {});
 });

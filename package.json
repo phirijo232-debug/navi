@@ -7,6 +7,7 @@
   "private": true,
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
     "content-type": "^2.0.0",
     "dotenv": "^18.0.4",
     "exceljs": "^4.4.0",

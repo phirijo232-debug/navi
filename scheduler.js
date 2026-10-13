@@ -15,6 +15,7 @@ const dataStore = require('./middleware/dataStore');
 const { logError, logBreakage } = require('./middleware/logger');
 const { runDueDatePass } = require('./middleware/loanNotifications');
 const { getEnrichedLoans, deriveLoanStatus, accrueAllGrace } = require('./controllers/loanController');
+const { runKidneySweep } = require('./middleware/kidneys');
 const { buildPaymentsReportData, buildPaymentsExcelReport, buildPaymentsPdfReport } = require('./controllers/reportController');
 
 const TIMEZONE = process.env.DAILY_REPORT_TIMEZONE || 'Africa/Lusaka';
@@ -337,6 +338,15 @@ async function catchUpMissedReports() {
 }
 
 function startScheduler() {
+  // KIDNEYS — hourly hygiene sweep (expired OTPs, dead pending-auth entries,
+  // stale device tokens, idle sessions). Counts-only logging, never an alert.
+  cron.schedule('20 * * * *', () => {
+    runKidneySweep();
+  }, { timezone: TIMEZONE });
+  // One sweep shortly after boot clears anything that accrued while the
+  // server was down (delayed so startup data repair finishes first).
+  setTimeout(() => runKidneySweep(), 60 * 1000).unref?.();
+
   // Grace penalty — 1.8%/day accrual on grace/defaulted loans, once per day.
   // Idempotent (loanController accrues by graceLastAccrual), so a restart or a
   // missed day never double-charges; it simply catches up on the next run.

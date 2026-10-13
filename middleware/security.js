@@ -95,6 +95,7 @@ const PUBLIC_PATHS = new Set([
   '/password-reset',
   '/password-reset/confirm',
   '/status',
+  '/health',
   '/favicon.ico'
 ]);
 

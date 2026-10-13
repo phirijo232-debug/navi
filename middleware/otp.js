@@ -128,4 +128,4 @@ function verifyOTP(input, targetEmail = null, purpose = null) {
   delete otpStore[key];
   return { valid: true };
 }
-module.exports = { sendOTP, verifyOTP, generateOTP, buildOtpKey };
+module.exports = { sendOTP, verifyOTP, generateOTP, buildOtpKey, cleanupExpiredOtps };

@@ -84,3 +84,129 @@
 [2026-10-12T12:29:52.093Z] HR BACKUP CREATED backup-20261012-122952-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
 [2026-10-12T12:29:52.125Z] HR BACKUP RESTORED backup-20261012-122952-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
 [2026-10-12T12:29:52.368Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T07:56:42.222Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T07:56:42.350Z] HR BACKUP CREATED backup-20261013-075642 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T07:56:42.386Z] HR BACKUP CREATED backup-20261013-075642-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T07:56:42.464Z] HR BACKUP CREATED backup-20261013-075642-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T07:56:42.517Z] HR BACKUP RESTORED backup-20261013-075642-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T07:56:42.928Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T07:59:37.775Z] HR BACKUP CREATED backup-20261013-075937 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T07:59:37.794Z] HR BACKUP CREATED backup-20261013-075937-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T07:59:37.846Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T07:59:37.854Z] HR BACKUP CREATED backup-20261013-075937-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T07:59:37.871Z] HR BACKUP RESTORED backup-20261013-075937-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T07:59:38.134Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T08:51:48.585Z] HR BACKUP CREATED backup-20261013-085148 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T08:51:48.649Z] HR BACKUP CREATED backup-20261013-085148-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T08:51:48.829Z] HR BACKUP CREATED backup-20261013-085148-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T08:51:48.900Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T08:51:48.941Z] HR BACKUP RESTORED backup-20261013-085148-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T08:51:49.539Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T08:58:49.224Z] HR BACKUP CREATED backup-20261013-085849 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T08:58:49.262Z] HR BACKUP CREATED backup-20261013-085849-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T08:58:49.383Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T08:58:49.423Z] HR BACKUP CREATED backup-20261013-085849-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T08:58:49.479Z] HR BACKUP RESTORED backup-20261013-085849-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T08:58:49.841Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T10:09:40.345Z] HR BACKUP CREATED backup-20261013-100940 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:09:40.378Z] HR BACKUP CREATED backup-20261013-100940-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:09:40.439Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T10:09:40.533Z] HR BACKUP CREATED backup-20261013-100940-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:09:40.564Z] HR BACKUP RESTORED backup-20261013-100940-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:09:40.737Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T10:10:09.003Z] HR BACKUP CREATED backup-20261013-101008 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:10:09.043Z] HR BACKUP CREATED backup-20261013-101009 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:10:09.099Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T10:10:09.206Z] HR BACKUP CREATED backup-20261013-101009-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:10:09.237Z] HR BACKUP RESTORED backup-20261013-101009-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:10:09.426Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T10:18:23.563Z] HR BACKUP CREATED backup-20261013-101823 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:18:23.592Z] HR BACKUP CREATED backup-20261013-101823-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:18:23.634Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T10:18:23.753Z] HR BACKUP CREATED backup-20261013-101823-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:18:23.802Z] HR BACKUP RESTORED backup-20261013-101823-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:18:23.964Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T10:18:35.567Z] HR BACKUP CREATED backup-20261013-101835 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:18:35.604Z] HR BACKUP CREATED backup-20261013-101835-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:18:35.734Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T10:18:35.870Z] HR BACKUP CREATED backup-20261013-101835-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:18:35.901Z] HR BACKUP RESTORED backup-20261013-101835-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:18:36.289Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T10:20:20.094Z] HR BACKUP CREATED backup-20261013-102020 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:20:20.128Z] HR BACKUP CREATED backup-20261013-102020-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:20:20.187Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T10:20:20.278Z] HR BACKUP CREATED backup-20261013-102020-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:20:20.311Z] HR BACKUP RESTORED backup-20261013-102020-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:20:20.515Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T10:20:45.257Z] HR BACKUP CREATED backup-20261013-102045 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:20:45.304Z] HR BACKUP CREATED backup-20261013-102045-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:20:45.451Z] HR BACKUP CREATED backup-20261013-102045-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:20:45.451Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T10:20:45.472Z] HR BACKUP RESTORED backup-20261013-102045-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T10:20:45.774Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T11:38:35.683Z] HR BACKUP CREATED backup-20261013-113835 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:38:35.785Z] HR BACKUP CREATED backup-20261013-113835-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:38:36.193Z] HR BACKUP CREATED backup-20261013-113836 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:38:36.199Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T11:38:36.398Z] HR BACKUP RESTORED backup-20261013-113836 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:38:36.758Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T11:38:52.468Z] HR BACKUP CREATED backup-20261013-113852 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:38:52.498Z] HR BACKUP CREATED backup-20261013-113852-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:38:52.774Z] HR BACKUP CREATED backup-20261013-113852-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:38:52.848Z] HR BACKUP RESTORED backup-20261013-113852-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:38:52.869Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T11:38:53.537Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T11:41:13.684Z] HR BACKUP CREATED backup-20261013-114113 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:41:13.709Z] HR BACKUP CREATED backup-20261013-114113-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:41:13.769Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T11:41:13.892Z] HR BACKUP CREATED backup-20261013-114113-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:41:13.924Z] HR BACKUP RESTORED backup-20261013-114113-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:41:14.169Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T11:41:31.545Z] HR BACKUP CREATED backup-20261013-114131 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:41:31.574Z] HR BACKUP CREATED backup-20261013-114131-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:41:31.669Z] HR BACKUP CREATED backup-20261013-114131-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:41:31.701Z] HR BACKUP RESTORED backup-20261013-114131-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:41:31.718Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T11:41:32.060Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T11:41:44.854Z] HR BACKUP CREATED backup-20261013-114144 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:41:44.891Z] HR BACKUP CREATED backup-20261013-114144-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:41:44.949Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T11:41:45.145Z] HR BACKUP CREATED backup-20261013-114145 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:41:45.178Z] HR BACKUP RESTORED backup-20261013-114145 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:41:45.398Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T11:42:00.611Z] HR BACKUP CREATED backup-20261013-114200 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:00.695Z] HR BACKUP CREATED backup-20261013-114200-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:00.789Z] HR BACKUP CREATED backup-20261013-114200-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:00.815Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T11:42:00.832Z] HR BACKUP RESTORED backup-20261013-114200-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:01.183Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T11:42:15.001Z] HR BACKUP CREATED backup-20261013-114214 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:15.027Z] HR BACKUP CREATED backup-20261013-114215 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:15.075Z] HR BACKUP CREATED backup-20261013-114215-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:15.127Z] HR BACKUP RESTORED backup-20261013-114215-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:15.152Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T11:42:15.471Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T11:42:28.081Z] HR BACKUP CREATED backup-20261013-114228 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:28.117Z] HR BACKUP CREATED backup-20261013-114228-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:28.178Z] HR BACKUP CREATED backup-20261013-114228-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:28.196Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T11:42:28.212Z] HR BACKUP RESTORED backup-20261013-114228-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:28.487Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T11:42:40.514Z] HR BACKUP CREATED backup-20261013-114240 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:40.543Z] HR BACKUP CREATED backup-20261013-114240-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:40.580Z] HR BACKUP CREATED backup-20261013-114240-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:40.601Z] HR BACKUP RESTORED backup-20261013-114240-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:42:40.666Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T11:42:40.949Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T11:49:19.313Z] HR BACKUP CREATED backup-20261013-114919 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:49:19.380Z] HR BACKUP CREATED backup-20261013-114919-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:49:19.457Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T11:49:19.564Z] HR BACKUP CREATED backup-20261013-114919-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:49:19.601Z] HR BACKUP RESTORED backup-20261013-114919-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:49:20.269Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown
+[2026-10-13T11:50:30.551Z] HR BACKUP CREATED backup-20261013-115030 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:50:30.593Z] HR BACKUP CREATED backup-20261013-115030-1 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:50:30.629Z] HR RESTRICT notifyAll on employee id=3 | by id=2 email=unknown
+[2026-10-13T11:50:30.814Z] HR BACKUP CREATED backup-20261013-115030-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:50:31.050Z] HR BACKUP RESTORED backup-20261013-115030-2 files=users.json,loans.json,feedback.json,notifications.json,dailyReportState.json | by id=1 email=admin@example.test
+[2026-10-13T11:50:31.092Z] HR STORE SWITCH APPROVED to other | by id=3 email=unknown

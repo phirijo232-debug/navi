@@ -1,5 +1,6 @@
 const { logError } = require('../middleware/logger');
 const { isAdminRole } = require('../middleware/storeScope');
+const { findUserByDeviceToken } = require('../middleware/security');
 
 const activeSessions = {};
 const failureTracker = {};
@@ -65,10 +66,60 @@ const getActiveSessions = circuitBreaker('getActiveSessions', async (req, res) =
   if (!isAdminRole(req.authUser?.role)) {
     return res.status(403).json({ error: 'Admin access required.' });
   }
+  // ─── LEAK TIGHTENING ──────────────────────────────────────────────────────
+  // Previously the map keys were the RAW device tokens of every user on the
+  // server — any isAdminRole caller (incl. a store_admin) could harvest tokens
+  // for accounts outside their store and hijack those sessions. Now:
+  //   • token is masked (last 4 only) and used as an opaque id,
+  //   • store_admin sees ONLY sessions of users in their own store,
+  //   • franchise_admin/admin see all, resolved users show email + store,
+  //   • unknown/trusted-tool tokens are visible to full admins only.
+  const callerRole = req.authUser?.role;
+  const callerStore = req.authUser?.storeId;
+  const isFullAdmin = callerRole === 'admin' || callerRole === 'franchise_admin';
+
+  const sessions = [];
+  for (const [token, session] of Object.entries(activeSessions)) {
+    const user = findUserByDeviceToken(token);
+    const userStore = user?.storeId || null;
+    const userRole = user?.role || null;
+
+    // Store-scoped admins never see sessions outside their store; tokens that
+    // don't resolve to any user are admin-only.
+    if (!isFullAdmin) {
+      if (!user || userStore !== callerStore) continue;
+    }
+
+    sessions.push({
+      // Opaque id — only the last 4 characters survive; the full token is
+      // never echoed back to any caller.
+      id: `…${String(token).slice(-4)}`,
+      email: user?.email || null,
+      role: userRole,
+      storeId: userStore,
+      ip: session?.ip || null,
+      lastSeen: session?.lastSeen || null
+    });
+  }
+
   res.json({
-    total: Object.keys(activeSessions).length,
-    sessions: activeSessions
+    total: sessions.length,
+    sessions
   });
 });
 
-module.exports = { trackSession, getActiveSessions };
+// ─── KIDNEYS: drop sessions idle longer than maxAgeMs (default 24h) ─────────
+// Returns the number pruned — counts only, never token/IP material.
+function pruneSessions(maxAgeMs = 24 * 60 * 60 * 1000, now = Date.now()) {
+  let pruned = 0;
+  for (const [token, session] of Object.entries(activeSessions)) {
+    const lastSeen = Date.parse(session?.lastSeen || '');
+    if (!Number.isFinite(lastSeen) || now - lastSeen > maxAgeMs) {
+      delete activeSessions[token];
+      pruned++;
+    }
+  }
+  return pruned;
+}
+
+module.exports = { trackSession, getActiveSessions, pruneSessions };

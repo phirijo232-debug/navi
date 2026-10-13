@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getStatus } = require('../controllers/statusController');
+const { getStatus, getHealth } = require('../controllers/statusController');
 const { getAccessLogs, getErrorLogs } = require('../controllers/logController');
 const { getActiveSessions } = require('../controllers/sessionController');
 const {
@@ -36,6 +36,9 @@ const {
 router.get('/', (req, res) => res.send('Navi Server is running!'));
 
 router.get('/status', getStatus);
+// IMMUNE: public tier returns {status, uptime} only; the admin tier (memory, db,
+// heartbeat) activates only with a valid admin x-device-token in the same call.
+router.get('/health', getHealth);
 router.get('/logs/access', getAccessLogs);
 router.get('/logs/errors', getErrorLogs);
 router.get('/sessions', getActiveSessions);

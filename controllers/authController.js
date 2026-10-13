@@ -40,6 +40,9 @@ const USERS_FILE = dataStore.paths.users;
 const pendingSignups = {};
 const pendingLogins = {};
 const pendingResets = {};
+// KIDNEYS: pending-auth entries older than this are dead weight (OTP windows
+// are 5 minutes) — the hourly sweep drops them so the maps never grow forever.
+const PENDING_AUTH_TTL_MS = 15 * 60 * 1000;
 // Invites are persisted to data/invites.json so a server restart can never
 // silently invalidate a link already shared with a customer. Reads/writes go
 // through dataStore (atomic write + .bak recovery) — dataStore.js untouched.
@@ -65,6 +68,56 @@ function cleanupExpiredInvites() {
     }
   });
   if (changed) saveInvites(invites);
+}
+
+// ─── KIDNEYS: sweep dead pending-auth state ─────────────────────────────────
+// Drops pending signups/logins/resets older than PENDING_AUTH_TTL_MS (their
+// OTPs expire in 5 minutes anyway) and prunes trusted device tokens that have
+// not been seen for DEVICE_TOKEN_TTL_MS. Returns counts only — never any
+// email/token material — so the log line can never leak user data.
+const DEVICE_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+
+function sweepExpiredAuth(now = Date.now()) {
+  const cutoff = now - PENDING_AUTH_TTL_MS;
+  const deviceCutoff = now - DEVICE_TOKEN_TTL_MS;
+  let deadSignups = 0;
+  let deadLogins = 0;
+  let deadResets = 0;
+
+  for (const [email, entry] of Object.entries(pendingSignups)) {
+    if (!(entry.createdAt > cutoff)) { delete pendingSignups[email]; deadSignups++; }
+  }
+  for (const [email, entry] of Object.entries(pendingLogins)) {
+    if (!(entry.createdAt > cutoff)) { delete pendingLogins[email]; deadLogins++; }
+  }
+  for (const [email, entry] of Object.entries(pendingResets)) {
+    if (!(entry.expiresAt > now) || !(entry.createdAt > cutoff)) { delete pendingResets[email]; deadResets++; }
+  }
+
+  let staleDevices = 0;
+  try {
+    const users = getUsers();
+    let changed = false;
+    for (const user of users) {
+      if (!Array.isArray(user.trustedDevices) || !user.trustedDevices.length) continue;
+      const before = user.trustedDevices.length;
+      user.trustedDevices = user.trustedDevices.filter((device) => {
+        const lastSeen = Date.parse(device?.lastSeen || device?.createdAt || '');
+        // Never prune a device with no readable timestamp (defensive) — only
+        // clearly stale ones with a parseable lastSeen/createdAt past 90 days.
+        return !(Number.isFinite(lastSeen) && lastSeen < deviceCutoff);
+      });
+      if (user.trustedDevices.length !== before) {
+        staleDevices += before - user.trustedDevices.length;
+        changed = true;
+      }
+    }
+    if (changed) saveUsers(users);
+  } catch {
+    // Device pruning is best-effort; pending-auth sweep already succeeded.
+  }
+
+  return { deadSignups, deadLogins, deadResets, staleDevices };
 }
 
 function generateInviteToken(email) {
@@ -258,7 +311,7 @@ async function requestSignup(req, res) {
       return res.status(400).json({ error: 'Email already registered.' });
     }
 
-    pendingSignups[email] = { username, email, password, phone: normalizedPhone, nrc: nrc ? String(nrc).trim() : null, inviteToken };
+    pendingSignups[email] = { username, email, password, phone: normalizedPhone, nrc: nrc ? String(nrc).trim() : null, inviteToken, createdAt: Date.now() };
     await otpService.sendOTP('Account Signup Verification', email, false);
     res.json({ message: 'OTP sent to your email. Please verify to complete signup.' });
 
@@ -396,7 +449,8 @@ async function requestLogin(req, res) {
       otpEmail,
       username: user.username,
       role: user.role,
-      storeId: user.storeId || config.DEFAULT_STORE_ID
+      storeId: user.storeId || config.DEFAULT_STORE_ID,
+      createdAt: Date.now()
     };
     res.json({
       message: 'OTP sent. Please verify to complete login.',
@@ -502,7 +556,8 @@ async function requestPasswordReset(req, res) {
     pendingResets[email] = {
       email,
       otpEmail,
-      expiresAt: Date.now() + 5 * 60 * 1000
+      expiresAt: Date.now() + 5 * 60 * 1000,
+      createdAt: Date.now()
     };
     return res.json({
       message: 'OTP sent for password reset.',
@@ -967,4 +1022,4 @@ function verifyStoreSwitch(req, res) {
   }
 }
 
-module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError };
+module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError, sweepExpiredAuth };
