@@ -11,7 +11,8 @@ const {
   logBreakage,
   sendErrorAlert,
   replayPendingAlerts,
-  emailTransporter
+  emailTransporter,
+  PENDING_ALERTS_FILE
 } = require('../middleware/logger');
 const { requestLogin, requestPasswordReset, classifyMailError } = require('../controllers/authController');
 
@@ -168,7 +169,7 @@ test('identical breakage incidents alert once per 15 minutes; new handlers alert
   };
   // Isolate from any real queued outage alerts: the post-send replay must not
   // add spurious sends here (and must not consume the real pending queue).
-  const pendingFile = path.join(__dirname, '../logs/pending-alerts.log');
+  const pendingFile = PENDING_ALERTS_FILE;
   const pendingBefore = fs.existsSync(pendingFile) ? fs.readFileSync(pendingFile, 'utf8') : null;
   try {
     process.env.GMAIL_USER = 'alerts@example.test';
@@ -199,7 +200,7 @@ test('identical breakage incidents alert once per 15 minutes; new handlers alert
 });
 
 test('alert emails that fail to send are queued in logs/pending-alerts.log', async (t) => {
-  const pendingFile = path.join(__dirname, '../logs/pending-alerts.log');
+  const pendingFile = PENDING_ALERTS_FILE;
   const before = fs.existsSync(pendingFile) ? fs.readFileSync(pendingFile, 'utf8') : null;
   const saved = {
     GMAIL_USER: process.env.GMAIL_USER,
@@ -237,7 +238,7 @@ test('alert emails that fail to send are queued in logs/pending-alerts.log', asy
 });
 
 test('replayPendingAlerts drains queued alerts to the admin inbox and clears the file on recovery', async (t) => {
-  const pendingFile = path.join(__dirname, '../logs/pending-alerts.log');
+  const pendingFile = PENDING_ALERTS_FILE;
   const before = fs.existsSync(pendingFile) ? fs.readFileSync(pendingFile, 'utf8') : null;
   const saved = {
     GMAIL_USER: process.env.GMAIL_USER,
@@ -276,7 +277,7 @@ test('replayPendingAlerts drains queued alerts to the admin inbox and clears the
 });
 
 test('replayPendingAlerts keeps the unsent remainder when the transport is still down', async (t) => {
-  const pendingFile = path.join(__dirname, '../logs/pending-alerts.log');
+  const pendingFile = PENDING_ALERTS_FILE;
   const before = fs.existsSync(pendingFile) ? fs.readFileSync(pendingFile, 'utf8') : null;
   const saved = {
     GMAIL_USER: process.env.GMAIL_USER,

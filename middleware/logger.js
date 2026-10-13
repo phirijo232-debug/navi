@@ -1,6 +1,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const fs = require('fs');
+const os = require('os');
 const nodemailer = require('nodemailer');
 const config = require('../config');
 
@@ -19,7 +20,30 @@ const ALERT_COOLDOWN_MS = 15 * 60 * 1000;
 // Gmail-down fallback: when the alert email itself cannot be sent, the incident
 // is queued as a JSON line here so an SMTP outage never silently loses a
 // breakage alert — the file can be reviewed (or replayed) after recovery.
-const PENDING_ALERTS_FILE = path.resolve(__dirname, '../logs/pending-alerts.log');
+//
+// ─── Sandbox the log directory too ──────────────────────────────────────────
+// dataStore.js redirects data/ to a private temp sandbox under the test runner
+// so the suite can never touch live user/loan files. The logger was NOT part of
+// that isolation, so every test run appended its noise (@example.test,
+// DATA RECOVERED, circuit-trip dry-runs) straight into the LIVE logs/. This
+// mirrors dataStore's behaviour for logs/. logger.js must not require dataStore
+// (dataStore requires logger → circular), so the tiny test-env check is
+// duplicated here on purpose.
+function resolveLogsDir() {
+  if (process.env.NAVI_LOGS_DIR) return path.resolve(process.env.NAVI_LOGS_DIR);
+  const isTest =
+    Boolean(process.env.NODE_TEST_CONTEXT) ||
+    process.argv.some(arg => arg.includes('mocha')) ||
+    (typeof require.main !== 'undefined' && require.main?.filename &&
+      require.main.filename.split(/[\\/]/).slice(0, -1).includes('test'));
+  if (isTest) return fs.mkdtempSync(path.join(os.tmpdir(), 'navi-test-logs-'));
+  return path.resolve(__dirname, '../logs');
+}
+const LOGS_DIR = resolveLogsDir();
+const ERRORS_FILE = path.join(LOGS_DIR, 'errors.log');
+const ACCESS_FILE = path.join(LOGS_DIR, 'access.log');
+const HR_AUDIT_FILE = path.join(LOGS_DIR, 'hr-audit.log');
+const PENDING_ALERTS_FILE = path.join(LOGS_DIR, 'pending-alerts.log');
 
 function persistPendingAlert(subject, body) {
   try {
@@ -154,7 +178,7 @@ function logBreakage(file, handler, err, label = 'CIRCUIT TRIPPED') {
 function logError(message, notify = false) {
   const time = new Date().toISOString();
   const entry = `[${time}] ${message}\n`;
-  fs.appendFileSync(config.LOGS.ERRORS, entry);
+  fs.appendFileSync(ERRORS_FILE, entry);
   console.error(entry);
   if (notify) {
     sendErrorAlert('Navi Server Error Alert', `${entry}\nCheck the server logs for more details.`).catch(() => {});
@@ -170,7 +194,7 @@ function logAccess(req, res, next) {
     // <a> navigation needs). LAN mitigation only — full fix is signed URLs.
     const safeUrl = String(req.url).replace(/([?&])token=[^&]*/gi, '$1token=REDACTED');
     const entry = `[${time}] ${req.method} ${safeUrl} - ${req.ip}\n`;
-    fs.appendFileSync(config.LOGS.ACCESS, entry);
+    fs.appendFileSync(ACCESS_FILE, entry);
   }
   next();
 }
@@ -184,7 +208,7 @@ function logHr(action, actor = {}) {
   const actorEmail = actor.email || 'unknown';
   const entry = `[${time}] HR ${action} | by id=${actorId} email=${actorEmail}\n`;
   try {
-    fs.appendFileSync(path.resolve(__dirname, '../logs/hr-audit.log'), entry);
+    fs.appendFileSync(HR_AUDIT_FILE, entry);
   } catch (err) {
     console.error('HR audit log write failed:', err.message);
   }
@@ -200,6 +224,14 @@ module.exports = {
   sendErrorAlert,
   replayPendingAlerts,
   emailTransporter,
+  // Resolved log locations (sandboxed under the test runner so the suite never
+  // writes to the live logs/). Exported so tests read from wherever the logger
+  // actually writes instead of hardcoding the production path.
+  LOGS_DIR,
+  ERRORS_FILE,
+  ACCESS_FILE,
+  HR_AUDIT_FILE,
+  PENDING_ALERTS_FILE,
   clearAlertCooldowns: () => alertCooldowns.clear(),
   clearPendingReplayThrottle: () => { lastPendingReplay = 0; }
 };
