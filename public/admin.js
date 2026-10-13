@@ -50,12 +50,69 @@ function renderLoggedInAdmin() {
   el.textContent = `Logged in: ${name}${email && email !== name ? ` (${email})` : ''} · ${role}`;
 }
 
+// ─── Public/private server-mode toggle (franchise manager only) ──────────────
+// The backend is the real gate (only the allow-listed admin/franchise role may
+// flip it). The client just shows/hides the control and reflects the state.
+async function refreshServerMode() {
+  const status = document.getElementById('serverModeStatus');
+  if (!status) return;
+  try {
+    const res = await fetch('/admin/server-mode', { headers: getStoreHeaders() });
+    if (res.status === 403) { status.hidden = true; return; }
+    if (!res.ok) throw new Error('read failed');
+    const data = await res.json();
+    status.hidden = false;
+    status.textContent = data.mode === 'public'
+      ? 'Server mode: PUBLIC (internet-reachable, device token still required)'
+      : 'Server mode: PRIVATE (local network only)';
+    status.dataset.mode = data.mode;
+  } catch {
+    status.hidden = true;
+  }
+}
+
+async function toggleServerMode() {
+  const status = document.getElementById('serverModeStatus');
+  const current = (status && status.dataset.mode) || 'private';
+  const next = current === 'public' ? 'private' : 'public';
+  const ok = confirm(
+    `Switch server to ${next.toUpperCase()} mode?\n\n` +
+    'PRIVATE = reachable only on the local network.\n' +
+    'PUBLIC = reachable from the internet, but every protected route still requires a valid device token.'
+  );
+  if (!ok) return;
+  try {
+    const res = await fetch('/admin/server-mode', {
+      method: 'POST',
+      headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ mode: next })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { alert(data.error || 'Could not change the server mode.'); return; }
+    await refreshServerMode();
+    alert(`Server mode is now ${data.mode.toUpperCase()}.`);
+  } catch {
+    alert('Could not change the server mode. Please try again.');
+  }
+}
+
+function initServerMode() {
+  const btn = document.getElementById('serverModeBtn');
+  if (!btn) return;
+  const role = localStorage.getItem('userRole');
+  const isFranchiseManager = role === 'admin' || role === 'franchise_admin';
+  btn.hidden = !isFranchiseManager;
+  btn.onclick = toggleServerMode; // replace (not add) so re-entry never stacks listeners
+  if (isFranchiseManager) refreshServerMode();
+}
+
 function showDashboard() {
   document.getElementById('storeSelect').classList.add('hidden');
   document.getElementById('adminAuth').classList.add('hidden');
   hideAdminViews();
   document.getElementById('adminDashboard').classList.remove('hidden');
   renderLoggedInAdmin();
+  initServerMode();
 }
 
 function showCustomersView() {

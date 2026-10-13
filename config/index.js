@@ -6,6 +6,16 @@ module.exports = {
   STORES: [
     { id: 'buraza', name: 'Buraza Micro Finance', code: 'BMF', active: true }
   ],
+
+  // Public/private server-mode toggle (see middleware/security.js). PRIVATE keeps
+  // the server LAN-only; PUBLIC makes it internet-reachable while STILL requiring
+  // device-token auth on every protected route. Only the franchise-manager admin
+  // (FRANCHISE_MANAGER_EMAILS + an admin/franchise role) may flip it.
+  SERVER_MODE: process.env.SERVER_MODE || 'private',
+  FRANCHISE_MANAGER_EMAILS: (process.env.FRANCHISE_MANAGER_EMAILS || 'jophiri223@gmail.com')
+    .split(',')
+    .map(email => email.trim().toLowerCase())
+    .filter(Boolean),
   SHUTDOWN_KEY: process.env.SHUTDOWN_KEY || process.env.MASTER_KEY || 'phirii26',
 
   LOAN_STATUSES: {

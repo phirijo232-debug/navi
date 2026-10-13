@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { logError } = require('../middleware/logger');
 const { getStatus, getHealth } = require('../controllers/statusController');
 const { getAccessLogs, getErrorLogs } = require('../controllers/logController');
 const { getActiveSessions } = require('../controllers/sessionController');
@@ -33,7 +34,7 @@ const {
   getTrackingSheet, getUserTracking
 } = require('../controllers/reportController');
 
-const { healthRateLimiter } = require('../middleware/security');
+const { healthRateLimiter, getServerMode, setServerMode, isFranchiseManager } = require('../middleware/security');
 
 router.get('/', (req, res) => res.send('Navi Server is running!'));
 
@@ -99,6 +100,40 @@ router.post('/admin/announcements', sendAdminAnnouncement);
 router.post('/admin/backup', createBackup);
 router.get('/admin/backups', listBackups);
 router.post('/admin/restore', restoreBackup);
+
+// Public/private server-mode toggle — franchise-manager admin only (jophiri223).
+// PRIVATE = LAN-only; PUBLIC = internet-reachable but still device-token gated.
+router.get('/admin/server-mode', (req, res) => {
+  try {
+    if (!isFranchiseManager(req.authUser)) {
+      logError(`SERVER MODE READ BLOCKED — ${req.authUser?.email || 'unauthenticated'} from ${req.ip}`);
+      return res.status(403).json({ error: 'Forbidden. Only the franchise manager admin may view the server mode.' });
+    }
+    return res.json({ mode: getServerMode() });
+  } catch (err) {
+    logError(`SERVER MODE READ FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Server mode is temporarily unavailable.' });
+  }
+});
+
+router.post('/admin/server-mode', (req, res) => {
+  try {
+    if (!isFranchiseManager(req.authUser)) {
+      logError(`SERVER MODE CHANGE BLOCKED — ${req.authUser?.email || 'unauthenticated'} from ${req.ip}`);
+      return res.status(403).json({ error: 'Forbidden. Only the franchise manager admin may change the server mode.' });
+    }
+    const mode = String(req.body?.mode || '').toLowerCase();
+    if (mode !== 'public' && mode !== 'private') {
+      return res.status(400).json({ error: "Invalid mode. Use 'public' or 'private'." });
+    }
+    setServerMode(mode);
+    logError(`SERVER MODE CHANGED to ${mode.toUpperCase()} by ${req.authUser?.email} from ${req.ip}`, true);
+    return res.json({ mode: getServerMode(), message: `Server mode set to ${mode}.` });
+  } catch (err) {
+    logError(`SERVER MODE CHANGE FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Could not change the server mode.' });
+  }
+});
 router.get('/hr/employees', listEmployees);
 router.patch('/hr/employees/:id', editEmployee);
 router.post('/hr/employees/:id/restrictions', setEmployeeRestriction);

@@ -5,8 +5,60 @@ const rateLimit = require('express-rate-limit');
 const { logError } = require('./logger');
 const config = require('../config');
 const dataStore = require('./dataStore');
+const { isFranchiseAdmin } = require('./storeScope');
 
 const USERS_FILE = dataStore.paths.users;
+
+// ─── Public/private server-mode toggle ───────────────────────────────────────
+// PRIVATE (default): deviceAuth only accepts LAN IPs. PUBLIC: the server is
+// internet-reachable, but device-token auth STILL applies to every non-public
+// route — public mode widens reach, it never drops authentication. Only a
+// franchise-manager admin (isFranchiseManager) may flip it; the choice is
+// persisted to data/serverMode.json so it survives restarts.
+const SERVER_MODE_FILE = path.join(dataStore.DATA_DIR, 'serverMode.json');
+let serverMode = 'private';
+
+function loadServerMode() {
+  try {
+    const saved = dataStore.readJson(
+      SERVER_MODE_FILE,
+      null,
+      value => value && (value.mode === 'public' || value.mode === 'private')
+    );
+    if (saved && (saved.mode === 'public' || saved.mode === 'private')) {
+      serverMode = saved.mode;
+      return serverMode;
+    }
+  } catch { /* fall through to env/default */ }
+  serverMode = String(process.env.SERVER_MODE).toLowerCase() === 'public' ? 'public' : 'private';
+  return serverMode;
+}
+
+function getServerMode() {
+  return serverMode;
+}
+
+function setServerMode(mode) {
+  if (mode !== 'public' && mode !== 'private') return false;
+  serverMode = mode;
+  try {
+    dataStore.writeJson(SERVER_MODE_FILE, { mode, updatedAt: new Date().toISOString() });
+  } catch (err) {
+    logError(`SERVER MODE SAVE FAILED: ${err.message}`);
+  }
+  return true;
+}
+
+// Only a franchise-manager admin — email in the allow-list AND an admin/franchise
+// role — may flip the public/private server mode. A bare trusted-device token
+// (no user) never qualifies.
+function isFranchiseManager(user) {
+  if (!user || !user.email) return false;
+  const email = String(user.email).toLowerCase();
+  return config.FRANCHISE_MANAGER_EMAILS.includes(email) && isFranchiseAdmin(user.role);
+}
+
+loadServerMode();
 
 function getUsers() {
   return dataStore.readJson(USERS_FILE, [], Array.isArray);
@@ -108,7 +160,10 @@ function deviceAuth(req, res, next) {
   const token = req.headers['x-device-token'];
   const isPrivate = isPrivateIp(ip);
 
-  if (!isPrivate) {
+  // PRIVATE (default): only LAN IPs may reach authenticated routes. PUBLIC: the
+  // server is internet-reachable, but device-token auth still applies below —
+  // public mode widens reach, it never drops authentication.
+  if (!isPrivate && getServerMode() !== 'public') {
     logError(`BLOCKED — non-local IP access attempt from ${ip}`);
     return res.status(403).send('Access denied. Connect from the local network or use a registered device token.');
   }
@@ -175,4 +230,4 @@ const healthRateLimiter = rateLimit({
   }
 });
 
-module.exports = { helmet, deviceAuth, rateLimiter, authRateLimiter, healthRateLimiter, checkMasterPassword, findUserByDeviceToken };
+module.exports = { helmet, deviceAuth, rateLimiter, authRateLimiter, healthRateLimiter, checkMasterPassword, findUserByDeviceToken, getServerMode, setServerMode, isFranchiseManager };
