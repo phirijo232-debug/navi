@@ -1,5 +1,5 @@
 module.exports = {
-  PORT: Number(process.env.PORT) || 3000,
+PORT: Number(process.env.PORT) || 3000,
   HOST: '0.0.0.0',
   FRANCHISE_ID: 'pryme-vertex',
   DEFAULT_STORE_ID: process.env.DEFAULT_STORE_ID || 'buraza',
