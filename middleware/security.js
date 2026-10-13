@@ -159,4 +159,20 @@ const authRateLimiter = rateLimit({
   }
 });
 
-module.exports = { helmet, deviceAuth, rateLimiter, authRateLimiter, checkMasterPassword, findUserByDeviceToken };
+// Dedicated limiter for the public, unauthenticated GET /health endpoint.
+// /health lives in PUBLIC_PATHS (deviceAuth skips it), so without its own cap a
+// local/network actor could hammer it thousands of times a second and load the
+// CPU. 60 requests per minute per IP is generous for an uptime monitor while
+// still bounding floods. Kept separate from the global limiter so the
+// dashboard's /status polling is unaffected.
+const healthRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({ error: 'Too many health checks. Slow down.' });
+  }
+});
+
+module.exports = { helmet, deviceAuth, rateLimiter, authRateLimiter, healthRateLimiter, checkMasterPassword, findUserByDeviceToken };

@@ -60,14 +60,15 @@ function saveInvites(invites) {
 function cleanupExpiredInvites() {
   const invites = loadInvites();
   const now = Date.now();
-  let changed = false;
+  let removed = 0;
   Object.keys(invites).forEach((token) => {
     if (invites[token].expiresAt <= now) {
       delete invites[token];
-      changed = true;
+      removed++;
     }
   });
-  if (changed) saveInvites(invites);
+  if (removed > 0) saveInvites(invites);
+  return removed;
 }
 
 // ─── KIDNEYS: sweep dead pending-auth state ─────────────────────────────────
@@ -1022,4 +1023,4 @@ function verifyStoreSwitch(req, res) {
   }
 }
 
-module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError, sweepExpiredAuth };
+module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError, sweepExpiredAuth, cleanupExpiredInvites };
