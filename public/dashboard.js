@@ -6,8 +6,19 @@ function getUrgencyPriority(loan) {
   return order[urgency] ?? 2;
 }
 
-function getLoanStatusKey(status) {
-  return String(status || '').trim().toLowerCase().replace(/\s+/g, '_');
+const CANONICAL_STATUSES = ['pending', 'active', 'grace', 'defaulted', 'liquidated', 'paid', 'declined'];
+const LEGACY_STATUS_MAP = {
+  awaiting_approval: 'pending', approved: 'active', in_progress: 'active',
+  'in-progress': 'active', running: 'active', overdue: 'grace',
+  default: 'defaulted', liquidation: 'liquidated', recovered: 'liquidated',
+  settled: 'paid', closed: 'paid', completed: 'paid', rejected: 'declined'
+};
+// Canonical lifecycle only — prefer the server's live businessStatus.
+function getLoanStatusKey(loan) {
+  const canonical = String(loan?.businessStatus || '').trim().toLowerCase();
+  if (CANONICAL_STATUSES.includes(canonical)) return canonical;
+  const raw = String(loan?.status || '').trim().toLowerCase().replace(/\s+/g, '_');
+  return LEGACY_STATUS_MAP[raw] || (CANONICAL_STATUSES.includes(raw) ? raw : 'pending');
 }
 
 function getAdminLoanTimeline(loan) {
@@ -80,7 +91,7 @@ function renderAdminLoanList() {
 
   const filtered = adminState.loans
     .filter(loan => {
-      const currentStatus = getLoanStatusKey(loan.status);
+      const currentStatus = getLoanStatusKey(loan);
       if (statusFilter === 'all') return true;
       return currentStatus === statusFilter;
     })
@@ -93,8 +104,8 @@ function renderAdminLoanList() {
   }
 
   container.innerHTML = filtered.map(loan => {
-    const statusKey = getLoanStatusKey(loan.status);
-    const badgeClass = statusKey === 'in_progress' ? 'in_progress' : statusKey;
+    const statusKey = getLoanStatusKey(loan);
+    const badgeClass = statusKey;
     return `
       <button type="button" class="admin-loan-card ${adminState.selectedId === loan.id ? 'selected' : ''}" data-id="${loan.id}">
         <div class="admin-loan-head">
@@ -130,10 +141,14 @@ function renderAdminReviewDetail(loan) {
 
   const frontName = loan.collateralFront ? loan.collateralFront.replace(/^[^\-]+-/, '') : '';
   const backName = loan.collateralBack ? loan.collateralBack.replace(/^[^\-]+-/, '') : '';
-  const frontLink = loan.collateralFront ? `<a href="/uploads/${loan.collateralFront}" target="_blank" rel="noreferrer" class="attachment-btn">View front image</a>` : '<span class="attachment-empty">No front image</span>';
-  const backLink = loan.collateralBack ? `<a href="/uploads/${loan.collateralBack}" target="_blank" rel="noreferrer" class="attachment-btn">View back image</a>` : '<span class="attachment-empty">No back image</span>';
-  const statusKey = getLoanStatusKey(loan.status);
-  const statusLabel = formatStatus(loan.status || 'pending');
+  const fileUrl = (name) => {
+    const token = localStorage.getItem('deviceToken') || '';
+    return `/uploads/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}`;
+  };
+  const frontLink = loan.collateralFront ? `<a href="${fileUrl(loan.collateralFront)}" target="_blank" rel="noreferrer" class="attachment-btn">View front image</a>` : '<span class="attachment-empty">No front image</span>';
+  const backLink = loan.collateralBack ? `<a href="${fileUrl(loan.collateralBack)}" target="_blank" rel="noreferrer" class="attachment-btn">View back image</a>` : '<span class="attachment-empty">No back image</span>';
+  const statusKey = getLoanStatusKey(loan);
+  const statusLabel = formatStatus(loan.businessStatus || loan.status || 'pending');
   const activityLog = Array.isArray(loan.statusHistory) && loan.statusHistory.length
     ? loan.statusHistory.map(entry => `
         <li>
@@ -341,24 +356,35 @@ async function fetchData() {
   try {
     const token = localStorage.getItem('deviceToken') || '';
     const headers = { 'x-device-token': token };
+    const isAdmin = localStorage.getItem('userRole') === 'admin';
 
     const status = await fetch('/status', { headers }).then(r => r.json());
-    const sessions = await fetch('/sessions', { headers }).then(r => r.json());
-    const accessLogs = await fetch('/logs/access', { headers }).then(r => r.json());
-    const errorLogs = await fetch('/logs/errors', { headers }).then(r => r.json());
-
     document.getElementById('status').textContent = status.status.toUpperCase();
     document.getElementById('uptime').textContent = status.uptime;
     document.getElementById('ram').textContent = status.ram.used;
     document.getElementById('cpu').textContent = status.cpu.cores + ' Cores';
-    document.getElementById('sessions').textContent = sessions.total;
 
+    // Active sessions + logs are admin-only now; non-admins see a notice instead
+    // of a broken panel (and never trigger a 403 fetch loop).
+    const sessionsEl = document.getElementById('sessions');
+    if (!isAdmin) {
+      sessionsEl.textContent = '—';
+      document.getElementById('access-log').innerHTML = '<li>Admin only</li>';
+      document.getElementById('error-log').innerHTML = '<li class="threat">Admin only</li>';
+      return;
+    }
+
+    const sessions = await fetch('/sessions', { headers }).then(r => r.json());
+    sessionsEl.textContent = sessions.total;
+
+    const accessLogs = await fetch('/logs/access', { headers }).then(r => r.json());
     const accessList = document.getElementById('access-log');
-    accessList.innerHTML = accessLogs.logs.slice(-10).reverse()
+    accessList.innerHTML = (accessLogs.logs || []).slice(-10).reverse()
       .map(l => `<li>${l}</li>`).join('');
 
+    const errorLogs = await fetch('/logs/errors', { headers }).then(r => r.json());
     const errorList = document.getElementById('error-log');
-    errorList.innerHTML = errorLogs.logs.slice(-10).reverse()
+    errorList.innerHTML = (errorLogs.logs || []).slice(-10).reverse()
       .map(l => `<li class="threat">${l}</li>`).join('');
 
   } catch (err) {

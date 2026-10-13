@@ -1,7 +1,21 @@
 .env
 data/dailyReportState.json
+data/*.bak
+data/*.corrupt
+data/*.tmp
+data/invites.json
+data/backups/
+data/navi.db
+data/navi.db-shm
+data/navi.db-wal
+data/health.json
 node_modules
-node_modules
-node_modules
-node_modules
-node_modules
+
+# ─── Runtime artifacts — never commit (customer data / PII) ───
+# Logs are written at runtime by middleware/logger.js
+logs/
+# Core data files hold customer PII (users, loans, feedback) + runtime state
+data/*.json
+# Uploaded KYC / proof-of-payment / collateral images (customer PII)
+public/uploads/
+

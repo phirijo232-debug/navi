@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const otpService = require('../middleware/otp');
 const { requestPasswordReset, confirmPasswordReset } = require('../controllers/authController');
 
-const USERS_FILE = path.join(__dirname, '../data/users.json');
+const USERS_FILE = require('../middleware/dataStore').paths.users;
 
 function responseRecorder() {
   return {
@@ -67,7 +67,7 @@ test('regular user reset verifies the account mailbox, rejects a wrong OTP, and 
   }
 });
 
-test('store-admin reset sends and verifies OTP through the configured company mailbox', async (t) => {
+test('store-admin reset sends and verifies OTP through the registered account mailbox', async (t) => {
   const original = fs.readFileSync(USERS_FILE, 'utf8');
   const oldHash = await bcrypt.hash('OldPass1!', 10);
   fs.writeFileSync(USERS_FILE, JSON.stringify([{
@@ -88,10 +88,10 @@ test('store-admin reset sends and verifies OTP through the configured company ma
     await requestPasswordReset({ body: { email: 'bmf-admin@example.test' } }, requestResponse);
 
     assert.equal(requestResponse.statusCode, 200);
-    assert.equal(requestResponse.body.otpChannel, 'company');
-    assert.equal(requestResponse.body.otpSentTo, process.env.GMAIL_USER);
+    assert.equal(requestResponse.body.otpChannel, 'account');
+    assert.equal(requestResponse.body.otpSentTo, 'bmf-admin@example.test');
     assert.equal(sendOtp.mock.calls[0].arguments[1], 'bmf-admin@example.test');
-    assert.equal(sendOtp.mock.calls[0].arguments[3], process.env.GMAIL_USER);
+    assert.equal(sendOtp.mock.calls[0].arguments[3], 'bmf-admin@example.test');
 
     const otp = otpService.generateOTP('bmf-admin@example.test:Password Reset');
     const confirmationResponse = responseRecorder();

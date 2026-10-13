@@ -9,9 +9,9 @@ const { getFeedback } = require('../controllers/feedbackController');
 const { updateLoanStatus } = require('../controllers/loanController');
 const { createAdminUser } = require('../controllers/authController');
 
-const USERS_FILE = path.join(__dirname, '../data/users.json');
-const LOANS_FILE = path.join(__dirname, '../data/loans.json');
-const FEEDBACK_FILE = path.join(__dirname, '../data/feedback.json');
+const USERS_FILE = require('../middleware/dataStore').paths.users;
+const LOANS_FILE = require('../middleware/dataStore').paths.loans;
+const FEEDBACK_FILE = require('../middleware/dataStore').paths.feedback;
 
 function responseRecorder() {
   return {
@@ -129,6 +129,7 @@ test('franchise admins can provision BMF store admins but store admins cannot el
         email: 'operator@example.test',
         password: 'StrongPass1!',
         confirmPassword: 'StrongPass1!',
+        nrc: '123456/78/1',
         role: 'store_admin'
       }
     }, franchiseResponse);
@@ -145,6 +146,7 @@ test('franchise admins can provision BMF store admins but store admins cannot el
         email: 'newcustomer@example.test',
         password: 'StrongPass1!',
         confirmPassword: 'StrongPass1!',
+        nrc: '123456/78/1',
         role: 'store_admin'
       }
     }, storeResponse);

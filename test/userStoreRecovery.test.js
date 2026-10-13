@@ -1,10 +1,30 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const path = require('node:path');
-const { requestSignup, getUsersDirectory } = require('../controllers/authController');
+const { requestSignup, getAllUsers, createInvite } = require('../controllers/authController');
 
-const USERS_FILE = path.join(__dirname, '../data/users.json');
+const USERS_FILE = require('../middleware/dataStore').paths.users;
+
+function makeRes() {
+  return {
+    statusCode: 200,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    }
+  };
+}
+
+async function createInviteToken(email) {
+  const res = makeRes();
+  await createInvite({ body: { email }, authUser: { role: 'admin' } }, res);
+  assert.equal(res.statusCode, 200, `invite generation failed: ${JSON.stringify(res.body)}`);
+  return res.body.inviteToken;
+}
 
 test('requestSignup can recover when the users store is malformed', async () => {
   const original = fs.readFileSync(USERS_FILE, 'utf8');
@@ -17,21 +37,14 @@ test('requestSignup can recover when the users store is malformed', async () => 
         email: 'recover@example.com',
         password: 'StrongPass1!',
         confirmPassword: 'StrongPass1!',
-        phone: '+2600000000'
+        phone: '+260977000000',
+        nrc: '123456/78/1',
+        // Signup is invite-only now — the recovery path must still work with a valid token.
+        inviteToken: await createInviteToken('recover@example.com')
       }
     };
 
-    const res = {
-      statusCode: 200,
-      status(code) {
-        this.statusCode = code;
-        return this;
-      },
-      json(payload) {
-        this.body = payload;
-        return this;
-      }
-    };
+    const res = makeRes();
 
     await requestSignup(req, res);
 
@@ -42,7 +55,7 @@ test('requestSignup can recover when the users store is malformed', async () => 
   }
 });
 
-test('requestSignup requires a valid WhatsApp phone number', async () => {
+test('requestSignup requires a valid Zambian mobile number', async () => {
   const req = {
     body: {
       username: 'WhatsApp User',
@@ -68,12 +81,18 @@ test('requestSignup requires a valid WhatsApp phone number', async () => {
   await requestSignup(req, res);
 
   assert.equal(res.statusCode, 400);
-  assert.match(res.body.error, /valid WhatsApp|phone number/i);
+  assert.equal(res.body.error, 'Please enter a valid Zambian mobile number (e.g. 0977123456)');
 });
 
-test('admin can fetch the user directory with account summaries', async () => {
+test('requestSignup requires a valid NRC number', async () => {
   const req = {
-    authUser: { role: 'admin' }
+    body: {
+      username: 'NRC User',
+      email: 'nrc@example.com',
+      password: 'StrongPass1!',
+      confirmPassword: 'StrongPass1!',
+      phone: '+260977000000'
+    }
   };
 
   const res = {
@@ -88,9 +107,36 @@ test('admin can fetch the user directory with account summaries', async () => {
     }
   };
 
-  await getUsersDirectory(req, res);
+  await requestSignup(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error, /NRC/i);
+});
+
+test('admin can fetch the user directory with account summaries', async () => {
+  const req = {
+    authUser: { role: 'admin' },
+    headers: {},
+    query: {},
+    body: {}
+  };
+
+  const res = {
+    statusCode: 200,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    }
+  };
+
+  getAllUsers(req, res);
 
   assert.equal(res.statusCode, 200);
-  assert.ok(Array.isArray(res.body.users));
-  assert.ok(res.body.users.some(user => user.email));
+  assert.ok(Array.isArray(res.body), 'directory returns a plain user array');
+  assert.ok(res.body.some(user => user.email));
+  assert.ok(res.body.every(user => user.password === undefined), 'passwords must never be exposed');
 });

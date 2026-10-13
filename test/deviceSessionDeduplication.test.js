@@ -6,9 +6,9 @@ const bcrypt = require('bcryptjs');
 const otpService = require('../middleware/otp');
 const { requestLogin, confirmLogin } = require('../controllers/authController');
 
-const USERS_FILE = path.join(__dirname, '../data/users.json');
+const USERS_FILE = require('../middleware/dataStore').paths.users;
 
-test('admin login sends OTP to the configured mailbox and reuses the same trusted device', async (t) => {
+test('admin login sends OTP to the registered account mailbox and reuses the same trusted device', async (t) => {
   const original = fs.readFileSync(USERS_FILE, 'utf8');
 
   const passwordHash = await bcrypt.hash('StrongPass1!', 10);
@@ -48,9 +48,9 @@ test('admin login sends OTP to the configured mailbox and reuses the same truste
 
     await requestLogin(loginReq, loginRes);
 
-    assert.equal(loginRes.body.otpSentTo, process.env.GMAIL_USER);
+    assert.equal(loginRes.body.otpSentTo, 'sameuser@example.com');
     assert.equal(sendOtp.mock.calls[0].arguments[1], 'sameuser@example.com');
-    assert.equal(sendOtp.mock.calls[0].arguments[3], process.env.GMAIL_USER);
+    assert.equal(sendOtp.mock.calls[0].arguments[3], 'sameuser@example.com');
     const otp = otpService.generateOTP('sameuser@example.com:Login Verification');
 
     const confirmReq = {

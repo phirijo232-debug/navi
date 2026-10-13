@@ -4,21 +4,17 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { logError } = require('./logger');
 const config = require('../config');
+const dataStore = require('./dataStore');
 
-const USERS_FILE = path.join(__dirname, '../data/users.json');
+const USERS_FILE = dataStore.paths.users;
 
 function getUsers() {
-  try {
-    return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-  } catch (err) {
-    logError(`USER LOAD FAILED: ${err.message}`);
-    return [];
-  }
+  return dataStore.readJson(USERS_FILE, [], Array.isArray);
 }
 
 function saveUsers(users) {
   try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+    dataStore.writeJson(USERS_FILE, users);
   } catch (err) {
     logError(`USER SAVE FAILED: ${err.message}`);
   }
@@ -99,9 +95,7 @@ const PUBLIC_PATHS = new Set([
   '/password-reset',
   '/password-reset/confirm',
   '/status',
-  '/sessions',
-  '/logs/access',
-  '/logs/errors',
+  '/health',
   '/favicon.ico'
 ]);
 
@@ -150,4 +144,35 @@ const rateLimiter = rateLimit({
   }
 });
 
-module.exports = { helmet, deviceAuth, rateLimiter, checkMasterPassword };
+// Strict limiter for brute-force-sensitive endpoints (login, signup, password
+// reset, vault OTP). Applied to EVERY source IP — including localhost — so a
+// local process cannot hammer these flows unchecked. Kept separate from the
+// global limiter so the dashboard's frequent status polling is never throttled.
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logError(`AUTH RATE LIMIT HIT: ${req.method} ${req.path} from ${req.ip}`);
+    res.status(429).json({ error: 'Too many attempts. Please wait a few minutes and try again.' });
+  }
+});
+
+// Dedicated limiter for the public, unauthenticated GET /health endpoint.
+// /health lives in PUBLIC_PATHS (deviceAuth skips it), so without its own cap a
+// local/network actor could hammer it thousands of times a second and load the
+// CPU. 60 requests per minute per IP is generous for an uptime monitor while
+// still bounding floods. Kept separate from the global limiter so the
+// dashboard's /status polling is unaffected.
+const healthRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({ error: 'Too many health checks. Slow down.' });
+  }
+});
+
+module.exports = { helmet, deviceAuth, rateLimiter, authRateLimiter, healthRateLimiter, checkMasterPassword, findUserByDeviceToken };

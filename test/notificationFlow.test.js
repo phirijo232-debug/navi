@@ -6,7 +6,7 @@ const emailService = require('../middleware/email');
 const { getGreetingByTime, buildLoanSummaryText, buildLoanStatusNotification, buildWelcomeMessage, buildRequestReceivedMessage, getNotificationRecipients } = emailService;
 const { sendAdminAnnouncement } = require('../controllers/authController');
 
-const USERS_FILE = path.join(__dirname, '../data/users.json');
+const USERS_FILE = require('../middleware/dataStore').paths.users;
 
 test('notification helpers return the right messaging and greetings', () => {
   assert.match(getGreetingByTime(9), /morning/i);

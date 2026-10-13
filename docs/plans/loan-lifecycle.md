@@ -1,0 +1,2 @@
+| 2026-10-11 | Retroactive penalties avoided — accrual base pinned on first pass; non-retroactive by default |
+| 2026-10-11 | Loan DECISIONS (approve/decline/grace/verify/liquidate) stay store_admin-only per tested franchise policy (storeScope.test.js); payments/notifications remain admin+store_admin |

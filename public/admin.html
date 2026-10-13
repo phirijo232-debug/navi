@@ -251,6 +251,17 @@
     .status-overdue { background: rgba(255,103,103,0.16); color: #ff9d9d; }
     .status-in_progress { background: rgba(0,123,255,0.15); color: #9ec8ff; }
     .status-paid { background: rgba(23,162,184,0.16); color: #7fe6ec; }
+    .status-active { background: rgba(40,167,69,0.15); color: #82e6a2; }
+    .status-grace { background: rgba(255,152,0,0.16); color: #ffcc80; }
+    .status-defaulted { background: rgba(220,53,69,0.18); color: #ff9ca9; }
+    .status-liquidated { background: rgba(111,76,255,0.20); color: #c9beff; }
+    /* Selected customer modal spans the full screen width. */
+    #userModal .modal-content { width: calc(100vw - 36px); max-width: none; margin: 12px auto; }
+    .timeframe-filters { margin-top: 6px; }
+    .timeframe-custom { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+    .timeframe-custom label { font-weight: 600; font-size: 0.9rem; }
+    .timeframe-custom .modal-input { width: auto; padding: 7px 10px; }
+    .timeframe-note { opacity: 0.75; font-size: 0.85rem; margin: 6px 0 10px; }
     .loan-filters {
       display: flex;
       gap: 8px;
@@ -272,6 +283,39 @@
     .report-metric { padding: 12px; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; }
     body.light .report-metric { border-color: rgba(0,0,0,0.12); }
     .report-metric strong { display: block; margin-top: 5px; font-size: 1.2rem; }
+    .request-badge {
+      display: inline-block;
+      min-width: 30px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(0,207,255,0.22);
+      color: inherit;
+      font-size: 0.85rem;
+      font-weight: 800;
+      text-align: center;
+    }
+    body.light .request-badge { background: rgba(0,120,180,0.14); }
+    .request-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 16px 4px;
+      border-top: 1px solid rgba(255,255,255,0.12);
+    }
+    body.light .request-row { border-color: rgba(0,0,0,0.1); }
+    .request-seq {
+      display: inline-block;
+      min-width: 34px;
+      height: 34px;
+      line-height: 34px;
+      border-radius: 50%;
+      background: rgba(123,47,255,0.25);
+      text-align: center;
+      font-weight: 800;
+    }
+    .loan-filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
     .feedback-item { padding: 14px 0; border-top: 1px solid rgba(255,255,255,0.12); }
     body.light .feedback-item { border-color: rgba(0,0,0,0.1); }
     .feedback-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
@@ -308,6 +352,13 @@
   </style>
 </head>
 <body>
+  <button class="menu-toggle" id="adminMenuBtn" type="button" aria-label="Open menu">⋮</button>
+  <div class="dropdown-menu" id="adminMenuDropdown">
+    <button class="menu-action" type="button" id="adminMenuDashboard">Dashboard</button>
+    <button class="menu-action" type="button" id="adminMenuCustomers">Customers</button>
+    <button class="menu-action" type="button" id="adminMenuHr">HR</button>
+  </div>
+
   <button class="toggle-mode" id="modeBtn" type="button">Switch Mode</button>
 
   <div class="admin-shell">
@@ -374,21 +425,36 @@
 
     <section id="adminDashboard" class="hidden">
       <div class="admin-topbar">
-        <h1>Admin Control Panel</h1>
+        <div>
+          <h1>Admin Control Panel</h1>
+          <p id="loggedInAdmin" class="message-text" style="text-align:left; margin: 4px 0 0;"></p>
+        </div>
         <div class="button-row">
           <button id="announcementBtn" class="toggle-mode" type="button" style="max-width: 220px;">Send announcement</button>
           <button id="notifyOverdueBtn" class="toggle-mode" type="button" style="max-width: 200px;">Notify overdue</button>
-          <button id="createUserBtn" class="enter-btn" type="button" style="max-width: 200px;">Create User</button>
+          <button id="addLoanBtn" class="enter-btn" type="button" style="max-width: 200px;">Add New Loan</button>
+          <button id="inviteBtn" class="toggle-mode" type="button" style="max-width: 200px;">Invite Links</button>
+          <button id="createUserBtn" class="toggle-mode" type="button" style="max-width: 200px;">Create User</button>
           <button id="backToStoresDashboard" class="toggle-mode" type="button" style="max-width: 180px;">Switch store</button>
           <button id="logoutBtn" class="toggle-mode" type="button" style="max-width: 180px;">Logout</button>
         </div>
       </div>
 
-      <div class="toolbar">
-        <input type="text" id="userSearch" class="search-box" placeholder="Search users by name or email..." style="max-width: 520px;">
-      </div>
-
-      <div id="userList" class="user-grid"></div>
+      <section class="panel store-section" aria-labelledby="newRequestsTitle">
+        <div class="admin-topbar">
+          <div>
+            <h2 id="newRequestsTitle">New Requests <span id="newRequestsBadge" class="request-badge" aria-live="polite">0</span></h2>
+            <p>Awaiting customer loan requests for BMF — numbered, with full customer information.</p>
+          </div>
+          <div class="button-row">
+            <button type="button" class="toggle-mode" id="refreshRequestsBtn" style="max-width: 200px;">Refresh requests</button>
+            <button type="button" class="toggle-mode" data-export-table="requests" style="max-width: 200px;">Export CSV</button>
+            <button type="button" class="toggle-mode" data-export-table="requests" data-export-format="pdf" style="max-width: 200px;">Export PDF</button>
+          </div>
+        </div>
+        <div id="newRequestsList"><p>Loading requests...</p></div>
+        <p id="newRequestsNote" class="message-text"></p>
+      </section>
 
       <section class="panel store-section" aria-labelledby="storeReportsTitle">
         <div class="admin-topbar">
@@ -406,7 +472,15 @@
       </section>
 
       <section class="panel store-section" aria-labelledby="storeFeedbackTitle">
-        <h2 id="storeFeedbackTitle">BMF customer feedback</h2>
+        <div class="admin-topbar">
+          <div>
+            <h2 id="storeFeedbackTitle">BMF customer feedback</h2>
+          </div>
+          <div class="button-row">
+            <button type="button" class="toggle-mode" data-export-table="feedback" style="max-width: 200px;">Export CSV</button>
+            <button type="button" class="toggle-mode" data-export-table="feedback" data-export-format="pdf" style="max-width: 200px;">Export PDF</button>
+          </div>
+        </div>
         <div class="loan-filters" id="storeFeedbackFilters" role="group" aria-label="Filter customer feedback">
           <button type="button" class="toggle-mode loan-filter active" data-feedback-filter="all">All</button>
           <button type="button" class="toggle-mode loan-filter" data-feedback-filter="complaint">Complaints</button>
@@ -415,6 +489,67 @@
           <button type="button" class="toggle-mode loan-filter" data-feedback-filter="inquiry">Inquiries</button>
         </div>
         <div id="storeFeedbackList"><p>Loading feedback...</p></div>
+      </section>
+    </section>
+
+    <section id="customersView" class="hidden">
+      <div class="admin-topbar">
+        <div>
+          <h1>Customers</h1>
+          <p class="message-text" style="text-align:left;">Full customer directory for this store. Search, sort, and open a customer to view their loans.</p>
+        </div>
+        <div class="button-row">
+          <button type="button" class="toggle-mode" id="customersBackBtn" style="max-width: 220px;">← Back to dashboard</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <input type="text" id="userSearch" class="search-box" placeholder="Search users by name, email or phone..." style="max-width: 520px;">
+        <select id="userSort" class="search-box" style="max-width: 220px;" aria-label="Sort customers">
+          <option value="name">Sort: Name</option>
+          <option value="loans">Sort: Most loans</option>
+          <option value="outstanding">Sort: Highest outstanding</option>
+        </select>
+        <button type="button" class="toggle-mode" data-export-table="users" style="max-width: 180px;">Export CSV</button>
+        <button type="button" class="toggle-mode" data-export-table="users" data-export-format="pdf" style="max-width: 180px;">Export PDF</button>
+      </div>
+      <div id="userList" class="user-grid"></div>
+    </section>
+
+    <section id="hrView" class="hidden">
+      <div class="admin-topbar">
+        <div>
+          <h1>Employee Securities (HR)</h1>
+          <p class="message-text" style="text-align:left;">Manage admin users, permissions, and store-switch approvals for this store.</p>
+        </div>
+        <div class="button-row">
+          <button type="button" class="toggle-mode" id="hrRefreshBtn" style="max-width: 180px;">Refresh</button>
+          <button type="button" class="toggle-mode" id="hrCreateBtn" style="max-width: 200px;">Create admin</button>
+          <button type="button" class="toggle-mode" id="hrBackBtn" style="max-width: 220px;">← Back to dashboard</button>
+        </div>
+      </div>
+      <div id="hrEmployeeList"><p>Loading employees...</p></div>
+      <p id="hrMessage" class="message-text"></p>
+
+      <section class="panel store-section" aria-labelledby="hrSwitchTitle">
+        <div class="admin-topbar">
+          <div>
+            <h2 id="hrSwitchTitle">Switch store (OTP required)</h2>
+            <p>Switching to a store you don't own sends an approval code to that store's Franchise Employee Admin.</p>
+          </div>
+        </div>
+        <div class="button-row">
+          <select id="hrSwitchStore" class="modal-input" style="max-width: 260px;" aria-label="Target store">
+            <option value="buraza">Buraza Micro Finance (BMF)</option>
+          </select>
+          <button type="button" class="toggle-mode" id="hrSwitchStoreBtn" style="max-width: 220px;">Request store switch</button>
+        </div>
+        <div id="hrSwitchArea" class="hidden" style="margin-top: 12px;">
+          <p id="hrSwitchInfo" class="message-text" style="text-align:left;"></p>
+          <form id="hrSwitchForm" class="auth-form" style="margin-top: 10px;">
+            <input type="text" id="hrSwitchOtp" class="modal-input" placeholder="Enter approval code" maxlength="6" required>
+            <button type="submit" class="enter-btn">Verify &amp; switch</button>
+          </form>
+        </div>
       </section>
     </section>
   </div>
@@ -448,16 +583,122 @@
       <form id="createUserForm" class="auth-form" style="margin-top: 18px;">
         <input type="text" id="newUserName" class="modal-input" placeholder="Full name" required>
         <input type="email" id="newUserEmail" class="modal-input" placeholder="Email" required>
-        <input type="tel" id="newUserPhone" class="modal-input" placeholder="Phone (optional)">
+        <input type="tel" id="newUserPhone" class="modal-input" placeholder="Phone (Zambian, e.g. 0977...)" required>
+        <input type="text" id="newUserNrc" class="modal-input" placeholder="NRC number (123456/78/1)" required>
         <select id="newUserRole" class="modal-input">
           <option value="user">Customer account</option>
-          <option value="store_admin">BMF store admin</option>
+          <option value="store_admin">BMF store admin (restricted)</option>
+          <option value="franchise_admin" data-franchise-role>Franchise Employee Admin</option>
         </select>
         <input type="password" id="newUserPassword" class="modal-input" placeholder="Password" required>
         <input type="password" id="newUserConfirmPassword" class="modal-input" placeholder="Confirm password" required>
         <button type="submit" class="enter-btn">Create User</button>
       </form>
       <p id="createUserMessage" class="message-text"></p>
+    </div>
+  </div>
+
+  <div id="editEmployeeModal" class="modal">
+    <div class="modal-content">
+      <button class="close" type="button" data-close-modal="editEmployeeModal" aria-label="Close">&times;</button>
+      <h2>Edit Employee</h2>
+      <form id="editEmployeeForm" class="auth-form" style="margin-top: 18px;">
+        <input type="hidden" id="editEmployeeId">
+        <input type="text" id="editEmployeeName" class="modal-input" placeholder="Full name">
+        <input type="email" id="editEmployeeEmail" class="modal-input" placeholder="Email">
+        <input type="tel" id="editEmployeePhone" class="modal-input" placeholder="Phone">
+        <input type="text" id="editEmployeeNrc" class="modal-input" placeholder="NRC (123456/78/1)">
+        <input type="password" id="editEmployeePassword" class="modal-input" placeholder="New password (leave blank to keep)">
+        <button type="submit" class="enter-btn">Save changes</button>
+      </form>
+      <p id="editEmployeeMessage" class="message-text"></p>
+    </div>
+  </div>
+
+  <div id="addLoanModal" class="modal">
+    <div class="modal-content">
+      <button class="close" type="button" data-close-modal="addLoanModal" aria-label="Close">&times;</button>
+      <h2>Add New Loan</h2>
+      <p>Record a loan you have already agreed and disbursed in person. It is saved as an active loan.</p>
+      <form id="addLoanForm" class="auth-form" style="margin-top: 18px;">
+        <label for="addLoanCustomer">Customer (registered user)</label>
+        <select id="addLoanCustomer" class="modal-input" required></select>
+        <input type="text" id="addLoanProduct" class="modal-input" placeholder="Product / collateral description" required>
+        <div class="loan-fields">
+          <div>
+            <label for="addLoanAmount">Amount borrowed (K)</label>
+            <input type="number" id="addLoanAmount" class="modal-input" min="1" step="0.01" placeholder="0.00" required>
+          </div>
+          <div>
+            <label for="addLoanTenure">Tenure (weeks)</label>
+            <select id="addLoanTenure" class="modal-input">
+              <option value="1">1 week</option>
+              <option value="2">2 weeks</option>
+              <option value="3">3 weeks</option>
+              <option value="4">4 weeks</option>
+            </select>
+          </div>
+        </div>
+        <div class="loan-fields">
+          <div>
+            <label for="addLoanInterest">Interest (auto)</label>
+            <input type="text" id="addLoanInterest" class="modal-input" readonly>
+          </div>
+          <div>
+            <label for="addLoanTotal">Total repayment (auto)</label>
+            <input type="text" id="addLoanTotal" class="modal-input" readonly>
+          </div>
+        </div>
+        <div class="loan-fields">
+          <div>
+            <label for="addLoanDueDate">Due date (auto, editable)</label>
+            <input type="date" id="addLoanDueDate" class="modal-input">
+          </div>
+          <div>
+            <label for="addLoanUrgency">Urgency</label>
+            <select id="addLoanUrgency" class="modal-input">
+              <option value="standard">Standard</option>
+              <option value="urgent">Urgent</option>
+              <option value="emergency">Emergency</option>
+            </select>
+          </div>
+        </div>
+        <label for="addLoanDisbursement">Disbursement method</label>
+        <select id="addLoanDisbursement" class="modal-input">
+          <option value="cash">Cash</option>
+          <option value="airtel">Airtel Money</option>
+          <option value="mtn">MTN MoMo</option>
+          <option value="bank">Bank Transfer</option>
+          <option value="other">Other</option>
+        </select>
+        <div class="loan-fields">
+          <div>
+            <label for="addLoanCollateralGrade">Collateral grade (1-100)</label>
+            <input type="number" id="addLoanCollateralGrade" class="modal-input" min="1" max="100" step="1" placeholder="e.g. 85">
+          </div>
+        </div>
+        <label>Collateral front photo (optional)<input type="file" id="addLoanCollateralFront" accept="image/*" class="modal-input" style="margin-top: 6px;"></label>
+        <label>Collateral back photo (optional)<input type="file" id="addLoanCollateralBack" accept="image/*" class="modal-input" style="margin-top: 6px;"></label>
+        <input type="text" id="addLoanNotes" class="modal-input" maxlength="300" placeholder="Notes / decision reason (optional)">
+        <button type="submit" class="enter-btn">Create active loan</button>
+      </form>
+      <p id="addLoanFeedback" class="message-text" role="status"></p>
+    </div>
+  </div>
+
+  <div id="inviteModal" class="modal">
+    <div class="modal-content">
+      <button class="close" type="button" data-close-modal="inviteModal" aria-label="Close">&times;</button>
+      <h2>Invite Links</h2>
+      <p>Generate a signup link for a new customer. Links expire after 24 hours.</p>
+      <form id="inviteForm" class="auth-form" style="margin-top: 18px;">
+        <input type="email" id="inviteEmail" class="modal-input" placeholder="Customer email" required>
+        <button type="submit" class="enter-btn">Generate invite link</button>
+      </form>
+      <p id="inviteFeedback" class="message-text" role="status"></p>
+      <div id="inviteLinkResult" class="message-text"></div>
+      <h3 style="margin-top: 18px;">Pending invite links</h3>
+      <div id="inviteList"><p>Loading invites...</p></div>
     </div>
   </div>
 

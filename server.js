@@ -2,14 +2,29 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const config = require('./config');
-const { logError, logAccess } = require('./middleware/logger');
-const { helmet, deviceAuth, rateLimiter } = require('./middleware/security');
+const { logError, logAccess, replayPendingAlerts } = require('./middleware/logger');
+const { helmet, deviceAuth, rateLimiter, authRateLimiter } = require('./middleware/security');
 const { verifyOTP, sendOTP } = require('./middleware/otp');
 const { trackSession } = require('./controllers/sessionController');
+const { serveFile } = require('./controllers/fileController');
 const routes = require('./routes');
-const { startDailyReportScheduler } = require('./middleware/dailyReport');
+const { startScheduler } = require('./scheduler');
+const { ensureDataIntegrity } = require('./middleware/dataStore');
+const { startHealthWatch } = require('./middleware/healthWatch');
+const { errorAudit, captureOrigin, appendAudit } = require('./middleware/errorAudit');
 
 const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || 'phirii26';
+const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
+
+// DEPLOYMENT GATE (blocking): public deployment is forbidden until the ?token=
+// image fallback is replaced with short-lived signed URLs. Set PUBLIC_DEPLOY=true
+// ONLY after that hardening is done — until then the server refuses to boot so an
+// insecure config can never go live. (See TODO.md + docs/plans/kyc-hardening.md.)
+if (String(process.env.PUBLIC_DEPLOY).toLowerCase() === 'true') {
+  console.error('Refusing to start: PUBLIC_DEPLOY=true requires signed-URL image serving (the ?token= fallback is LAN-only).');
+  console.error('Complete the signed-URL hardening and full security pass before enabling public mode.');
+  process.exit(1);
+}
 
 const app = express();
 app.disable('x-powered-by');
@@ -28,13 +43,34 @@ app.use(helmet({
 
 app.use(express.json());
 
+// Brute-force-sensitive endpoints (auth + vault OTP) get a strict limiter for
+// EVERY source IP — including localhost — so a local process can't hammer them.
+const AUTH_SENSITIVE_PATHS = new Set([
+  '/login', '/login/confirm', '/signup', '/signup/confirm', '/signup/resend',
+  '/password-reset', '/password-reset/confirm', '/vault/request', '/vault/authorize'
+]);
+
+app.use((req, res, next) => {
+  if (AUTH_SENSITIVE_PATHS.has(req.path)) {
+    return authRateLimiter(req, res, next);
+  }
+  next();
+});
+
+// General limiter still skips localhost so the dashboard's frequent status
+// polling (every 5s) is never throttled.
 app.use((req, res, next) => {
   const isLocalhost = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip);
-  if (isLocalhost) {
-    return next();
-  }
+  if (isLocalhost) return next();
   rateLimiter(req, res, next);
 });
+
+// Uploaded KYC / proof-of-payment images: served ONLY through the authenticated,
+// ownership-checked handler below — NOT via the public static mount. Registered
+// before express.static so a raw /uploads/<file> request never bypasses auth.
+// (Auth lives here, ahead of deviceAuth, because static is also ahead of it;
+// the handler resolves the user from the header or a scoped ?token=.)
+app.get('/uploads/:filename', serveFile);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -52,8 +88,7 @@ app.post('/vault/request', async (req, res) => {
       logError(`VAULT REQUEST BLOCKED — invalid master key from ${req.ip}`);
       return res.status(403).json({ error: 'Invalid master key.' });
     }
-
-    await sendOTP('Vault Access', process.env.GMAIL_USER);
+    await sendOTP('Vault Access', ADMIN_EMAIL);
     return res.json({ message: 'Vault OTP sent to the configured admin email.' });
   } catch (err) {
     logError(`VAULT REQUEST FAILED: ${err.message}`);
@@ -68,12 +103,10 @@ app.post('/vault/authorize', (req, res) => {
     if (!submittedKey || submittedKey !== ADMIN_KEY) {
       return res.status(403).json({ error: 'Invalid master key.' });
     }
-
-    const result = verifyOTP(otp, process.env.GMAIL_USER, 'Vault Access');
+    const result = verifyOTP(otp, ADMIN_EMAIL, 'Vault Access');
     if (!result.valid) {
       return res.status(400).json({ error: result.message });
     }
-
     return res.json({ authorized: true, message: 'Vault access approved.' });
   } catch (err) {
     logError(`VAULT AUTH FAILED: ${err.message}`);
@@ -98,7 +131,9 @@ app.use(trackSession);
 app.use('/', routes);
 
 process.on('uncaughtException', (err) => {
-  logError(`UNCAUGHT ERROR: ${err.stack || err.message}`, true);
+  const origin = captureOrigin(err);
+  logError(`[${origin}] UNCAUGHT ERROR: ${err.stack || err.message}`, true);
+  appendAudit(origin, err?.message || String(err), { source: 'uncaughtException' });
 });
 
 app.use((req, res) => {
@@ -110,16 +145,26 @@ app.use((req, res) => {
   res.status(404).send('Route not found');
 });
 
-app.use((err, req, res, next) => {
-  try {
-    logError(`GLOBAL SAFETY NET: ${err.stack || err.message} on ${req.method} ${req.url}`, true);
-  } catch {
-    console.error(`GLOBAL SAFETY NET: ${err.stack || err.message}`);
-  }
-  res.status(500).json({ error: 'Something went wrong. Please try again.' });
-});
+// IMMUNE + provenance: every failure that reaches the error pipeline is logged
+// with its origin (file:line handler) and a dedicated audit line, then returns
+// the same user-facing 500. Registered last so it only catches unhandled errors.
+app.use(errorAudit);
+
+const startupRepairs = ensureDataIntegrity();
+if (startupRepairs.length) {
+  console.warn(`Navi Server data repair: ${startupRepairs.join('; ')}`);
+}
 
 app.listen(config.PORT, config.HOST, () => {
   console.log(`Navi Server running on port ${config.PORT}`);
-  startDailyReportScheduler();
+  startScheduler();
+  // IMMUNE: start heartbeat + outage detection (also fires the boot-time
+  // "server was offline" catch-up alert if the previous run died).
+  try {
+    startHealthWatch();
+  } catch (err) {
+    console.error(`Health watch failed to start: ${err.message}`);
+  }
+  // Retry any breakage alerts queued during a prior SMTP outage (fire-and-forget).
+  replayPendingAlerts().catch(() => {});
 });

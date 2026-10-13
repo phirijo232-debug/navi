@@ -23,13 +23,12 @@
     <form id="signupForm" class="auth-form">
       <input type="text" id="username" placeholder="Username" required class="auth-input">
       <input type="email" id="email" placeholder="Email" required class="auth-input">
-      <input type="tel" id="phone" placeholder="WhatsApp number (required)" required class="auth-input" inputmode="tel">
-      <p class="form-note">Please provide a valid WhatsApp number so we can reach you by WhatsApp, SMS, or direct call when needed.</p>
+      <input type="tel" id="phone" placeholder="e.g. 0977123456" required class="auth-input" inputmode="tel" autocomplete="tel">
+      <input type="text" id="nrc" placeholder="NRC e.g. 123456/78/1" required class="auth-input" inputmode="numeric" autocomplete="off">
       <div class="input-wrap">
         <input type="password" id="password" placeholder="Password" required class="auth-input">
         <svg id="togglePass1" class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
       </div>
-      <p class="form-note">Use 8+ characters with letters, numbers, and symbols (e.g. @, #, !)</p>
       <div class="input-wrap">
         <input type="password" id="confirmPassword" placeholder="Confirm Password" required class="auth-input">
         <svg id="togglePass2" class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -85,6 +84,16 @@
     animateTagline('.tagline');
 
     let pendingEmail = '';
+
+    // Invite-only signup: the admin's link must carry ?invite=<token>
+    // (?token= also accepted). Without it the form stays closed — the server
+    // enforces the same rule, this just explains it up front.
+    const inviteParams = new URLSearchParams(window.location.search);
+    const inviteToken = (inviteParams.get('invite') || inviteParams.get('token') || '').trim();
+    if (!inviteToken) {
+      document.getElementById('signupForm').classList.add('hidden');
+      document.getElementById('message').textContent = 'Sign-up is invitation only. Please open the personal invite link sent to you by the administrator.';
+    }
     const eyeOpen = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
     const eyeClosed = `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>`;
 
@@ -108,8 +117,16 @@
       const username = document.getElementById('username').value;
       const email = document.getElementById('email').value;
       const phone = document.getElementById('phone').value;
+      const nrc = document.getElementById('nrc').value.trim();
       const password = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirmPassword').value;
+      const nrcRegex = new RegExp('^\\d{6}/\\d{2}/\\d$');
+
+      if (!nrcRegex.test(nrc)) {
+        document.getElementById('message').textContent = 'NRC/ID number must look like 123456/78/1.';
+        document.getElementById('loader').classList.remove('active');
+        return;
+      }
       const strengthRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?"{}|<>]).{8,}$/;
 
       if (password !== confirmPassword) {
@@ -127,7 +144,7 @@
       const res = await fetch('/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, phone, password, confirmPassword })
+        body: JSON.stringify({ username, email, phone, nrc, password, confirmPassword, inviteToken })
       });
       const data = await res.json();
 

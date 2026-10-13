@@ -2,23 +2,18 @@ const fs = require('fs');
 const path = require('path');
 const { logError } = require('../middleware/logger');
 const config = require('../config');
+const dataStore = require('../middleware/dataStore');
 const { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, isAdminRole } = require('../middleware/storeScope');
 
-const FEEDBACK_FILE = path.join(__dirname, '../data/feedback.json');
+const FEEDBACK_FILE = dataStore.paths.feedback;
 
 function getFeedbackData() {
-  try {
-    const data = fs.readFileSync(FEEDBACK_FILE, 'utf8');
-    return data ? JSON.parse(data) : [];
-  } catch (err) {
-    logError(`FEEDBACK READ FAILED: ${err.message}`);
-    return [];
-  }
+  return dataStore.readJson(FEEDBACK_FILE, [], Array.isArray);
 }
 
 function saveFeedbackData(entries) {
   try {
-    fs.writeFileSync(FEEDBACK_FILE, JSON.stringify(entries, null, 2));
+    dataStore.writeJson(FEEDBACK_FILE, entries);
   } catch (err) {
     logError(`FEEDBACK WRITE FAILED: ${err.message}`);
     throw err;
