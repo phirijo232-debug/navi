@@ -46,5 +46,23 @@ PORT: Number(process.env.PORT) || 3000,
   TRUSTED_TOKENS: [
     'LAPTOP-Solojjktitazeckjomerali',
     'PHONE-Alimercjoezectitjjksolo'
+  ],
+
+  // Routes reachable WITHOUT a device token (deviceAuth skips these). Invite
+  // validation must stay public so a prospective borrower can validate their
+  // link on signup.html before any account/device token exists.
+  PUBLIC_PATHS: [
+    '/',
+    '/signup',
+    '/signup/confirm',
+    '/signup/resend',
+    '/login',
+    '/login/confirm',
+    '/password-reset',
+    '/password-reset/confirm',
+    '/status',
+    '/health',
+    '/favicon.ico',
+    '/invites/validate'
   ]
 };

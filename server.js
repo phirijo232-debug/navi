@@ -3,7 +3,7 @@ const express = require('express');
 const path = require('path');
 const config = require('./config');
 const { logError, logAccess, replayPendingAlerts } = require('./middleware/logger');
-const { helmet, deviceAuth, rateLimiter, authRateLimiter } = require('./middleware/security');
+const { helmet, deviceAuth, rateLimiter, authRateLimiter, getServerMode } = require('./middleware/security');
 const { verifyOTP, sendOTP } = require('./middleware/otp');
 const { trackSession } = require('./controllers/sessionController');
 const { serveFile } = require('./controllers/fileController');
@@ -157,6 +157,8 @@ if (startupRepairs.length) {
 
 app.listen(config.PORT, config.HOST, () => {
   console.log(`Navi Server running on port ${config.PORT}`);
+  const mode = typeof getServerMode === 'function' ? getServerMode() : 'private';
+  console.log(`[server-mode] started in ${mode.toUpperCase()} mode`);
   startScheduler();
   // IMMUNE: start heartbeat + outage detection (also fires the boot-time
   // "server was offline" catch-up alert if the previous run died).

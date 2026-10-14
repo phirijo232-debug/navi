@@ -138,7 +138,7 @@ function checkMasterPassword(password) {
 }
 
 // ─── Token + IP check ──────────────────
-const PUBLIC_PATHS = new Set([
+const PUBLIC_PATHS = new Set(config.PUBLIC_PATHS || [
   '/signup',
   '/signup/confirm',
   '/signup/resend',
@@ -148,11 +148,18 @@ const PUBLIC_PATHS = new Set([
   '/password-reset/confirm',
   '/status',
   '/health',
-  '/favicon.ico'
+  '/favicon.ico',
+  '/invites/validate'
 ]);
 
+function isPublicPath(path) {
+  if (PUBLIC_PATHS.has(path)) return true;
+  if (path.startsWith('/invites/validate/')) return true;
+  return false;
+}
+
 function deviceAuth(req, res, next) {
-  if (PUBLIC_PATHS.has(req.path)) {
+  if (isPublicPath(req.path)) {
     return next();
   }
 
@@ -230,4 +237,4 @@ const healthRateLimiter = rateLimit({
   }
 });
 
-module.exports = { helmet, deviceAuth, rateLimiter, authRateLimiter, healthRateLimiter, checkMasterPassword, findUserByDeviceToken, getServerMode, setServerMode, isFranchiseManager };
+module.exports = { helmet, deviceAuth, rateLimiter, authRateLimiter, healthRateLimiter, checkMasterPassword, findUserByDeviceToken, getServerMode, setServerMode, isFranchiseManager, isPublicPath };

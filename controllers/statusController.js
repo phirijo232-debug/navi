@@ -1,6 +1,6 @@
 const os = require('os');
 const { logError } = require('../middleware/logger');
-const { findUserByDeviceToken } = require('../middleware/security');
+const { findUserByDeviceToken, getServerMode } = require('../middleware/security');
 const { isAdminRole } = require('../middleware/storeScope');
 const dataStore = require('../middleware/dataStore');
 const { heartbeatInfo } = require('../middleware/healthWatch');
@@ -61,6 +61,12 @@ const getStatus = circuitBreaker('getStatus', async (req, res) => {
     }
   };
 
+  const token = req.headers && req.headers['x-device-token'];
+  const user = token ? findUserByDeviceToken(token) : null;
+  if (user && isAdminRole(user.role)) {
+    status.serverMode = typeof getServerMode === 'function' ? getServerMode() : 'private';
+  }
+
   res.json(status);
 });
 
@@ -84,6 +90,7 @@ const getHealth = circuitBreaker('getHealth', async (req, res) => {
   const dbHealth = dataStore.db.isHealthy();
   res.json({
     ...base,
+    serverMode: typeof getServerMode === 'function' ? getServerMode() : 'private',
     memory: {
       usedMB: Math.round((process.memoryUsage().rss) / 1024 / 1024),
       heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)

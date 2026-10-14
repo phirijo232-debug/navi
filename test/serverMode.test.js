@@ -101,3 +101,24 @@ test('GET /admin/server-mode blocks non-managers', () => {
   handler({ authUser: { email: 'admin@prymevertex.test', role: 'store_admin' }, ip: '127.0.0.1' }, res);
   assert.equal(res.statusCode, 403);
 });
+
+test('GET /status reports the current serverMode to authenticated admins', async () => {
+  const { getStatus } = require('../controllers/statusController');
+  const res = responseRecorder();
+  // jophiri223 admin device token
+  await getStatus({ headers: { 'x-device-token': '7fbd91684e4ce5c948e81248ed40c582749b11dcd9038db07c814ba95cb98b3e' } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(typeof res.body.serverMode, 'string');
+  assert.ok(['public', 'private'].includes(res.body.serverMode));
+});
+
+test('deviceAuth allows invite validation routes without a device token', (t, done) => {
+  const { deviceAuth } = security;
+  const req = { path: '/invites/validate/sample-invite-token', ip: '127.0.0.1', headers: {} };
+  const res = responseRecorder();
+  deviceAuth(req, res, () => {
+    // next() called => allowed through
+    assert.equal(res.statusCode, 200);
+    done();
+  });
+});

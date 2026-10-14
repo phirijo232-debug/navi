@@ -51,6 +51,7 @@ test('GET /health admin tier adds detail only for a valid admin token', async ()
     assert.ok(adminRes.body.memory, 'admin sees memory');
     assert.ok(adminRes.body.db, 'admin sees db');
     assert.ok(adminRes.body.heartbeat, 'admin sees heartbeat');
+    assert.ok(['public', 'private'].includes(adminRes.body.serverMode), 'admin sees serverMode');
     // But even the admin tier must not leak the db file path.
     const flat = JSON.stringify(adminRes.body);
     assert.ok(!flat.includes('navi.db'), 'db file path must never be exposed');
