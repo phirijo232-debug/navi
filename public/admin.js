@@ -170,13 +170,13 @@ function enterStore(storeId) {
 function setAuthMessage(text, isError = false) {
   const el = document.getElementById('authMessage');
   el.textContent = text;
-  el.style.color = isError ? '#ff9ca9' : '#d6e7ff';
+  el.style.color = isError ? '#ff9ca9' : '#CCD0CF';
 }
 
 function setCreateUserMessage(text, isError = false) {
   const el = document.getElementById('createUserMessage');
   el.textContent = text;
-  el.style.color = isError ? '#ff9ca9' : '#d6e7ff';
+  el.style.color = isError ? '#ff9ca9' : '#CCD0CF';
 }
 
 function setLoader(active) {
@@ -1287,7 +1287,7 @@ function setHrMessage(text, isError = false) {
   const el = document.getElementById('hrMessage');
   if (!el) return;
   el.textContent = text;
-  el.style.color = isError ? '#ff9ca9' : '#d6e7ff';
+  el.style.color = isError ? '#ff9ca9' : '#CCD0CF';
 }
 
 async function fetchHrEmployees() {

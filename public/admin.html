@@ -8,12 +8,12 @@
   <style>
     body {
       min-height: 100vh;
-      background: #050510;
-      color: #eaeaf9;
+      background: #06141B;
+      color: #CCD0CF;
     }
     body.light {
-      background: #f0f4ff;
-      color: #1a1a2e;
+      background: #DDE1E0;
+      color: #06141B;
     }
     .admin-shell {
       position: relative;
@@ -23,7 +23,7 @@
       padding: 32px 18px 60px;
     }
     .panel {
-      background: rgba(18, 20, 38, 0.78);
+      background: rgba(6, 20, 27, 0.78);
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 18px;
       box-shadow: 0 18px 40px rgba(0,0,0,0.28);
@@ -31,8 +31,8 @@
     }
     body.light .panel {
       background: rgba(255,255,255,0.9);
-      border-color: rgba(44, 62, 121, 0.18);
-      box-shadow: 0 18px 40px rgba(99, 78, 173, 0.12);
+      border-color: rgba(74, 92, 106, 0.22);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
     }
     .brand-header {
       display: flex;
@@ -79,7 +79,7 @@
     }
     .store-card:hover:not(:disabled) {
       transform: translateY(-2px);
-      border-color: rgba(0,207,255,0.7);
+      border-color: rgba(155,168,171,0.7);
     }
     .store-card:disabled {
       cursor: not-allowed;
@@ -118,7 +118,7 @@
     body.light .search-box,
     body.light .modal-input {
       border-color: rgba(0,0,0,0.2);
-      color: #1a1a2e;
+      color: #06141B;
     }
     .header-actions {
       display: flex;
@@ -171,11 +171,11 @@
     }
     body.light .user-card {
       border-color: rgba(0,0,0,0.08);
-      background: rgba(125, 140, 255, 0.04);
+      background: rgba(74, 92, 106, 0.06);
     }
     .user-card:hover {
       transform: translateY(-2px);
-      border-color: rgba(123,47,255,0.8);
+      border-color: rgba(155,168,171,0.8);
     }
     .user-card h3 {
       margin-bottom: 8px;
@@ -191,7 +191,7 @@
       position: fixed;
       inset: 0;
       z-index: 1000;
-      background: rgba(2, 3, 14, 0.72);
+      background: rgba(6, 20, 27, 0.72);
       padding: 18px;
       overflow-y: auto;
     }
@@ -200,7 +200,7 @@
       margin: 60px auto;
       padding: 22px 20px 20px;
       border-radius: 16px;
-      background: rgba(13, 15, 26, 0.98);
+      background: rgba(11, 29, 38, 0.98);
       border: 1px solid rgba(255,255,255,0.12);
       position: relative;
     }
@@ -226,7 +226,7 @@
     }
     body.light .loan-item {
       border-color: rgba(0,0,0,0.08);
-      background: rgba(8, 15, 32, 0.02);
+      background: rgba(6, 20, 27, 0.02);
     }
     .loan-header {
       display: flex;
@@ -268,7 +268,7 @@
       flex-wrap: wrap;
       margin: 14px 0;
     }
-    .loan-filter.active { border-color: #00cfff; background: rgba(0,207,255,0.18); }
+    .loan-filter.active { border-color: #9BA8AB; background: rgba(155,168,171,0.18); }
     .loan-fields {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -288,13 +288,13 @@
       min-width: 30px;
       padding: 4px 10px;
       border-radius: 999px;
-      background: rgba(0,207,255,0.22);
+      background: rgba(155,168,171,0.22);
       color: inherit;
       font-size: 0.85rem;
       font-weight: 800;
       text-align: center;
     }
-    body.light .request-badge { background: rgba(0,120,180,0.14); }
+    body.light .request-badge { background: rgba(74,92,106,0.14); }
     .request-row {
       display: flex;
       align-items: flex-start;
@@ -311,7 +311,7 @@
       height: 34px;
       line-height: 34px;
       border-radius: 50%;
-      background: rgba(123,47,255,0.25);
+      background: rgba(155,168,171,0.25);
       text-align: center;
       font-weight: 800;
     }
@@ -339,7 +339,7 @@
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #7b2fff, #00cfff);
+      background: linear-gradient(135deg, #4A5C6A, #9BA8AB);
       animation: bounce 0.9s infinite alternate;
     }
     .loader span:nth-child(2) { animation-delay: 0.15s; }
