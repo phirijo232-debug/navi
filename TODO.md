@@ -17,6 +17,7 @@
 - [x] Add explicit audit trail fields for loan actions, timestamps, and who changed what.
 - [x] Add overdue detection and repayment reminders to reduce manual follow-up.
 - [x] Add admin reporting exports (CSV or PDF) for loans, totals, and outstanding balances.
+- [x] BMF 10-report system: typed-report handlers (`controllers/reportController.js`), flat routes (`routes/index.js`), services (`services/bmfReports.js`, `services/bmfExcel.js`, `services/bmfPdf.js`), daily scheduler at 08:00 Africa/Lusaka to `jophiri223@gmail.com`, admin panel integration.
 - [x] Add notification hooks for approval, payment, and overdue events using the email path already in place.
 - [x] Add backup/restore handling for users and loan records to protect project data.
 - [x] Notify the admin inbox when a server breakage trips a circuit breaker (logError notify path with 15-minute flood protection per incident).

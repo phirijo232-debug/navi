@@ -31,7 +31,8 @@ const {
   getDefaulterAnalytics, getOverdueAnalytics, getPaidAnalytics,
   getUserReport, searchReports, getPaymentsLedger,
   getPaymentsReportExport, getTrackingAnalytics, exportTrackingSheet,
-  getTrackingSheet, getUserTracking
+  getTrackingSheet, getUserTracking,
+  getTypedReport, getTypedReportExcel, getTypedReportPdf
 } = require('../controllers/reportController');
 
 const { healthRateLimiter, getServerMode, setServerMode, isFranchiseManager } = require('../middleware/security');
@@ -54,6 +55,11 @@ router.get('/reports/search', searchReports);
 router.get('/reports/user/:email', getUserReport);
 router.get('/reports/analytics/tracking', getTrackingAnalytics);
 router.get('/reports/analytics/tracking/export', exportTrackingSheet);
+// Flat typed-report routes (static, must come before :scope dynamic routes)
+router.get('/reports/:type', getTypedReport);
+router.get('/reports/:type/export', getTypedReportExcel);
+router.get('/reports/:type/pdf', getTypedReportPdf);
+
 router.get('/reports/:scope/summary', getReportSummary);
 router.get('/reports/:scope/export', exportReport);
 router.get('/reports/:scope/profits', getProfitAnalytics);

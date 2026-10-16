@@ -38,6 +38,8 @@ function collectFrontendCalls() {
       while ((match = pattern.exec(source)) !== null) {
         const raw = match[2];
         if (!raw.startsWith('/')) continue;
+        // Skip template literals with interpolations (can't be statically resolved)
+        if (raw.includes('${')) continue;
         const clean = raw.split('?')[0].split('#')[0];
         calls.push({ file: name, raw, clean });
       }
@@ -51,7 +53,7 @@ function matchesRoute(frontendPath, routePath) {
   const routeSegs = routePath.split('/').filter(Boolean);
   if (frontendSegs.length !== routeSegs.length) return false;
   return frontendSegs.every((seg, i) =>
-    routeSegs[i].startsWith(':') || routeSegs[i] === seg
+    routeSegs[i].startsWith(':') || routeSegs[i].startsWith('${') || routeSegs[i] === seg
   );
 }
 

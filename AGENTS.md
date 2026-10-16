@@ -80,6 +80,9 @@ POST /uploads/sign
 GET  /reports/user
 GET  /reports/all
 GET  /reports/analytics
+GET  /reports/:type            (typed-report JSON: daily, all-loans, payments-today, overdue, defaulters, monthly-collections, borrower-statements, approval-log, interest-revenue, repayment-performance, repayment-tracker)
+GET  /reports/:type/export     (typed-report Excel)
+GET  /reports/:type/pdf        (typed-report PDF)
 GET  /reports/:scope/summary
 GET  /reports/:scope/export
 GET  /reports/:scope/profits

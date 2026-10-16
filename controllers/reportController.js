@@ -9,6 +9,9 @@ const { getFeedbackData } = require('./feedbackController');
 const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole } = require('../middleware/storeScope');
 const { getEnrichedLoans, summarizeStore, searchLoansByReceipt, normalizeStatus } = require('./loanController');
 const { buildTrackingSheet, persistTracking } = require('./reportTracking');
+const R = require('../services/bmfReports');
+const X = require('../services/bmfExcel');
+const P = require('../services/bmfPdf');
 
 const USERS_FILE = dataStore.paths.users;
 const LOANS_FILE = dataStore.paths.loans;
@@ -1142,6 +1145,308 @@ function getTrackingSheet(req, res) {
   }
 }
 
+// â”€â”€â”€ BMF typed-report handlers (GET /reports/:type) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function getTypedReport(req, res) {
+  try {
+    const type = req.params.type;
+    const scope = req.query.scope || 'buraza';
+    const { from, to, invalid } = readPeriod(req);
+    if (invalid) return res.status(400).json({ error: 'from/to must be YYYY-MM-DD dates.' });
+    if (!isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required for this report scope.' });
+
+    const users = readArray(USERS_FILE);
+    const today = new Date().toISOString().slice(0, 10);
+    const loans = applyPeriodFilter(readArray(LOANS_FILE), from, to)
+      .filter(l => scope === 'all' || getRecordStoreId(l) === scope);
+
+    let data;
+    switch (type) {
+      case 'daily':
+        data = R.dailySummaryRows(loans, users, from || today);
+        break;
+      case 'all-loans':
+        data = R.allLoansRows(loans, users, from || today);
+        break;
+      case 'payments-today':
+        data = R.paymentsTodayRows(loans, users, from || today);
+        break;
+      case 'overdue':
+        data = R.overdueRows(loans, users, from || today);
+        break;
+      case 'defaulters':
+        data = R.defaulterRows(loans, users, from || today);
+        break;
+      case 'monthly-collections':
+        data = R.monthlyCollectionsRows(loans, users, (from || today).slice(0, 7));
+        break;
+      case 'borrower-statements':
+        data = R.borrowerStatementRows(loans, users);
+        break;
+      case 'approval-log':
+        data = R.approvalLogRows(loans, users);
+        break;
+      case 'interest-revenue':
+        data = R.interestRevenueRows(loans, users, (from || today).slice(0, 7));
+        break;
+      case 'repayment-performance':
+        data = R.repaymentPerformanceRows(loans, users, from || today);
+        break;
+      case 'repayment-tracker': {
+        const loanId = req.query.loanId;
+        if (!loanId) return res.status(400).json({ error: 'loanId query parameter is required for repayment-tracker.' });
+        const loan = loans.find(l => String(l.id) === String(loanId) || String(l.receiptNumber) === String(loanId));
+        if (!loan) return res.status(404).json({ error: 'Loan not found.' });
+        const user = R.userByEmail(users, loan.email);
+        data = R.repaymentTrackerRows(loan, user);
+        break;
+      }
+      default:
+        return res.status(400).json({ error: `Unknown report type: ${type}` });
+    }
+
+    const format = String(req.query.format || '').toLowerCase();
+    if (format === 'xlsx') return getTypedReportExcel(req, res);
+    if (format === 'pdf') return getTypedReportPdf(req, res);
+
+    return res.json({
+      type,
+      scope,
+      generatedAt: new Date().toISOString(),
+      period: { from: from || null, to: to || null },
+      ...data
+    });
+  } catch (err) {
+    logBreakage('reportController.js', 'getTypedReport', err, 'TYPED REPORT FAILED');
+    if (!res.headersSent) return res.status(503).json({ error: 'Report is temporarily unavailable.' });
+  }
+}
+
+// Typed-report Excel export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function getTypedReportExcel(req, res) {
+  try {
+    const type = req.params.type;
+    const scope = req.query.scope || 'buraza';
+    const { from, to, invalid } = readPeriod(req);
+    if (invalid) return res.status(400).json({ error: 'from/to must be YYYY-MM-DD dates.' });
+    if (!isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required for this report scope.' });
+
+    const users = readArray(USERS_FILE);
+    const today = new Date().toISOString().slice(0, 10);
+    const loans = applyPeriodFilter(readArray(LOANS_FILE), from, to)
+      .filter(l => scope === 'all' || getRecordStoreId(l) === scope);
+
+    const wb = new (require('exceljs')).Workbook();
+    wb.creator = 'BMF';
+
+    if (type === 'daily') {
+      const filled = await X.buildDailyWorkbook(loans, users, from || today);
+      const buffer = await X.workbookToBuffer(filled);
+      return sendTypedXlsx(res, buffer, `BMF-Daily-Report-${from || today}`);
+    }
+
+    if (type === 'repayment-tracker') {
+      const loanId = req.query.loanId;
+      if (!loanId) return res.status(400).json({ error: 'loanId query parameter is required for repayment-tracker.' });
+      const loan = loans.find(l => String(l.id) === String(loanId) || String(l.receiptNumber) === String(loanId));
+      if (!loan) return res.status(404).json({ error: 'Loan not found.' });
+      const user = R.userByEmail(users, loan.email);
+      const ws = X.buildTrackerSheet(wb, loan, user);
+      const buffer = await X.workbookToBuffer(wb);
+      const name = String(loan.username || loan.email || 'Borrower').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'Borrower';
+      return sendTypedXlsx(res, buffer, `BMF-Report-${name}-${today}`);
+    }
+
+    let sheetName, headers, rows, title, fill, fontColor, emptyText;
+    switch (type) {
+      case 'all-loans': {
+        const d = R.allLoansRows(loans, users, from || today);
+        sheetName = 'All Loans'; headers = d.headers; rows = d.rows; title = 'BMF ALL LOANS'; break;
+      }
+      case 'payments-today': {
+        const d = R.paymentsTodayRows(loans, users, from || today);
+        sheetName = 'Payments Today'; headers = d.headers; rows = d.rows; title = 'BMF PAYMENTS TODAY'; emptyText = '(No payments recorded on this date)'; break;
+      }
+      case 'overdue': {
+        const d = R.overdueRows(loans, users, from || today);
+        sheetName = 'Overdue'; headers = d.headers; rows = d.rows; title = 'BMF OVERDUE LOANS'; fill = 'FFFF0000'; fontColor = 'FFFFFFFF'; emptyText = '(No overdue loans on this date)'; break;
+      }
+      case 'defaulters': {
+        const d = R.defaulterRows(loans, users, from || today);
+        sheetName = 'Defaulters'; headers = d.headers; rows = d.rows; title = 'BMF DEFAULTERS'; fill = 'FF8B0000'; fontColor = 'FFFFFFFF'; emptyText = '(No defaulters on this date)'; break;
+      }
+      case 'monthly-collections': {
+        const d = R.monthlyCollectionsRows(loans, users, (from || today).slice(0, 7));
+        sheetName = 'Monthly Collections'; headers = d.headers; rows = d.rows; title = 'BMF MONTHLY COLLECTIONS'; emptyText = '(No collections in this month)'; break;
+      }
+      case 'approval-log': {
+        const d = R.approvalLogRows(loans, users);
+        sheetName = 'Approval Log'; headers = d.headers; rows = d.rows; title = 'BMF LOAN APPROVAL LOG'; fill = 'FF006400'; fontColor = 'FFFFFFFF'; emptyText = '(No approvals in range)'; break;
+      }
+      case 'borrower-statements': {
+        const d = R.borrowerStatementRows(loans, users);
+        d.sections.forEach((s, i) => {
+          const ws = wb.addWorksheet(`Statements ${i + 1}`);
+          ws.columns = [22, 18, 16, 16, 16].map(w => ({ width: w }));
+          X.titleBanner(ws, `${s.borrower} — ${s.email}`, 5);
+          X.headerRow(ws, 4, ['Loan ID', 'Principal (K)', 'Interest (K)', 'Paid (K)', 'Outstanding (K)'], 'FFFFFF00');
+          X.dataRows(ws, 5, s.loans);
+        });
+        const buffer = await X.workbookToBuffer(wb);
+        return sendTypedXlsx(res, buffer, `BMF-Borrower-Statements-${today}`);
+      }
+      case 'interest-revenue': {
+        const d = R.interestRevenueRows(loans, users, (from || today).slice(0, 7));
+        const ws = wb.addWorksheet('Interest & Revenue');
+        ws.columns = [30, 20, 20, 20, 20, 20].map(w => ({ width: w }));
+        X.titleBanner(ws, 'BMF INTEREST & REVENUE', 6);
+        X.headerRow(ws, 4, d.summaryHeaders, 'FF006400', 'FFFFFFFF');
+        X.dataRows(ws, 5, d.summary);
+        X.headerRow(ws, 5 + d.summary.length + 1, d.detailHeaders, 'FFFFFF00');
+        X.dataRows(ws, 5 + d.summary.length + 2, d.detail);
+        const buffer = await X.workbookToBuffer(wb);
+        return sendTypedXlsx(res, buffer, `BMF-Interest-Revenue-${(from || today).slice(0, 7)}`);
+      }
+      case 'repayment-performance': {
+        const d = R.repaymentPerformanceRows(loans, users, from || today);
+        const ws = wb.addWorksheet('Repayment Performance');
+        ws.columns = [26, 24, 12, 12, 12, 18, 14].map(w => ({ width: w }));
+        X.titleBanner(ws, 'BMF REPAYMENT PERFORMANCE', 7);
+        X.headerRow(ws, 4, d.summaryHeaders, 'FF6A0DAD', 'FFFFFFFF');
+        X.dataRows(ws, 5, d.summary);
+        X.headerRow(ws, 5 + d.summary.length + 1, d.tableHeaders, 'FFFFFF00');
+        const start = 5 + d.summary.length + 2;
+        X.dataRows(ws, start, d.table);
+        const buffer = await X.workbookToBuffer(wb);
+        return sendTypedXlsx(res, buffer, `BMF-Repayment-Performance-${today}`);
+      }
+      default:
+        return res.status(400).json({ error: `Unknown report type: ${type}` });
+    }
+
+    if (!sheetName) return res.status(400).json({ error: `Unknown report type: ${type}` });
+
+    X.genericSheet(wb, sheetName, headers, rows, { title, fill, fontColor, emptyText });
+    const buffer = await X.workbookToBuffer(wb);
+    return sendTypedXlsx(res, buffer, R.filenameFor(type, { date: from || today }));
+  } catch (err) {
+    logBreakage('reportController.js', 'getTypedReportExcel', err, 'TYPED REPORT EXCEL FAILED');
+    if (!res.headersSent) return res.status(503).json({ error: 'Report export is temporarily unavailable.' });
+  }
+}
+
+// â”€â”€â”€ Typed-report PDF export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function getTypedReportPdf(req, res) {
+  try {
+    const type = req.params.type;
+    const scope = req.query.scope || 'buraza';
+    const { from, to, invalid } = readPeriod(req);
+    if (invalid) return res.status(400).json({ error: 'from/to must be YYYY-MM-DD dates.' });
+    if (!isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required for this report scope.' });
+
+    const users = readArray(USERS_FILE);
+    const today = new Date().toISOString().slice(0, 10);
+    const loans = applyPeriodFilter(readArray(LOANS_FILE), from, to)
+      .filter(l => scope === 'all' || getRecordStoreId(l) === scope);
+
+    if (type === 'repayment-tracker') {
+      const loanId = req.query.loanId;
+      if (!loanId) return res.status(400).json({ error: 'loanId query parameter is required for repayment-tracker.' });
+      const loan = loans.find(l => String(l.id) === String(loanId) || String(l.receiptNumber) === String(loanId));
+      if (!loan) return res.status(404).json({ error: 'Loan not found.' });
+      const user = R.userByEmail(users, loan.email);
+      const pdf = await P.trackerPdf(loan, user);
+      const name = String(loan.username || loan.email || 'Borrower').replace(/[^A-Za-z0-9]+/g, '-');
+      return sendTypedPdf(res, pdf, `BMF-Report-${name}-${today}`);
+    }
+
+    let sections;
+    switch (type) {
+      case 'daily': {
+        const d = R.dailySummaryRows(loans, users, from || today);
+        sections = [{ title: 'DAILY SUMMARY', headers: d.headers, rows: d.rows }];
+        break;
+      }
+      case 'all-loans': {
+        const d = R.allLoansRows(loans, users, from || today);
+        sections = [{ title: 'ALL LOANS', headers: d.headers, rows: d.rows }];
+        break;
+      }
+      case 'payments-today': {
+        const d = R.paymentsTodayRows(loans, users, from || today);
+        sections = [{ title: 'PAYMENTS TODAY', headers: d.headers, rows: d.rows, emptyText: '(No payments recorded on this date)' }];
+        break;
+      }
+      case 'overdue': {
+        const d = R.overdueRows(loans, users, from || today);
+        sections = [{ title: 'OVERDUE LOANS', headers: d.headers, rows: d.rows, emptyText: '(No overdue loans on this date)' }];
+        break;
+      }
+      case 'defaulters': {
+        const d = R.defaulterRows(loans, users, from || today);
+        sections = [{ title: 'DEFAULTERS', headers: d.headers, rows: d.rows, emptyText: '(No defaulters on this date)' }];
+        break;
+      }
+      case 'monthly-collections': {
+        const d = R.monthlyCollectionsRows(loans, users, (from || today).slice(0, 7));
+        sections = [{ title: 'MONTHLY COLLECTIONS', headers: d.headers, rows: d.rows, emptyText: '(No collections in this month)' }];
+        break;
+      }
+      case 'approval-log': {
+        const d = R.approvalLogRows(loans, users);
+        sections = [{ title: 'LOAN APPROVAL LOG', headers: d.headers, rows: d.rows, emptyText: '(No approvals in range)' }];
+        break;
+      }
+      case 'interest-revenue': {
+        const d = R.interestRevenueRows(loans, users, (from || today).slice(0, 7));
+        sections = [
+          { title: `INTEREST & REVENUE (${d.meta.month})`, headers: d.summaryHeaders, rows: d.summary },
+          { title: 'DETAIL', headers: d.detailHeaders, rows: d.detail }
+        ];
+        break;
+      }
+      case 'repayment-performance': {
+        const d = R.repaymentPerformanceRows(loans, users, from || today);
+        sections = [
+          { title: 'REPAYMENT PERFORMANCE SUMMARY', headers: d.summaryHeaders, rows: d.summary },
+          { title: 'BORROWER DETAIL', headers: d.tableHeaders, rows: d.table }
+        ];
+        break;
+      }
+      case 'borrower-statements': {
+        const d = R.borrowerStatementRows(loans, users);
+        sections = d.sections.map(s => ({
+          title: `${s.borrower} — ${s.email}`,
+          headers: ['Loan ID', 'Principal (K)', 'Interest (K)', 'Paid (K)', 'Outstanding (K)', 'Status', 'Due Date'],
+          rows: s.loans.map(r => r.slice(0, 7))
+        }));
+        break;
+      }
+      default:
+        return res.status(400).json({ error: `Unknown report type: ${type}` });
+    }
+
+    if (!sections) return res.status(400).json({ error: `Unknown report type: ${type}` });
+
+    const pdf = await P.businessPdf(sections, { title: `BMF ${type.toUpperCase()} REPORT`, date: today });
+    return sendTypedPdf(res, pdf, `BMF-${type}-${today}`);
+  } catch (err) {
+    logBreakage('reportController.js', 'getTypedReportPdf', err, 'TYPED REPORT PDF FAILED');
+    if (!res.headersSent) return res.status(503).json({ error: 'Report export is temporarily unavailable.' });
+  }
+}
+
+function sendTypedXlsx(res, buffer, filename) {
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}.xlsx"`);
+  return res.send(Buffer.from(buffer));
+}
+
+function sendTypedPdf(res, buffer, filename) {
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`);
+  return res.send(Buffer.from(buffer));
+}
+
 module.exports = {
   categorizeLoan,
   getReportData,
@@ -1167,5 +1472,10 @@ module.exports = {
   getTrackingAnalytics,
   getUserTracking,
   getTrackingSheet,
-  exportTrackingSheet
+  exportTrackingSheet,
+  getTypedReport,
+  getTypedReportExcel,
+  getTypedReportPdf,
+  sendTypedXlsx,
+  sendTypedPdf
 };

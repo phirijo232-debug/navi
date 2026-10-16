@@ -17,6 +17,9 @@ const { runDueDatePass } = require('./middleware/loanNotifications');
 const { getEnrichedLoans, deriveLoanStatus, accrueAllGrace } = require('./controllers/loanController');
 const { runKidneySweep } = require('./middleware/kidneys');
 const { buildPaymentsReportData, buildPaymentsExcelReport, buildPaymentsPdfReport } = require('./controllers/reportController');
+const R = require('./services/bmfReports');
+const X = require('./services/bmfExcel');
+const P = require('./services/bmfPdf');
 
 const TIMEZONE = process.env.DAILY_REPORT_TIMEZONE || 'Africa/Lusaka';
 // Rule 8: report recipient. Env wins; default is the admin mailbox.
@@ -252,7 +255,17 @@ async function buildReportXlsx(data) {
 async function sendDailyLoanReport() {
   const data = buildDailyReportData();
   const subject = `Pryme Buraza Micro Finance — Daily Loan Report ${data.reportDate}` + (data.period ? ` (${data.period.from || 'start'} to ${data.period.to || 'today'})` : '');
-  const [pdf, xlsx] = await Promise.all([buildReportPdf(data), buildReportXlsx(data)]);
+
+  const loans = getEnrichedLoans();
+  const users = dataStore.readJson(dataStore.paths.users, [], Array.isArray);
+
+  const [pdf, xlsx] = await Promise.all([
+    P.businessPdf([{ title: 'DAILY SUMMARY', headers: ['Metric', 'Value'], rows: R.dailySummaryRows(loans, users, data.reportDate).rows }], { title: 'BMF DAILY REPORT', date: data.reportDate }),
+    (async () => {
+      const wb = await X.buildDailyWorkbook(loans, users, data.reportDate);
+      return X.workbookToBuffer(wb);
+    })()
+  ]);
 
   const result = await emailService.sendCustomerEmail({
     to: REPORT_RECIPIENT,
