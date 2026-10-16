@@ -34,8 +34,22 @@ PORT: Number(process.env.PORT) || 3000,
 
   REPORTS: {
     DAILY_ADMIN_EMAIL: process.env.DAILY_REPORT_EMAIL || 'jophiri223@gmail.com',
-    DAILY_SEND_TIME: process.env.DAILY_REPORT_TIME || '23:59',
-    TIME_ZONE: process.env.DAILY_REPORT_TIMEZONE || 'Africa/Lusaka'
+    DAILY_SEND_TIME: process.env.DAILY_REPORT_TIME || '08:00',
+    TIME_ZONE: process.env.DAILY_REPORT_TIMEZONE || 'Africa/Lusaka',
+    // Single source of truth for the 10 BMF report types (Excel + PDF + admin panel + scheduler share this).
+    REPORT_TYPES: [
+      'daily',
+      'all-loans',
+      'payments-today',
+      'overdue',
+      'defaulters',
+      'monthly-collections',
+      'borrower-statements',
+      'approval-log',
+      'interest-revenue',
+      'repayment-performance',
+      'repayment-tracker'
+    ]
   },
 
   LOGS: {
@@ -43,10 +57,11 @@ PORT: Number(process.env.PORT) || 3000,
     ERRORS: 'logs/errors.log'
   },
 
-  TRUSTED_TOKENS: [
-    'LAPTOP-Solojjktitazeckjomerali',
-    'PHONE-Alimercjoezectitjjksolo'
-  ],
+  // Trusted-token bypass REMOVED for public access (was: bare CLI-only strings
+  // that map to no real user). Every authenticated request must now resolve to a
+  // real user in users.json via findUserByDeviceToken. See
+  // docs/plans/public-internet-access.md.
+  TRUSTED_TOKENS: [],
 
   // Routes reachable WITHOUT a device token (deviceAuth skips these). Invite
   // validation must stay public so a prospective borrower can validate their

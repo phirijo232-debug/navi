@@ -727,8 +727,16 @@ function getAllUsers(req, res) {
     const users = getUsers()
       .filter(user => storeId === 'all' || getRecordStoreId(user) === storeId)
       .map(u => {
-      const { password, ...safeUser } = u; // Don't send passwords
-      return safeUser;
+      // SECURITY: strip ALL credential material — password (hash), tokens
+      // (legacy blind credentials), and trustedDevices (LIVE device tokens that
+      // would let anyone reading /users impersonate the user). Keep only a safe
+      // summary (device count + last-seen) for the admin customer directory.
+      const { password, tokens, trustedDevices, ...rest } = u;
+      if (trustedDevices && Array.isArray(trustedDevices) && trustedDevices.length) {
+        rest._trustedDeviceCount = trustedDevices.length;
+        rest._trustedDeviceLastSeen = trustedDevices.map(d => d.lastSeen || d.createdAt).sort().pop();
+      }
+      return rest;
     });
     res.json(users);
   } catch (err) {

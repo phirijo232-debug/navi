@@ -1,0 +1,18 @@
+getTrackingAnalytics :: isAuthorized(req, scope)
+exportTrackingSheet :: isAuthorized(req, scope)
+getUserTracking :: isAuthorized(req, scope)
+getReportSummary :: isAuthorized(req, scope)
+getProfitAnalytics :: isAuthorized(req, scope)
+getDefaulterAnalytics :: isAuthorized(req, scope)
+getOverdueAnalytics :: isAuthorized(req, scope)
+getPaidAnalytics :: isAuthorized(req, scope)
+getPaymentsLedger :: isAdminRole(req.authUser?.role)
+getPaymentsReportExport :: isAdminRole(req.authUser?.role)
+getUserReport :: isAuthorizedUserReport(req, email)
+searchReports :: isAdminRole(req.authUser?.role)
+exportReport :: isAuthorized(req, scope)
+requireAdmin :: isAdminRole(req.authUser?.role)
+getSingleUserReport :: ?
+getAllUsersReport :: ?
+getAnalyticsReport :: ?
+getTrackingSheet :: isAuthorized(req, scope)

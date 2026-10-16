@@ -76,6 +76,7 @@ POST /loans/:id/action
 POST /loans/payment
 POST /loans/:id/notify-overdue
 POST /loans/notify-overdue
+POST /uploads/sign
 GET  /reports/user
 GET  /reports/all
 GET  /reports/analytics
@@ -262,6 +263,12 @@ Announcements (POST /admin/announcements)
   admin.html must hide the announcement button from role 'admin' to match.
 HR / Employee Securities (GET/PATCH /hr/employees)
   admin + franchise_admin only.
+FIELD HYGIENE (GET /users — public-facing even when authed): strip ALL
+  credential material — password (hash), tokens (legacy blind credentials),
+  AND trustedDevices (LIVE device tokens — leaking these lets any admin-panel
+  reader impersonate the user). Return only safe summaries (device count +
+  last-seen). Never return `safeUser` after destructuring to `...rest` —
+  return `rest` or the tokens ride along untouched.
 
 ## ExecPlans
 When implementing complex features or significant changes, create an ExecPlan

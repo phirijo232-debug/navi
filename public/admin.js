@@ -8,6 +8,30 @@ let activeLoanFilter = 'all';
 let activeTimeframeFilter = 'all';
 let customTimeframeFrom = '';
 let customTimeframeTo = '';
+
+// Report panel state
+let reportScope = 'buraza';
+let reportType = 'daily';
+let reportFrom = '';
+let reportTo = '';
+
+const REPORT_TYPE_LABELS = {
+  daily: 'Daily',
+  'all-loans': 'All Loans',
+  'payments-today': 'Payments',
+  overdue: 'Overdue',
+  defaulters: 'Defaulters',
+  profits: 'Profit / Interest'
+};
+
+const REPORT_ENDPOINT = {
+  daily: 'summary',
+  'all-loans': 'summary',
+  'payments-today': 'paid',
+  overdue: 'overdue',
+  defaulters: 'defaulters',
+  profits: 'profits'
+};
 let storeFeedback = [];
 let activeFeedbackFilter = 'all';
 let portfolioLoans = [];
@@ -195,6 +219,40 @@ function getStoreHeaders(extraHeaders = {}) {
   };
 }
 
+// ─── Signed image links (?token= removed for public access) ──────────────────
+// <a> clicks cannot attach the x-device-token header, so on click we ask the
+// server for a 10-minute signed URL (POST /uploads/sign — ownership-checked
+// server-side) and open that. The device token never appears in a URL.
+async function openSignedUpload(filename) {
+  if (!filename) return;
+  try {
+    const res = await fetch('/uploads/sign', {
+      method: 'POST',
+      headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ filename })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.url) {
+      console.error('Signed link failed:', data.error || res.status);
+      return;
+    }
+    const opened = window.open(data.url, '_blank');
+    if (!opened) window.location.assign(data.url); // popup blocked → same tab
+  } catch (err) {
+    console.error('Signed link error:', err);
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const target = event.target;
+  const link = target && typeof target.closest === 'function'
+    ? target.closest('[data-upload-filename]')
+    : null;
+  if (!link) return;
+  event.preventDefault();
+  openSignedUpload(link.getAttribute('data-upload-filename'));
+});
+
 function ensureAdminAccess() {
   const token = getDeviceToken();
   const role = localStorage.getItem('userRole');
@@ -239,7 +297,7 @@ async function fetchUsers() {
 
     allUsers = await response.json();
     applyUserFilterAndSort();
-    await Promise.all([fetchStoreReport(), fetchStoreFeedback(), fetchNewRequests()]);
+    await Promise.all([fetchReportData(), fetchStoreFeedback(), fetchNewRequests()]);
   } catch (err) {
     console.error(err);
     setAuthMessage('Access denied or session expired. Please login again.', true);
@@ -337,29 +395,78 @@ async function notifySelectedUser() {
   }
 }
 
-async function fetchStoreReport() {
+async function fetchReportData() {
   const metrics = document.getElementById('storeReportMetrics');
+  const table = document.getElementById('storeReportTable');
+  const note = document.getElementById('storeReportNote');
+  metrics.innerHTML = '<p>Loading report summary...</p>';
+  table.innerHTML = '';
+  note.textContent = '';
+
   try {
-    const response = await fetch('/reports/buraza/summary', { headers: getStoreHeaders() });
+    const scope = reportScope;
+    const endpoint = REPORT_ENDPOINT[reportType] || 'summary';
+    const qs = new URLSearchParams();
+    if (reportFrom) qs.set('from', reportFrom);
+    if (reportTo) qs.set('to', reportTo);
+    const url = `/reports/${scope}/${endpoint}${qs.toString() ? '?' + qs.toString() : ''}`;
+
+    const response = await fetch(url, { headers: getStoreHeaders() });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Unable to load BMF reports.');
-    const summary = data.summary;
+
+    // --- Render summary metrics ---
+    const summary = data.summary || {};
     const values = [
-      ['Cash collected', formatCurrency(summary.cashCollected)],
-      ['Gross interest booked', formatCurrency(summary.grossInterestBooked)],
-      ['Outstanding', formatCurrency(summary.totalOutstanding)],
-      ['Pending payments', String(summary.pendingPayments)],
-      ['Partial payments', String(summary.partialPayments)],
-      ['Settled loans', String(summary.settledLoans)],
-      ['Defaulters', String(summary.defaulters)],
-      ['Loyal customers', String(summary.loyalCustomers)]
+      ['Total loans', String(summary.totalLoans || summary.settledCount || summary.overdue || summary.defaulters || summary.active || 0)],
+      ['Cash collected', formatCurrency(summary.cashCollected || summary.totalCollected || 0)],
+      ['Gross interest booked', formatCurrency(summary.grossInterestBooked || summary.totalInterestBooked || 0)],
+      ['Outstanding', formatCurrency(summary.totalOutstanding || 0)],
+      ['Pending payments', String(summary.pendingPayments || 0)],
+      ['Defaulters', String(summary.defaulters || 0)],
+      ['Settled loans', String(summary.settledLoans || summary.paid || 0)],
+      ['Loyal customers', String(summary.loyalCustomers || 0)]
     ];
     metrics.innerHTML = values.map(([label, value]) => `
       <div class="report-metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>
     `).join('');
-    document.getElementById('storeReportNote').textContent = data.note || '';
+    if (data.note) note.textContent = data.note;
+
+    // --- Render loan table ---
+    const loans = data.loans || data.byStatus ? Object.values(data.byStatus).flat() : [];
+    if (loans && loans.length) {
+      const headers = ['Receipt', 'Customer', 'Product', 'Status', 'Principal (K)', 'Interest (K)', 'Paid (K)', 'Outstanding (K)', 'Due Date'];
+      const rows = loans.map(loan => {
+        const statusClass = 'status-' + String(loan.status || loan.businessStatus || 'unknown').toLowerCase().replace(/\s+/g, '-');
+        return `
+          <tr>
+            <td>${escapeHtml(loan.receiptNumber || loan.id || '')}</td>
+            <td>${escapeHtml(loan.customer || loan.email || '')}</td>
+            <td>${escapeHtml(loan.product || '')}</td>
+            <td><span class="status-tag ${statusClass}">${escapeHtml(loan.status || loan.businessStatus || 'unknown')}</span></td>
+            <td>${formatCurrency(loan.amount || loan.principal || 0)}</td>
+            <td>${formatCurrency(loan.interestBooked || loan.interestAmount || 0)}</td>
+            <td>${formatCurrency(loan.totalCollected || loan.paidTotal || 0)}</td>
+            <td>${formatCurrency(loan.outstanding || 0)}</td>
+            <td>${escapeHtml(loan.dueDate || '')}</td>
+          </tr>
+        `;
+      }).join('');
+      table.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr>${headers.map(h => `<th style="text-align:left;padding:8px;border:1px solid rgba(255,255,255,0.12);">${escapeHtml(h)}</th>`).join('')}</tr>
+          </thead>
+          <tbody>${rows.map(r => `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">${r}</tr>`).join('')}</tbody>
+        </table>
+      `;
+    } else {
+      table.innerHTML = '<p style="opacity:0.7;">No loan records found for the selected scope and period.</p>';
+    }
   } catch (err) {
     metrics.innerHTML = `<p>${escapeHtml(err.message || 'Unable to load BMF reports.')}</p>`;
+    table.innerHTML = '';
+    note.textContent = '';
   }
 }
 
@@ -419,12 +526,15 @@ async function updateStoreFeedback(id, status) {
   }
 }
 
-async function downloadStoreReport(format) {
+async function downloadReport(format) {
   const note = document.getElementById('storeReportNote');
   try {
-    const response = await fetch(`/reports/buraza/export?format=${encodeURIComponent(format)}`, {
-      headers: getStoreHeaders()
-    });
+    const qs = new URLSearchParams({ format });
+    if (reportFrom) qs.set('from', reportFrom);
+    if (reportTo) qs.set('to', reportTo);
+    const endpoint = REPORT_ENDPOINT[reportType] || 'summary';
+    const url = `/reports/${reportScope}/${endpoint}?${qs.toString()}`;
+    const response = await fetch(url, { headers: getStoreHeaders() });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       throw new Error(data.error || 'Unable to download report.');
@@ -433,7 +543,7 @@ async function downloadStoreReport(format) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `buraza-ledger-${new Date().toISOString().slice(0, 10)}.${format}`;
+    link.download = `BMF-${reportScope}-${reportType}-${new Date().toISOString().slice(0, 10)}.${format}`;
     link.click();
     URL.revokeObjectURL(url);
     note.textContent = 'Report downloaded.';
@@ -560,20 +670,19 @@ function renderLoanDetails(loan) {
       `).join('')
     : '<li>No status history.</li>';
   const payments = Array.isArray(loan.payments) ? loan.payments : [];
-  const fileUrl = (name) => {
-    const token = localStorage.getItem('deviceToken') || '';
-    return `/uploads/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}`;
-  };
+  // Placeholder anchors: the click-to-sign listener above fetches a short-lived
+  // signed URL from /uploads/sign at open time (?token= no longer exists).
+  const fileLink = (name) => `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(name)}">`;
   const paymentHistory = payments.length ? payments.map(payment => `
     <li>
       ${formatCurrency(payment.amount)} · ${escapeHtml(payment.mode || 'payment')} · ${escapeHtml(formatDate(payment.date))}
       ${payment.note ? `<div>${escapeHtml(payment.note)}</div>` : ''}
-      ${payment.screenshot ? `<a class="proof-link" href="${fileUrl(payment.screenshot)}" target="_blank" rel="noopener">View proof of payment</a>` : '<span>No proof attached</span>'}
+      ${payment.screenshot ? `${fileLink(payment.screenshot)}View proof of payment</a>` : '<span>No proof attached</span>'}
     </li>
   `).join('') : '<li>No payments recorded.</li>';
-  const proofLinks = [loan.collateralFront, loan.collateralBack].filter(Boolean).map((filename, index) => `
-    <a class="proof-link" href="${fileUrl(filename)}" target="_blank" rel="noopener">View collateral ${index ? 'back' : 'front'}</a>
-  `).join('');
+  const proofLinks = [loan.collateralFront, loan.collateralBack].filter(Boolean).map((filename, index) =>
+    `${fileLink(filename)}View collateral ${index ? 'back' : 'front'}</a>`
+  ).join('');
   const outstanding = Number(loan.outstanding || 0);
   // Payments: admin or store_admin (both may record money). Decisions: the
   // assigned store_admin only — mirrors the backend's franchise-scoping gate.
@@ -1569,8 +1678,54 @@ document.getElementById('announcementBtn').addEventListener('click', () => {
   document.getElementById('announcementModal').style.display = 'block';
 });
 document.querySelectorAll('[data-report-format]').forEach(button => {
-  button.addEventListener('click', () => downloadStoreReport(button.dataset.reportFormat));
+  button.addEventListener('click', () => downloadReport(button.dataset.reportFormat));
 });
+
+// ─── Report panel: scope / type / period / refresh ──────────────────────────
+const reportScopeEl = document.getElementById('reportScope');
+const reportFromEl = document.getElementById('reportFrom');
+const reportToEl = document.getElementById('reportTo');
+const refreshReportBtn = document.getElementById('refreshReportBtn');
+
+// Hide franchise-level scope for non-admin roles
+const role = localStorage.getItem('userRole') || '';
+if (reportScopeEl) {
+  const allOption = reportScopeEl.querySelector('option[value="all"]');
+  if (allOption && role !== 'admin' && role !== 'franchise_admin') {
+    allOption.hidden = true;
+    if (reportScope === 'all') reportScope = 'buraza';
+  }
+  reportScopeEl.addEventListener('change', () => {
+    reportScope = reportScopeEl.value;
+    fetchReportData();
+  });
+}
+
+document.querySelectorAll('[data-report-type]').forEach(button => {
+  button.addEventListener('click', () => {
+    reportType = button.dataset.reportType;
+    document.querySelectorAll('[data-report-type]').forEach(b => {
+      b.classList.toggle('active', b === button);
+    });
+    fetchReportData();
+  });
+});
+
+if (reportFromEl) {
+  reportFromEl.addEventListener('change', () => {
+    reportFrom = reportFromEl.value;
+    fetchReportData();
+  });
+}
+if (reportToEl) {
+  reportToEl.addEventListener('change', () => {
+    reportTo = reportToEl.value;
+    fetchReportData();
+  });
+}
+if (refreshReportBtn) {
+  refreshReportBtn.addEventListener('click', () => fetchReportData());
+}
 document.querySelectorAll('[data-feedback-filter]').forEach(button => {
   button.addEventListener('click', () => {
     activeFeedbackFilter = button.dataset.feedbackFilter || 'all';

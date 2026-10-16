@@ -1,0 +1,22 @@
+> git branch --contains 1d1c052
+
+
+> git show 1d1c052 --stat --oneline
+1d1c052 untracked files on cline checkpoint
+ _tests_out.txt                       |  Bin 0 -> 6184 bytes
+ boot-check.txt                       |  Bin 0 -> 14 bytes
+ check-auth.txt                       |  Bin 0 -> 14 bytes
+ check-node.txt                       |  Bin 0 -> 20 bytes
+ check-server.txt                     |  Bin 0 -> 14 bytes
+ controllers/reportSpec.js            | 1393 ++++++++++++++++++++++++++++++++
+ controllers/reportSpec.js.bak        | 1438 ++++++++++++++++++++++++++++++++++
+ docs/plans/public-internet-access.md |   80 ++
+ gates-dump.txt                       |   18 +
+ middleware/signedUrl.js              |   60 ++
+ test-out.txt                         |  Bin 0 -> 60252 bytes
+ test-run.txt                         |  Bin 0 -> 60262 bytes
+ tools/show.js                        |    8 +
+ 13 files changed, 2997 insertions(+)
+
+
+extracted checkpoint_reportSpec.js bytes=61947

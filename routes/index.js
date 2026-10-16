@@ -35,6 +35,7 @@ const {
 } = require('../controllers/reportController');
 
 const { healthRateLimiter, getServerMode, setServerMode, isFranchiseManager } = require('../middleware/security');
+const { signUpload } = require('../controllers/fileController');
 
 router.get('/', (req, res) => res.send('Navi Server is running!'));
 
@@ -81,6 +82,12 @@ router.post('/loans/:id/notify-overdue', sendLoanNotification);
 router.post('/loans/payment', upload.fields([
   { name: 'screenshot', maxCount: 1 }
 ]), recordPayment);
+
+// Signed image links: issues a 10-minute HMAC URL for ONE file after the
+// ownership/store-scope check passes (serveFile verifies the signature). This
+// replaces the old ?token= image links — the device token never enters a URL.
+// Static path, no params, so ordering is safe here.
+router.post('/uploads/sign', signUpload);
 
 router.post('/signup', requestSignup);
 router.post('/signup/confirm', confirmSignup);

@@ -1,0 +1,77 @@
+===== controllers/reportSpec.js (1310) =====
+buildReportDataset: 680
+function buildWorkbook: 1148
+function searchBorrowers: 87
+function buildBusinessPdf: 899, 962
+function buildTablePdf: 848
+function buildDailyWorkbook: 625
+module.exports: 677
+const REPORT_TYPES: 693
+styleSheetTitle: —
+styleBanner: —
+USERS_FILE: 24, 88, 560
+THIN_BORDER: 572, 586, 607, 1116, 1123, 1130
+monthLabels =: —
+const byCustomer: —
+allLoanRows =: —
+overdueRows =: —
+defaulterRows =: —
+borrowerStatements =: —
+performanceRows =: 1167
+loansInScope: 1189, 1245, 1271
+monthlyRows =: —
+const summary =: 664, 1188
+approvalLogRows =: 1231
+revenueMonthly =: 1244
+
+===== controllers/reportSpec.js.bak (1439) =====
+buildReportDataset: 471
+function buildWorkbook: 1289
+function searchBorrowers: 87
+function buildBusinessPdf: 861
+function buildTablePdf: 729
+function buildDailyWorkbook: 1145
+module.exports: 468
+const REPORT_TYPES: 484, 615
+styleSheetTitle: 1358
+styleBanner: 1367
+USERS_FILE: 24, 88
+THIN_BORDER: 1341, 1348, 1355
+monthLabels =: 108
+const byCustomer: 128
+allLoanRows =: —
+overdueRows =: —
+defaulterRows =: —
+borrowerStatements =: 134
+performanceRows =: 176
+loansInScope: 120, 129, 198, 1378, 1403
+monthlyRows =: 119
+const summary =: 197, 1308
+approvalLogRows =: 243
+revenueMonthly =: 1377
+
+===== checkpoint_reportSpec.js (1394) =====
+buildReportDataset: 764
+function buildWorkbook: 1232
+function searchBorrowers: 87
+function buildBusinessPdf: 983, 1046
+function buildTablePdf: 932
+function buildDailyWorkbook: 709
+module.exports: 761
+const REPORT_TYPES: 777
+styleSheetTitle: —
+styleBanner: —
+USERS_FILE: 24, 88, 644
+THIN_BORDER: 656, 670, 691, 1200, 1207, 1214
+monthLabels =: 120
+const byCustomer: 157
+allLoanRows =: —
+overdueRows =: —
+defaulterRows =: —
+borrowerStatements =: 163
+performanceRows =: 1251
+loansInScope: 132, 158, 1273, 1329, 1355
+monthlyRows =: 131
+const summary =: 748, 1272
+approvalLogRows =: 1315
+revenueMonthly =: 1328

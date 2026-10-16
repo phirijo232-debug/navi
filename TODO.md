@@ -24,8 +24,9 @@
 - [ ] Add UI polish for status badges, summary cards, and error messages for faster admin use.
 - [ ] Add a strict release checklist before deployment: env checks, login flow, invite checks, and data integrity checks.
 - [x] Partial `?token=` hardening (LAN mitigation): redact the device token from `logs/access.log`, set `Cache-Control: no-store` + `Referrer-Policy: no-referrer` on image responses, and log a warning when a file is opened via the URL token.
-- [ ] DEPLOYMENT GATE (blocking): do NOT set `PUBLIC_DEPLOY=true` / bind publicly until signed URLs replace the `?token=` image fallback — `server.js` refuses to boot in public mode until the image-serving path is strengthened to the fullest (signed URLs + full security pass).
-- [ ] Deployment security: replace the `?token=` image fallback with short-lived signed URLs — the device token currently appears in the URL when a customer opens a KYC/payment image (logged by routers, browsers, and proxy servers; acceptable on the LAN only, must be fixed before any public deploy).
+- [x] Deployment gate (blocking): `server.js` refuses `PUBLIC_DEPLOY=true` boot unless `SIGNING_SECRET` is set AND `MASTER_KEY` is a non-default value.
+- [x] Deployment security: replaced the `?token=` image fallback with short-lived signed URLs — `POST /uploads/sign` issues a 10-minute HMAC link only after the ownership/store check passes; `serveFile` rejects raw `?token=` with 403. The device token no longer appears in any URL.
+- [ ] PUBLIC_DEPLOY go-live: set `SIGNING_SECRET` (long random) in `.env`, then set `PUBLIC_DEPLOY=true` and boot behind one reverse proxy / ngrok (`app.set('trust proxy', 1)` already in place).
 
 
 

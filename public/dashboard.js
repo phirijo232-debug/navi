@@ -132,6 +132,41 @@ function renderAdminLoanList() {
   }
 }
 
+// ─── Signed image links (?token= removed for public access) ──────────────────
+// <a> clicks cannot attach the x-device-token header, so on click we ask the
+// server for a 10-minute signed URL (POST /uploads/sign — ownership-checked
+// server-side) and open that. The device token never appears in a URL.
+async function openSignedUpload(filename) {
+  if (!filename) return;
+  const token = localStorage.getItem('deviceToken') || '';
+  try {
+    const res = await fetch('/uploads/sign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-device-token': token },
+      body: JSON.stringify({ filename })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.url) {
+      console.error('Signed link failed:', data.error || res.status);
+      return;
+    }
+    const opened = window.open(data.url, '_blank');
+    if (!opened) window.location.assign(data.url); // popup blocked → same tab
+  } catch (err) {
+    console.error('Signed link error:', err);
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const target = event.target;
+  const link = target && typeof target.closest === 'function'
+    ? target.closest('[data-upload-filename]')
+    : null;
+  if (!link) return;
+  event.preventDefault();
+  openSignedUpload(link.getAttribute('data-upload-filename'));
+});
+
 function renderAdminReviewDetail(loan) {
   const detail = document.getElementById('adminLoanDetail');
   if (!loan) {
@@ -141,12 +176,11 @@ function renderAdminReviewDetail(loan) {
 
   const frontName = loan.collateralFront ? loan.collateralFront.replace(/^[^\-]+-/, '') : '';
   const backName = loan.collateralBack ? loan.collateralBack.replace(/^[^\-]+-/, '') : '';
-  const fileUrl = (name) => {
-    const token = localStorage.getItem('deviceToken') || '';
-    return `/uploads/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}`;
-  };
-  const frontLink = loan.collateralFront ? `<a href="${fileUrl(loan.collateralFront)}" target="_blank" rel="noreferrer" class="attachment-btn">View front image</a>` : '<span class="attachment-empty">No front image</span>';
-  const backLink = loan.collateralBack ? `<a href="${fileUrl(loan.collateralBack)}" target="_blank" rel="noreferrer" class="attachment-btn">View back image</a>` : '<span class="attachment-empty">No back image</span>';
+  // Placeholder anchors: the click-to-sign listener above fetches a short-lived
+  // signed URL from /uploads/sign at open time (?token= no longer exists).
+  const fileLink = (name) => `<a href="#" data-upload-filename="${String(name).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}" class="attachment-btn">`;
+  const frontLink = loan.collateralFront ? `${fileLink(loan.collateralFront)}View front image</a>` : '<span class="attachment-empty">No front image</span>';
+  const backLink = loan.collateralBack ? `${fileLink(loan.collateralBack)}View back image</a>` : '<span class="attachment-empty">No back image</span>';
   const statusKey = getLoanStatusKey(loan);
   const statusLabel = formatStatus(loan.businessStatus || loan.status || 'pending');
   const activityLog = Array.isArray(loan.statusHistory) && loan.statusHistory.length

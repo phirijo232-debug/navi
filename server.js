@@ -16,18 +16,28 @@ const { errorAudit, captureOrigin, appendAudit } = require('./middleware/errorAu
 const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || 'phirii26';
 const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
 
-// DEPLOYMENT GATE (blocking): public deployment is forbidden until the ?token=
-// image fallback is replaced with short-lived signed URLs. Set PUBLIC_DEPLOY=true
-// ONLY after that hardening is done — until then the server refuses to boot so an
-// insecure config can never go live. (See TODO.md + docs/plans/kyc-hardening.md.)
+// DEPLOYMENT GATE (blocking): public deployment requires (a) signed-URL image
+// serving — already implemented in middleware/signedUrl.js + fileController —
+// and (b) hardened secrets: MASTER_KEY (vault/shutdown key, must no longer fall
+// back to the hardcoded default) and SIGNING_SECRET (image-link signing; without
+// it links die on every restart). Refuse to boot so a weak config can't go live.
 if (String(process.env.PUBLIC_DEPLOY).toLowerCase() === 'true') {
-  console.error('Refusing to start: PUBLIC_DEPLOY=true requires signed-URL image serving (the ?token= fallback is LAN-only).');
-  console.error('Complete the signed-URL hardening and full security pass before enabling public mode.');
-  process.exit(1);
+  const missing = [];
+  if (!process.env.MASTER_KEY || process.env.MASTER_KEY === 'phirii26') missing.push('MASTER_KEY');
+  if (!process.env.SIGNING_SECRET) missing.push('SIGNING_SECRET');
+  if (missing.length) {
+    console.error(`Refusing to start: PUBLIC_DEPLOY=true needs ${missing.join(' and ')} set in .env (long random values).`);
+    process.exit(1);
+  }
 }
 
 const app = express();
 app.disable('x-powered-by');
+// PUBLIC: sit behind one reverse proxy (nginx/Caddy/cloudflare). Trust exactly
+// one hop so req.ip / X-Forwarded-For resolve to the REAL client IP — rate
+// limiting and audit logs are useless if everyone looks like the proxy. Never
+// set `true` (trusts any spoofed X-Forwarded-For from the open internet).
+app.set('trust proxy', 1);
 
 app.use(helmet({
   hsts: false,
@@ -57,19 +67,22 @@ app.use((req, res, next) => {
   next();
 });
 
-// General limiter still skips localhost so the dashboard's frequent status
-// polling (every 5s) is never throttled.
+// General limiter skips localhost AND /status: the dashboard polls status every
+// 5s (per tab, forever) — on a public IP that would 429 itself away. /status is
+// a tiny read-only public payload (PUBLIC_PATHS), so exempt it explicitly;
+// auth-sensitive endpoints keep their stricter limits above.
 app.use((req, res, next) => {
   const isLocalhost = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip);
-  if (isLocalhost) return next();
+  if (isLocalhost || req.path === '/status') return next();
   rateLimiter(req, res, next);
 });
 
 // Uploaded KYC / proof-of-payment images: served ONLY through the authenticated,
 // ownership-checked handler below — NOT via the public static mount. Registered
 // before express.static so a raw /uploads/<file> request never bypasses auth.
-// (Auth lives here, ahead of deviceAuth, because static is also ahead of it;
-// the handler resolves the user from the header or a scoped ?token=.)
+// Accepts either an x-device-token header user or a short-lived ?exp=&sig=
+// signed link (public PCs open images via <a>, which cannot send headers).
+// Raw ?token= is rejected inside serveFile.
 app.get('/uploads/:filename', serveFile);
 
 app.use(express.static(path.join(__dirname, 'public')));

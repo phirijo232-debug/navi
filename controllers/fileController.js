@@ -4,6 +4,7 @@ const { getLoansData } = require('./loanController');
 const { findUserByDeviceToken } = require('../middleware/security');
 const { canAccessRecord, isAdminRole } = require('../middleware/storeScope');
 const { logError } = require('../middleware/logger');
+const { verifyUploadSig, signUploadQuery, TTL_SECONDS } = require('../middleware/signedUrl');
 
 const UPLOAD_DIR = path.join(__dirname, '../public/uploads');
 const ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
@@ -20,12 +21,14 @@ function safeFilename(raw) {
   return name;
 }
 
-// Resolve the requester: prefer the deviceAuth-populated req.authUser, else fall
-// back to a header token or a scoped ?token= (needed because <a> navigation
-// cannot attach an x-device-token header).
+// Resolve the requester: prefer the deviceAuth-populated req.authUser, else the
+// x-device-token header. <a> navigation cannot attach headers, so files are
+// opened through short-lived signed URLs (see signUpload) — raw ?token= is
+// rejected (it leaked the session into URLs/logs/proxies).
 function resolveAuthUser(req) {
   if (req.authUser && req.authUser.email) return req.authUser;
-  const token = req.headers['x-device-token'] || req.query?.token;
+  const token = req.headers['x-device-token'];
+  if (!token) return null;
   return findUserByDeviceToken(token);
 }
 
@@ -55,18 +58,31 @@ function serveFile(req, res) {
     if (!abs.startsWith(UPLOAD_DIR + path.sep) || !fs.existsSync(abs)) {
       return res.status(404).send('Not found.');
     }
+    // Raw ?token= device tokens are rejected — the session must never travel in
+    // a URL (it lands in router/browser/proxy logs). Open via POST /uploads/sign.
+    if (req.query && req.query.token !== undefined) {
+      logError(`FILE ACCESS BLOCKED: raw ?token= rejected for ${filename} from ${req.ip}`);
+      return res.status(403).send('Access denied. Request a signed link instead.');
+    }
+    // Signed-link opening (no header user): possession of a fresh, valid
+    // signature for THIS file authorizes this one open (S3 presigned model).
+    const { exp, sig } = req.query || {};
+    if (exp !== undefined || sig !== undefined) {
+      if (!verifyUploadSig(filename, exp, sig)) {
+        logError(`FILE ACCESS DENIED (bad/expired signature): ${filename} from ${req.ip}`);
+        return res.status(403).send('Access denied. The link is invalid or expired.');
+      }
+      res.set('Cache-Control', 'private, no-store');
+      res.set('Referrer-Policy', 'no-referrer');
+      return res.sendFile(abs);
+    }
     const user = resolveAuthUser(req);
     if (!canViewFile(user, filename)) {
       logError(`FILE ACCESS DENIED: ${filename} for ${user?.email || 'unknown'} from ${req.ip}`);
       return res.status(403).send('Access denied.');
     }
-    // Mitigate URL leakage of the scoped ?token=: never cache the response and
-    // don't leak the URL via Referer. (Full fix = signed URLs before public deploy.)
     res.set('Cache-Control', 'private, no-store');
     res.set('Referrer-Policy', 'no-referrer');
-    if (req.query?.token) {
-      logError(`FILE ACCESS VIA URL TOKEN: ${filename} for ${user?.email || 'unknown'} from ${req.ip} (LAN-only mitigation; replace ?token= with signed URLs before public deploy)`);
-    }
     return res.sendFile(abs);
   } catch (err) {
     logError(`FILE SERVE FAILED: ${err.message}`);
@@ -74,4 +90,29 @@ function serveFile(req, res) {
   }
 }
 
-module.exports = { serveFile, safeFilename, canViewFile };
+// Issue a short-lived signed link for ONE file, only AFTER the caller's
+// ownership/store-scope check passes. Requires the device token in the header
+// (deviceAuth already ran for this route) — req.authUser or header user.
+async function signUpload(req, res) {
+  try {
+    const filename = safeFilename(req.body?.filename || req.query?.filename);
+    if (!filename) {
+      return res.status(400).json({ error: 'Valid filename is required.' });
+    }
+    const user = resolveAuthUser(req);
+    if (!canViewFile(user, filename)) {
+      logError(`SIGNED LINK DENIED: ${filename} for ${user?.email || 'unknown'} from ${req.ip}`);
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+    const { exp, sig } = signUploadQuery(filename);
+    return res.json({
+      url: `/uploads/${encodeURIComponent(filename)}?exp=${exp}&sig=${sig}`,
+      expiresIn: TTL_SECONDS
+    });
+  } catch (err) {
+    logError(`SIGNED LINK FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Unable to sign the file link.' });
+  }
+}
+
+module.exports = { serveFile, signUpload, safeFilename, canViewFile };

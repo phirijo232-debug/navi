@@ -327,6 +327,23 @@
       text-align: center;
       opacity: 0.9;
     }
+    .status-tag {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .status-tag.pending { background: rgba(245,158,11,0.22); color: #fbbf24; }
+    .status-tag.active { background: rgba(34,197,94,0.22); color: #4ade80; }
+    .status-tag.grace { background: rgba(59,130,246,0.22); color: #60a5fa; }
+    .status-tag.defaulted { background: rgba(239,68,68,0.22); color: #f87171; }
+    .status-tag.liquidated { background: rgba(156,163,175,0.22); color: #9ca3af; }
+    .status-tag.paid { background: rgba(16,185,129,0.22); color: #34d399; }
+    .status-tag.declined { background: rgba(234,179,8,0.22); color: #ca8a04; }
+    body.light .status-tag { color: inherit; opacity: 0.95; }
     .loader {
       display: none;
       width: 100%;
@@ -469,11 +486,36 @@
             <p>Payments collected, outstanding balances, settlements, and account status.</p>
           </div>
           <div class="button-row">
-            <button type="button" class="toggle-mode" data-report-format="xlsx">Download Excel</button>
-            <button type="button" class="toggle-mode" data-report-format="pdf">Download PDF</button>
+            <label style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:0.9rem;opacity:0.8;">Scope:</span>
+              <select id="reportScope" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);background:transparent;color:inherit;font-size:14px;">
+                <option value="buraza">Buraza Store</option>
+                <option value="all">All Stores (Franchise)</option>
+              </select>
+            </label>
+            <div class="loan-filters" role="group" aria-label="Report type" style="margin-left:8px;">
+              <button type="button" class="toggle-mode loan-filter active" data-report-type="daily">Daily</button>
+              <button type="button" class="toggle-mode loan-filter" data-report-type="all-loans">All Loans</button>
+              <button type="button" class="toggle-mode loan-filter" data-report-type="payments-today">Payments</button>
+              <button type="button" class="toggle-mode loan-filter" data-report-type="overdue">Overdue</button>
+              <button type="button" class="toggle-mode loan-filter" data-report-type="defaulters">Defaulters</button>
+              <button type="button" class="toggle-mode loan-filter" data-report-type="profits">Profit / Interest</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <label style="font-size:0.85rem;opacity:0.8;">From:</label>
+              <input type="date" id="reportFrom" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);background:transparent;color:inherit;font-size:14px;">
+              <label style="font-size:0.85rem;opacity:0.8;">To:</label>
+              <input type="date" id="reportTo" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);background:transparent;color:inherit;font-size:14px;">
+            </div>
+            <div class="button-row">
+              <button type="button" class="toggle-mode" data-report-format="xlsx">Download Excel</button>
+              <button type="button" class="toggle-mode" data-report-format="pdf">Download PDF</button>
+              <button type="button" class="toggle-mode" id="refreshReportBtn">Refresh</button>
+            </div>
           </div>
         </div>
         <div id="storeReportMetrics" class="report-metrics"><p>Loading report summary...</p></div>
+        <div id="storeReportTable" style="margin-top:16px;overflow-x:auto;"></div>
         <p id="storeReportNote" class="message-text"></p>
       </section>
 

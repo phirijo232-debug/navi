@@ -14,13 +14,16 @@ const rl = readline.createInterface({
 console.log('Navi Server CLI — Type "help" for commands');
 
 function sendToServer(path, method = 'GET', headers = {}) {
+  // TRUSTED_TOKENS is empty for public access — only send the header when a
+  // trusted token actually exists (routes the CLI hits are PUBLIC_PATHS anyway).
+  const defaultToken = config.TRUSTED_TOKENS[0];
   const options = {
     hostname: 'localhost',
     port: config.PORT,
     path,
     method,
     headers: {
-      'x-device-token': config.TRUSTED_TOKENS[0],
+      ...(defaultToken ? { 'x-device-token': defaultToken } : {}),
       ...headers
     }
   };

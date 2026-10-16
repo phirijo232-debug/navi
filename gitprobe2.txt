@@ -1,0 +1,14 @@
+> git log --all -S "buildReportDataset" --oneline
+1d1c052 untracked files on cline checkpoint
+
+
+> git log --all -S "buildRepaymentPerformanceSheet" --oneline
+1d1c052 untracked files on cline checkpoint
+
+
+> git log --all -S "reportSpec" --oneline
+1d1c052 untracked files on cline checkpoint
+
+
+> git grep -l "buildReportDataset" main Published-BMF-Branch backup-e77d090 feature/your-change 2>&1
+ERR: Command failed: git grep -l "buildReportDataset" main Published-BMF-Branch backup-e77d090 feature/your-change 2>&1

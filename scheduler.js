@@ -1,7 +1,7 @@
-// ─── BMF scheduler (Task 5 + Task 7 timing) ──────────────────────────────────
-// node-cron jobs, both anchored to Africa/Lusaka (UTC+2):
-//   23:58 — borrower notifications (countdown 3/2/1/0 + overdue)
-//   23:59 — daily admin report email with PDF + Excel attachments
+// ─── BMF scheduler (daily report job + hygiene jobs, all Africa/Lusaka) ─────
+//   08:00 — Daily Business Report (Excel + PDF) to jophiri223@gmail.com.
+//   This is the ONLY daily report: it replaced the old 23:58 notification pass
+//   and the 23:59 report slot entirely.
 // On startup: if a scheduled day was missed while the server was down, the
 // report is sent once as a catch-up before normal scheduling resumes.
 
@@ -20,7 +20,11 @@ const { buildPaymentsReportData, buildPaymentsExcelReport, buildPaymentsPdfRepor
 
 const TIMEZONE = process.env.DAILY_REPORT_TIMEZONE || 'Africa/Lusaka';
 // Rule 8: report recipient. Env wins; default is the admin mailbox.
+// Daily Business Report runs at DAILY_SEND_TIME (default 08:00) Lusaka.
+// Due-date notifications run separately at 23:58 (loanNotifications middleware).
 const REPORT_RECIPIENT = process.env.DAILY_REPORT_EMAIL || 'jophiri223@gmail.com';
+const DAILY_SEND_TIME = process.env.DAILY_REPORT_TIME || '08:00';
+const [DAILY_REPORT_HOUR, DAILY_REPORT_MINUTE] = DAILY_SEND_TIME.split(':').map(Number);
 const STATE_FILE = dataStore.paths.dailyReportState;
 // Flexible payment tracking sheet time frame - adjust anytime via .env without code changes.
 // Example: PAYMENTS_SHEET_FROM=2026-10-01, PAYMENTS_SHEET_TO=2026-10-31 (empty = all time).
@@ -368,9 +372,9 @@ function startScheduler() {
       .catch(err => logBreakage('scheduler.js', 'cron:notifications', err, 'SCHEDULER NOTIFICATIONS FAILED'));
   }, { timezone: TIMEZONE });
 
-  // Task 5 — daily report at 23:59. Guarded so a morning catch-up + evening
-  // cron never double-sends the same day's report.
-  cron.schedule('59 23 * * *', () => {
+  // Task 5 — daily report at DAILY_SEND_TIME (default 08:00 Lusaka). Guarded so
+  // a morning catch-up + scheduled cron never double-sends the same day's report.
+  cron.schedule(`${DAILY_REPORT_MINUTE} ${DAILY_REPORT_HOUR} * * *`, () => {
     const today = lusakaDate();
     if (readState().lastSentDate >= today) {
       console.log(`[scheduler] daily report for ${today} already sent — skipping duplicate run`);
@@ -394,7 +398,7 @@ function startScheduler() {
 
   catchUpMissedReports().catch(err => logBreakage('scheduler.js', 'catchUpMissedReports', err, 'SCHEDULER CATCH-UP FAILED'));
   catchUpPaymentsTracking().catch(err => logBreakage('scheduler.js', 'catchUpPaymentsTracking', err, 'SCHEDULER TRACKING CATCH-UP FAILED'));
-  console.log(`[scheduler] started (tz ${TIMEZONE}) — notifications 23:58, report 23:59 → ${REPORT_RECIPIENT}`);
+  console.log(`[scheduler] started (tz ${TIMEZONE}) — notifications 23:58, daily report ${DAILY_SEND_TIME} → ${REPORT_RECIPIENT}`);
 }
 
 module.exports = {

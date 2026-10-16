@@ -1,0 +1,36 @@
+> git branch -a
+* Published-BMF-Branch
+  backup-e77d090
+  feature/your-change
+  main
+  remotes/origin/HEAD -> origin/main
+  remotes/origin/Published-BMF-Branch
+  remotes/origin/feature/your-change
+  remotes/origin/main
+
+
+> git stash list
+
+
+> git log --all --oneline -- controllers/reportSpec.js
+
+
+> git log --all --oneline -- "*reportSpec*"
+
+
+> git rev-list --all --count
+194
+
+
+=== backup-like files ===
+C:\NaviServer\controllers\reportSpec.js.bak (69376)
+C:\NaviServer\data\dailyReportState.json.bak (34)
+C:\NaviServer\data\feedback.json.bak (998)
+C:\NaviServer\data\invites.json.bak (180)
+C:\NaviServer\data\loans.json.bak (12984)
+C:\NaviServer\data\notifications.json.bak (1561)
+C:\NaviServer\data\paymentsReportState.json.bak (56)
+C:\NaviServer\data\serverMode.json.bak (65)
+C:\NaviServer\data\users.json.bak (4732)
+C:\NaviServer\logs\access.log.bak (161140)
+C:\NaviServer\logs\errors.log.bak (73894)

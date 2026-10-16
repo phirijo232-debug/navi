@@ -1,0 +1,37 @@
+===== checkpoint_reportSpec.js (1394 lines) =====
+31: function todayIso() {
+35: function isoDate(value) {
+41: function formatKwacha(value) {
+46: function formatDateDDMMYYYY(value) {
+53: function formatDateDB(value) {
+58: function urgencyLabel(value) {
+64: function displayStatus(loan, today) {
+79: function resolveScope(req) {
+87: function searchBorrowers(q, scope) {
+194: function buildRepaymentPerformanceSheet(dataset) {
+242: function buildLoanApprovalLogSheet(dataset) {
+286: function buildInterestRevenueSheet(dataset) {
+330: function buildMonthlyCollectionsSheet(dataset) {
+374: function buildBorrowerStatementsSheet(dataset) {
+419: function buildOverdueSheet(dataset) {
+465: function buildDefaultersSheet(dataset) {
+510: function buildAllLoansSheet(dataset) {
+563: function buildPaymentsTodaySheet(dataset) {
+607:     // ── Sheets 2–10: full workbooks ───────────────────────────────────────
+630:   } else if (type === 'borrower-statements') {
+709: function buildDailyWorkbook(dataset) {
+734:   if (type === 'daily-report') {
+761: module.exports = {
+775: // ─── Report registry ──────────────────────────────────────────────────────────
+777: const REPORT_TYPES = {
+892: function buildEmailSummary(type, dataset) {
+932: function buildTablePdf(dataset, type, reportDate) {
+983: function buildBusinessPdf(dataset, reportDate) {
+1046: function buildBusinessPdf(dataset, reportDate) {
+1112: function pdfToBuffer(doc) {
+1122: function letterhead(doc, title, subtitle, meta) {
+1140: function drawTable(doc, columns, rows, pageWidth) {
+1202: function setHeaderCell(cell, text, opts = {}) {
+1210: function setDataCell(cell, value, opts = {}) {
+1217: function dataProductName(type) {
+1232: function buildWorkbook(dataset, type) {

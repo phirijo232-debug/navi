@@ -1,0 +1,146 @@
+===== controllers/reportSpec.js (1310 lines) =====
+31: function todayIso() {
+33: }
+35: function isoDate(value) {
+39: }
+41: function formatKwacha(value) {
+44: }
+46: function formatDateDDMMYYYY(value) {
+51: }
+53: function formatDateDB(value) {
+55: }
+58: function urgencyLabel(value) {
+61: }
+64: function displayStatus(loan, today) {
+76: }
+79: function resolveScope(req) {
+84: }
+87: function searchBorrowers(q, scope) {
+156: }
+158: function buildLoanApprovalLogSheet(dataset) {
+200: }
+202: function buildInterestRevenueSheet(dataset) {
+244: }
+246: function buildMonthlyCollectionsSheet(dataset) {
+288: }
+290: function buildBorrowerStatementsSheet(dataset) {
+333: }
+335: function buildOverdueSheet(dataset) {
+379: }
+381: function buildDefaultersSheet(dataset) {
+424: }
+426: function buildAllLoansSheet(dataset) {
+477: }
+479: function buildPaymentsTodaySheet(dataset) {
+521: }
+523:   if (type === 'repayment-performance') {
+546:   } else if (type === 'borrower-statements') {
+623: }
+625: function buildDailyWorkbook(dataset) {
+647:   return wb;
+648: }
+650:   if (type === 'daily-report') {
+677: module.exports = {
+689: };
+691: // ─── Report registry ──────────────────────────────────────────────────────────
+693: const REPORT_TYPES = {
+804: };
+808: function buildEmailSummary(type, dataset) {
+820: }
+845: }
+848: function buildTablePdf(dataset, type, reportDate) {
+897: }
+899: function buildBusinessPdf(dataset, reportDate) {
+962: function buildBusinessPdf(dataset, reportDate) {
+1028: function pdfToBuffer(doc) {
+1036: }
+1038: function letterhead(doc, title, subtitle, meta) {
+1054: }
+1056: function drawTable(doc, columns, rows, pageWidth) {
+1094: }
+1118: function setHeaderCell(cell, text, opts = {}) {
+1124: }
+1126: function setDataCell(cell, value, opts = {}) {
+1131: }
+1133: function dataProductName(type) {
+1146: }
+1148: function buildWorkbook(dataset, type) {
+1225: }
+1304: }
+1309: }
+
+===== controllers/reportSpec.js.bak (1439 lines) =====
+31: function todayIso() {
+33: }
+35: function isoDate(value) {
+39: }
+41: function formatKwacha(value) {
+44: }
+46: function formatDateDDMMYYYY(value) {
+51: }
+53: function formatDateDB(value) {
+55: }
+58: function urgencyLabel(value) {
+61: }
+64: function displayStatus(loan, today) {
+76: }
+79: function resolveScope(req) {
+84: }
+87: function searchBorrowers(q, scope) {
+234: }
+256: function buildRepaymentPerformanceSheet(dataset) {
+302: }
+304: function buildLoanApprovalLogSheet(dataset) {
+346: }
+348: function buildInterestRevenueSheet(dataset) {
+390: }
+392: function buildMonthlyCollectionsSheet(dataset) {
+434: }
+436: function buildBorrowerStatementsSheet(dataset) {
+468: module.exports = {
+480: };
+482: // ─── Report registry ──────────────────────────────────────────────────────────
+484: const REPORT_TYPES = {
+595: };
+599: function buildEmailSummary(type, dataset) {
+611: }
+613: // ─── Report registry ──────────────────────────────────────────────────────────
+615: const REPORT_TYPES = {
+726: };
+729: function buildTablePdf(dataset, type, reportDate) {
+778: }
+859: }
+861: function buildBusinessPdf(dataset, reportDate) {
+928: function pdfToBuffer(doc) {
+936: }
+938: function letterhead(doc, title, subtitle, meta) {
+954: }
+956: function drawTable(doc, columns, rows, pageWidth) {
+995: }
+1008: }
+1010: function buildDefaultersSheet(dataset) {
+1053: }
+1055: function buildPaymentsTodaySheet(dataset) {
+1097: }
+1099: function buildOverdueSheet(dataset) {
+1143: }
+1145: function buildDailyWorkbook(dataset) {
+1167:   return wb;
+1168: }
+1170: function buildAllLoansSheet(dataset) {
+1221: }
+1272: }
+1274: function dataProductName(type) {
+1287: }
+1289: function buildWorkbook(dataset, type) {
+1294:   if (type === 'daily-report') {
+1343: function setHeaderCell(cell, text, opts = {}) {
+1349: }
+1351: function setDataCell(cell, value, opts = {}) {
+1356: }
+1358: function styleSheetTitle(ws, text, { col = 1, row = 1, span = 8, fontSize = 14, height = 24 } = {}) {
+1365: }
+1367: function styleBanner(ws, text, { col = 1, row = 1, span = 8, height = 30 } = {}) {
+1375: }
+1438: }
+
