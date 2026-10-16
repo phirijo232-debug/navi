@@ -16,7 +16,7 @@ PORT: Number(process.env.PORT) || 3000,
     .split(',')
     .map(email => email.trim().toLowerCase())
     .filter(Boolean),
-  SHUTDOWN_KEY: process.env.SHUTDOWN_KEY || process.env.MASTER_KEY || 'phirii26',
+  SHUTDOWN_KEY: process.env.SHUTDOWN_KEY || process.env.MASTER_KEY || null,
 
   LOAN_STATUSES: {
     PENDING: 'pending',

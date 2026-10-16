@@ -13,7 +13,7 @@ const { ensureDataIntegrity } = require('./middleware/dataStore');
 const { startHealthWatch } = require('./middleware/healthWatch');
 const { errorAudit, captureOrigin, appendAudit } = require('./middleware/errorAudit');
 
-const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || 'phirii26';
+const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || null;
 const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
 
 // DEPLOYMENT GATE (blocking): public deployment requires (a) signed-URL image
@@ -97,7 +97,7 @@ app.post('/vault/request', async (req, res) => {
   try {
     const { password } = req.body || {};
     const submittedKey = password || req.headers['x-admin-key'] || req.headers['x-shutdown-key'];
-    if (!submittedKey || submittedKey !== ADMIN_KEY) {
+    if (!ADMIN_KEY || !submittedKey || submittedKey !== ADMIN_KEY) {
       logError(`VAULT REQUEST BLOCKED — invalid master key from ${req.ip}`);
       return res.status(403).json({ error: 'Invalid master key.' });
     }
@@ -113,7 +113,7 @@ app.post('/vault/authorize', (req, res) => {
   try {
     const { password, otp } = req.body || {};
     const submittedKey = password || req.headers['x-admin-key'] || req.headers['x-shutdown-key'];
-    if (!submittedKey || submittedKey !== ADMIN_KEY) {
+    if (!ADMIN_KEY || !submittedKey || submittedKey !== ADMIN_KEY) {
       return res.status(403).json({ error: 'Invalid master key.' });
     }
     const result = verifyOTP(otp, ADMIN_EMAIL, 'Vault Access');
@@ -129,7 +129,7 @@ app.post('/vault/authorize', (req, res) => {
 
 app.post('/internal-shutdown', (req, res) => {
   const key = req.headers['x-admin-key'] || req.headers['x-shutdown-key'];
-  if (key !== ADMIN_KEY) {
+  if (!ADMIN_KEY || key !== ADMIN_KEY) {
     logError(`UNAUTHORIZED SHUTDOWN ATTEMPT from ${req.ip}`);
     return res.status(403).send('Denied');
   }

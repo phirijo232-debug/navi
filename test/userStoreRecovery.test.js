@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const otpService = require('../middleware/otp');
 const { requestSignup, getAllUsers, createInvite } = require('../controllers/authController');
 
 const USERS_FILE = require('../middleware/dataStore').paths.users;
@@ -26,7 +27,8 @@ async function createInviteToken(email) {
   return res.body.inviteToken;
 }
 
-test('requestSignup can recover when the users store is malformed', async () => {
+test('requestSignup can recover when the users store is malformed', async t => {
+  t.mock.method(otpService, 'sendOTP', async () => '123456');
   const original = fs.readFileSync(USERS_FILE, 'utf8');
   fs.writeFileSync(USERS_FILE, '{"broken":');
 

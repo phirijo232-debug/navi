@@ -430,12 +430,12 @@ async function requestLogin(req, res) {
     const user = users.find(u => u.email === email);
 
     if (!user) {
-      return res.status(400).json({ error: 'Email not found.' });
+      return res.status(400).json({ error: 'Invalid email or password.' });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
-      return res.status(400).json({ error: 'Incorrect password.' });
+      return res.status(400).json({ error: 'Invalid email or password.' });
     }
 
     const otpEmail = String(user.email || '').trim();

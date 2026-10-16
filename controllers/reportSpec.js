@@ -1,679 +1,169 @@
 'use strict';
 
-/**
- * BMF reports engine
- * ─────────────────────────────────────────────────────────────────────────────
- * Builds every report in this project:
- *   - 3 Excel workbooks (single-user tracker / all-users workbook / search)
- *   - PDF books (business cover + table sheets)
- *   - JSON datasets consumed by the API + admin panel
- *
- * Sheet/format rules follow docs/BMF_REPORT_Format_Prompt_v2.md (locked).
- * Unique loan receipt: BMF-YYYYMMDD-XXXX · payment receipt: PAY-YYYYMMDD-XXXX
- * Kwacha: K 3,500.00 · dates DD/MM/YYYY · status names per config.LOAN_STATUSES
- */
-
+// Compatibility facade for the retired report-spec API. The live HTTP routes
+// use reportController.js and the shared BMF report services directly.
 const ExcelJS = require('exceljs');
-const PDFKit = require('pdfkit');
-const path = require('path');
 const config = require('../config');
 const dataStore = require('../middleware/dataStore');
-const { getEnrichedLoans, normalizeStatus } = require('./loanController');
+const { getEnrichedLoans } = require('./loanController');
 const { getRecordStoreId } = require('../middleware/storeScope');
+const R = require('../services/bmfReports');
+const X = require('../services/bmfExcel');
+const P = require('../services/bmfPdf');
 
-const USERS_FILE = dataStore.paths.users;
-const LOANS_FILE = dataStore.paths.loans;
-const REPORT_STATE_FILE = path.join(dataStore.DATA_DIR, 'scheduledReportState.json');
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Today's date in Lusaka (SAST, no DST). */
 function todayIso() {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lusaka', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: config.REPORTS.TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.filter(p => p.type !== 'literal').map(p => [p.type, p.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
-function isoDate(value) {
-  if (!value) return '';
-  const s = String(value).slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+function displayStatus(loan, today = todayIso()) {
+  const status = R.displayStatus(loan, today);
+  const labels = {
+    pending: 'Pending', active: 'Active', overdue: 'Overdue', default: 'Defaulted',
+    repaid: 'Paid', liquidated: 'Liquidated', declined: 'Declined'
+  };
+  return { label: labels[status] || status, group: status };
 }
 
-function formatKwacha(value) {
-  const n = Number(value) || 0;
-  return `K ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function scopedRecords(scope = config.DEFAULT_STORE_ID, reportDate = todayIso()) {
+  const users = dataStore.readJson(dataStore.paths.users, [], Array.isArray);
+  const loans = getEnrichedLoans(reportDate).filter(loan =>
+    scope === 'all' || getRecordStoreId(loan) === scope);
+  return { users: users.filter(user => scope === 'all' || getRecordStoreId(user) === scope), loans };
 }
 
-function formatDateDDMMYYYY(value) {
-  const s = isoDate(value);
-  if (!s) return '';
-  const p = s.split('-');
-  return `${p[2]}/${p[1]}/${p[0]}`;
+function buildReportDataset(scope = config.DEFAULT_STORE_ID, reportDate = todayIso()) {
+  const { users, loans } = scopedRecords(scope, reportDate);
+  const daily = R.dailySummaryRows(loans, users, reportDate);
+  const all = R.allLoansRows(loans, users, reportDate);
+  const payments = R.paymentsTodayRows(loans, users, reportDate);
+  const overdue = R.overdueRows(loans, users, reportDate);
+  const defaulters = R.defaulterRows(loans, users, reportDate);
+  const monthly = R.monthlyCollectionsRows(loans, users, reportDate.slice(0, 7));
+  const statements = R.borrowerStatementRows(loans, users);
+  const approvals = R.approvalLogRows(loans, users);
+  const revenue = R.interestRevenueRows(loans, users, reportDate.slice(0, 7));
+  const performance = R.repaymentPerformanceRows(loans, users, reportDate);
+  return {
+    scope, reportDate, users, loans,
+    summary: {
+      totalLoans: loans.length,
+      activeLoans: loans.filter(loan => ['active', 'grace'].includes(loan.businessStatus)).length,
+      overdueLoans: overdue.rows.length,
+      defaulters: defaulters.rows.length,
+      cashCollected: payments.rows.reduce((sum, row) => sum + Number(row[2] || 0), 0),
+      pendingPayments: loans.filter(loan => Number(loan.outstanding || 0) > 0).length
+    },
+    dailySummaryRows: daily.rows,
+    allLoanRows: all.rows,
+    paymentsTodayRows: payments.rows,
+    overdueRows: overdue.rows,
+    defaulterRows: defaulters.rows,
+    monthlyRows: monthly.rows,
+    borrowerStatements: statements.sections,
+    approvalLogRows: approvals.rows,
+    revenueMonthly: revenue.detail,
+    performanceRows: performance.table,
+    repaymentTracker: null
+  };
 }
 
-function formatDateDB(value) {
-  return isoDate(value) || '';
-}
-
-/** 1..5 → 'VVVVV' style urgency label used on the daily summary + loans sheet */
-function urgencyLabel(value) {
-  const map = { 1: 'Standard', 2: 'Urgent', 3: 'Urgent', 4: 'Emergency', 5: 'Emergency' };
-  return map[String(value)] || 'Standard';
-}
-
-/** Display text shown on the loans / overview sheets, latest history entry wins. */
-function displayStatus(loan, today) {
-  const hist = Array.isArray(loan.statusHistory) && loan.statusHistory.length ? loan.statusHistory : [];
-  const latest = hist.length ? hist[hist.length - 1] : {};
-  const canonical = normalizeStatus(loan.status);
-  const business = loan.businessStatus || canonical;
-  if (canonical === 'defaulted') return { label: 'Defaulted', group: 'defaulted' };
-  if (canonical === 'liquidated') return { label: 'Liquidated', group: 'liquidated' };
-  if (canonical === 'settled') return { label: 'Settled', group: 'settled' };
-  if (canonical === 'pending') return { label: 'Pending', group: 'pending' };
-  const isOver = business === 'active' && isoDate(loan.dueDate) < today;
-  if (isOver) return { label: 'Overdue', group: 'overdue' };
-  return { label: business || canonical, group: canonical };
-}
-
-/** Store-scope for a request: 'buraza', 'franchise' (all stores), or invalid. */
-function resolveScope(req) {
-  const requested = String(req.query.scope || '').trim() || getRecordStoreId(req);
-  if (requested === 'franchise') return 'all';
-  const known = config.STORES.some(s => s.id === requested);
-  return known ? requested : null;
-}
-
-/** /reports/borrowers search: users with role 'user', matched on name/phone/email. */
-function searchBorrowers(q, scope) {
-  const users = require(USERS_FILE);
-  const loans = require(LOANS_FILE);
-  const ql = q.toLowerCase();
-  const customers = [];
-  for (const user of users) {
-    if (user.role !== 'user') continue;
-    const storeOk = !scope || user.storeId === scope;
-    if (!storeOk) continue;
-    const hay = [
-      user.username, user.email, user.phone, user.nrc,
-      ...(Array.isArray(user.aliases) ? user.aliases : [])
-    ].join(' ').toLowerCase();
-    if (!hay.includes(ql)) continue;
-    const customerLoans = (Array.isArray(loans) ? loans : []).filter(l => l.email === user.email);
-    customers.push({
+function searchBorrowers(query, scope = config.DEFAULT_STORE_ID) {
+  const needle = String(query || '').trim().toLowerCase();
+  if (!needle) return [];
+  const { users, loans } = scopedRecords(scope);
+  return users.filter(user => user.role === 'user' && [user.username, user.email, user.phone, user.nrc]
+    .some(value => String(value || '').toLowerCase().includes(needle)))
+    .slice(0, 20)
+    .map(user => ({
       email: user.email,
       username: user.username,
-      storeId: user.storeId,
-    });
-  }
-
-// ── Monthly collections: per-month aggregates ─────────────────────────────
-  const fixedYear = Number(today.slice(0, 4));
-  const ws = new ExcelJS.Worksheet();
-  const columns = [
-    { header: 'Customer', width: 26 }, { header: 'Email', width: 26 }, { header: 'Loan Count', width: 12, align: 'right' },
-    { header: 'Capital Booked', width: 16, align: 'right' }, { header: 'Principal Paid', width: 16, align: 'right' },
-    { header: 'Interest Paid', width: 16, align: 'right' }, { header: 'Outstanding', width: 16, align: 'right' },
-    { header: 'Status', width: 12 }, { header: 'Risk Level', width: 12 }, { header: 'Last Event', width: 14 }
-  ];
-  const startRow = 1;
-  ws.mergeCells(1, startRow, 10, startRow);
-  ws.getCell(1, startRow).value = `Repayment Performance Report — ${dataset.reportDate}`;
-  ws.getCell(1, startRow).font = { name: 'Arial', size: 14, bold: true };
-  ws.getCell(1, startRow).alignment = { horizontal: 'center' };
-  ws.getRow(startRow + 1).height = 6;
-  const headerRow = startRow + 2;
-  for (let i = 0; i < columns.length; i += 1) {
-    const cell = ws.getCell(columns[i].header, headerRow);
-    setHeaderCell(cell, columns[i].header, { align: 'center' });
-  }
-  const dataStart = headerRow + 1;
-  const sorted = [...dataset.performanceRows].sort((a, b) => b.outstanding - a.outstanding);
-  if (!sorted.length) {
-    ws.mergeCells(1, dataStart, 10, dataStart);
-    ws.getCell(1, dataStart).value = 'No performance records available';
-    ws.getCell(1, dataStart).font = { name: 'Arial', size: 11, italic: true };
-    ws.getCell(1, dataStart).alignment = { horizontal: 'center' };
-  } else {
-    for (let i = 0; i < sorted.length; i += 1) {
-      const row = sorted[i];
-      const values = [
-        row.email, row.email, row.loanCount, formatKwacha(row.capitalBooked),
-        formatKwacha(row.principalPaid), formatKwacha(row.interestPaid), formatKwacha(row.outstanding),
-        row.status, row.riskLevel, row.lastEvent
-      ];
-      for (let j = 0; j < values.length; j += 1) {
-        setDataCell(ws.getCell(j + 1, dataStart + i), values[j], { align: 'left' });
-      }
-      if (row.riskLevel === 'High') ws.getCell(9, dataStart + i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } };
-      if (row.riskLevel === 'Medium') ws.getCell(9, dataStart + i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEB9C' } };
-      if (row.riskLevel === 'Low') ws.getCell(9, dataStart + i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } };
-    }
-  }
-  for (let i = 0; i < columns.length; i += 1) {
-    ws.getColumn(i + 1).width = columns[i].width;
-  }
-  return ws;
+      storeId: getRecordStoreId(user),
+      loans: loans.filter(loan => String(loan.email || '').toLowerCase() === String(user.email || '').toLowerCase())
+    }));
 }
 
-function buildLoanApprovalLogSheet(dataset) {
-  const ws = new ExcelJS.Worksheet();
-  const columns = [
-    { header: 'Loan ID', width: 10 }, { header: 'Receipt No.', width: 16 }, { header: 'Borrower', width: 18 },
-    { header: 'Lender', width: 18 }, { header: 'Amount', width: 14, align: 'right' },
-    { header: 'Interest', width: 14, align: 'right' }, { header: 'Total Payable', width: 14, align: 'right' },
-    { header: 'Approved At', width: 14 }, { header: 'Approved By', width: 14 }
-  ];
-  const startRow = 1;
-  ws.mergeCells(1, startRow, 9, startRow);
-  ws.getCell(1, startRow).value = `Loan Approval Log — ${dataset.reportDate}`;
-  ws.getCell(1, startRow).font = { name: 'Arial', size: 14, bold: true };
-  ws.getCell(1, startRow).alignment = { horizontal: 'center' };
-  ws.getRow(startRow + 1).height = 6;
-  const headerRow = startRow + 2;
-  for (let i = 0; i < columns.length; i += 1) {
-    const cell = ws.getCell(columns[i].header, headerRow);
-    setHeaderCell(cell, columns[i].header, { align: 'center' });
+function buildWorkbook(dataset, type = 'all-loans') {
+  if (type === 'daily' || type === 'daily-report') {
+    return X.buildDailyWorkbook(dataset.loans || [], dataset.users || [], dataset.reportDate || todayIso());
   }
-  const dataStart = headerRow + 1;
-  const sorted = [...dataset.approvalLogRows].sort((a, b) => new Date(b.approvedAt) - new Date(a.approvedAt));
-  if (!sorted.length) {
-    ws.mergeCells(1, dataStart, 9, dataStart);
-    ws.getCell(1, dataStart).value = 'No approvals recorded';
-    ws.getCell(1, dataStart).font = { name: 'Arial', size: 11, italic: true };
-    ws.getCell(1, dataStart).alignment = { horizontal: 'center' };
-  } else {
-    for (let i = 0; i < sorted.length; i += 1) {
-      const row = sorted[i];
-      const values = [
-        row.loanId, row.receiptNumber, row.borrower, row.lender, formatKwacha(row.principalAmount),
-        formatKwacha(row.interest), formatKwacha(row.totalPayable), row.approvedAt, row.approvedBy
-      ];
-      for (let j = 0; j < values.length; j += 1) {
-        setDataCell(ws.getCell(j + 1, dataStart + i), values[j], { align: 'left' });
-      }
-    }
+  if (type === 'repayment-tracker' && dataset.trackerLoan) {
+    const workbook = new ExcelJS.Workbook();
+    X.buildTrackerSheet(workbook, dataset.trackerLoan, dataset.trackerUser || null);
+    return workbook;
   }
-  for (let i = 0; i < columns.length; i += 1) {
-    ws.getColumn(i + 1).width = columns[i].width;
-  }
-  return ws;
-}
-
-function buildInterestRevenueSheet(dataset) {
-  const ws = new ExcelJS.Worksheet();
-  const columns = [
-    { header: 'Month', width: 12 }, { header: 'Month Index', width: 14, align: 'right' },
-    { header: 'Principal Booked', width: 16, align: 'right' }, { header: 'Interest Charged', width: 16, align: 'right' },
-    { header: 'Principal Collected', width: 16, align: 'right' }, { header: 'Interest Collected', width: 16, align: 'right' },
-    { header: 'Collection Rate', width: 14, align: 'right' }
-  ];
-  const startRow = 1;
-  ws.mergeCells(1, startRow, 7, startRow);
-  ws.getCell(1, startRow).value = `Interest & Revenue Report — ${dataset.reportDate}`;
-  ws.getCell(1, startRow).font = { name: 'Arial', size: 14, bold: true };
-  ws.getCell(1, startRow).alignment = { horizontal: 'center' };
-  ws.getRow(startRow + 1).height = 6;
-  const headerRow = startRow + 2;
-  for (let i = 0; i < columns.length; i += 1) {
-    const cell = ws.getCell(columns[i].header, headerRow);
-    setHeaderCell(cell, columns[i].header, { align: 'center' });
-  }
-  const dataStart = headerRow + 1;
-  const sorted = [...dataset.revenueMonthly].sort((a, b) => a.monthIndex - b.monthIndex);
-  if (!sorted.length) {
-    ws.mergeCells(1, dataStart, 7, dataStart);
-    ws.getCell(1, dataStart).value = 'No interest/revenue data available';
-    ws.getCell(1, dataStart).font = { name: 'Arial', size: 11, italic: true };
-    ws.getCell(1, dataStart).alignment = { horizontal: 'center' };
-  } else {
-    for (let i = 0; i < sorted.length; i += 1) {
-      const row = sorted[i];
-      const values = [
-        row.month, row.monthIndex, formatKwacha(row.principalBooked), formatKwacha(row.interestCharged),
-        formatKwacha(row.principalCollected), formatKwacha(row.interestCollected), row.collectionRate
-      ];
-      for (let j = 0; j < values.length; j += 1) {
-        setDataCell(ws.getCell(j + 1, dataStart + i), values[j], { align: 'left' });
-      }
-    }
-  }
-  for (let i = 0; i < columns.length; i += 1) {
-    ws.getColumn(i + 1).width = columns[i].width;
-  }
-  return ws;
-}
-
-function buildMonthlyCollectionsSheet(dataset) {
-  const ws = new ExcelJS.Worksheet();
-  const columns = [
-    { header: 'Month', width: 12 }, { header: 'First Day', width: 12 }, { header: 'Last Day', width: 12 },
-    { header: 'New Loans', width: 12, align: 'right' }, { header: 'Issued Value', width: 14, align: 'right' },
-    { header: 'Payments', width: 12, align: 'right' }, { header: 'Collected', width: 14, align: 'right' },
-    { header: 'Outstanding End', width: 14, align: 'right' }
-  ];
-  const startRow = 1;
-  ws.mergeCells(1, startRow, 8, startRow);
-  ws.getCell(1, startRow).value = `Monthly Collections — ${dataset.reportDate}`;
-  ws.getCell(1, startRow).font = { name: 'Arial', size: 14, bold: true };
-  ws.getCell(1, startRow).alignment = { horizontal: 'center' };
-  ws.getRow(startRow + 1).height = 6;
-  const headerRow = startRow + 2;
-  for (let i = 0; i < columns.length; i += 1) {
-    const cell = ws.getCell(columns[i].header, headerRow);
-    setHeaderCell(cell, columns[i].header, { align: 'center' });
-  }
-  const dataStart = headerRow + 1;
-  const sorted = [...dataset.monthlyRows].sort((a, b) => a.monthIndex - b.monthIndex);
-  if (!sorted.length) {
-    ws.mergeCells(1, dataStart, 8, dataStart);
-    ws.getCell(1, dataStart).value = 'No data for this period';
-    ws.getCell(1, dataStart).font = { name: 'Arial', size: 11, italic: true };
-    ws.getCell(1, dataStart).alignment = { horizontal: 'center' };
-  } else {
-    for (let i = 0; i < sorted.length; i += 1) {
-      const row = sorted[i];
-      const values = [
-        row.month, row.firstDay, row.lastDay, row.issuances, formatKwacha(row.issuedValue),
-        row.payments, formatKwacha(row.paymentsCollected), formatKwacha(row.outstandingEnd)
-      ];
-      for (let j = 0; j < values.length; j += 1) {
-        setDataCell(ws.getCell(j + 1, dataStart + i), values[j], { align: 'left' });
-      }
-    }
-  }
-  for (let i = 0; i < columns.length; i += 1) {
-    ws.getColumn(i + 1).width = columns[i].width;
-  }
-  return ws;
-}
-
-function buildBorrowerStatementsSheet(dataset) {
-  const ws = new ExcelJS.Worksheet();
-  const columns = [
-    { header: 'Borrower', width: 20 }, { header: 'Email', width: 22 }, { header: 'Loan Count', width: 12, align: 'right' },
-    { header: 'Capital', width: 14, align: 'right' }, { header: 'Principal Paid', width: 14, align: 'right' },
-    { header: 'Interest Paid', width: 14, align: 'right' }, { header: 'Outstanding', width: 14, align: 'right' },
-    { header: 'Status', width: 14 }
-  ];
-  const startRow = 1;
-  ws.mergeCells(1, startRow, 8, startRow);
-  ws.getCell(1, startRow).value = `Borrower Statements — ${dataset.reportDate}`;
-  ws.getCell(1, startRow).font = { name: 'Arial', size: 14, bold: true };
-  ws.getCell(1, startRow).alignment = { horizontal: 'center' };
-  ws.getRow(startRow + 1).height = 6;
-  const headerRow = startRow + 2;
-  for (let i = 0; i < columns.length; i += 1) {
-    const cell = ws.getCell(columns[i].header, headerRow);
-    setHeaderCell(cell, columns[i].header, { align: 'center' });
-  }
-  const dataStart = headerRow + 1;
-  const sorted = [...dataset.borrowerStatements].sort((a, b) => b.totals.outstanding - a.totals.outstanding);
-  if (!sorted.length) {
-    ws.mergeCells(1, dataStart, 8, dataStart);
-    ws.getCell(1, dataStart).value = 'No statements available';
-    ws.getCell(1, dataStart).font = { name: 'Arial', size: 11, italic: true };
-    ws.getCell(1, dataStart).alignment = { horizontal: 'center' };
-  } else {
-    for (let i = 0; i < sorted.length; i += 1) {
-      const row = sorted[i];
-      const values = [
-        row.email, row.email, row.totals.loanCount, formatKwacha(row.totals.capital),
-        formatKwacha(row.totals.principalPaid), formatKwacha(row.totals.interestPaid),
-        formatKwacha(row.totals.outstanding), row.totals.loanCount ? (row.loans[0].status || '—') : '—'
-      ];
-      for (let j = 0; j < values.length; j += 1) {
-        setDataCell(ws.getCell(j + 1, dataStart + i), values[j], { align: 'left' });
-      }
-    }
-  }
-  for (let i = 0; i < columns.length; i += 1) {
-    ws.getColumn(i + 1).width = columns[i].width;
-  }
-  return ws;
-}
-
-function buildOverdueSheet(dataset) {
-  const ws = new ExcelJS.Worksheet();
-  const columns = [
-    { header: 'Loan ID', width: 10 }, { header: 'Receipt No.', width: 16 }, { header: 'Borrower', width: 18 },
-    { header: 'Amount', width: 14, align: 'right' }, { header: 'Due Date', width: 12 },
-    { header: 'Days Overdue', width: 14, align: 'right' }, { header: 'Outstanding', width: 14, align: 'right' },
-    { header: 'Status', width: 14 }, { header: 'Approved By', width: 12 }
-  ];
-  const startRow = 1;
-  ws.mergeCells(1, startRow, 9, startRow);
-  ws.getCell(1, startRow).value = `Overdue Loans — ${dataset.reportDate}`;
-  ws.getCell(1, startRow).font = { name: 'Arial', size: 14, bold: true };
-  ws.getCell(1, startRow).alignment = { horizontal: 'center' };
-  ws.getRow(startRow + 1).height = 6;
-  const headerRow = startRow + 2;
-  for (let i = 0; i < columns.length; i += 1) {
-    const cell = ws.getCell(columns[i].header, headerRow);
-    setHeaderCell(cell, columns[i].header, { align: 'center' });
-  }
-  const dataStart = headerRow + 1;
-  const sorted = [...dataset.overdueRows].sort((a, b) => b.outstanding - a.outstanding);
-  if (!sorted.length) {
-    ws.mergeCells(1, dataStart, 9, dataStart);
-    ws.getCell(1, dataStart).value = 'No overdue loans';
-    ws.getCell(1, dataStart).font = { name: 'Arial', size: 11, italic: true };
-    ws.getCell(1, dataStart).alignment = { horizontal: 'center' };
-  } else {
-    for (let i = 0; i < sorted.length; i += 1) {
-      const row = sorted[i];
-      const days = Math.floor((new Date(dataset.reportDate) - new Date(row.dueDate)) / (1000 * 60 * 60 * 24));
-      const values = [
-        row.loanId, row.receiptNumber, row.borrower, formatKwacha(row.principalAmount),
-        formatDateDDMMYYYY(row.dueDate), days, formatKwacha(row.outstanding), row.status, row.approvedBy
-      ];
-      for (let j = 0; j < values.length; j += 1) {
-        setDataCell(ws.getCell(j + 1, dataStart + i), values[j], { align: 'left' });
-      }
-      ws.getCell(6, dataStart + i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } };
-    }
-  }
-  for (let i = 0; i < columns.length; i += 1) {
-    ws.getColumn(i + 1).width = columns[i].width;
-  }
-  return ws;
-}
-
-function buildDefaultersSheet(dataset) {
-  const ws = new ExcelJS.Worksheet();
-  const columns = [
-    { header: 'Loan ID', width: 10 }, { header: 'Receipt No.', width: 16 }, { header: 'Borrower', width: 18 },
-    { header: 'Amount', width: 14, align: 'right' }, { header: 'Due Date', width: 12 },
-    { header: 'Outstanding', width: 14, align: 'right' }, { header: 'Paid To Date', width: 14, align: 'right' },
-    { header: 'Status', width: 14 }, { header: 'Approved By', width: 12 }
-  ];
-  const startRow = 1;
-  ws.mergeCells(1, startRow, 9, startRow);
-  ws.getCell(1, startRow).value = `Defaulters — ${dataset.reportDate}`;
-  ws.getCell(1, startRow).font = { name: 'Arial', size: 14, bold: true };
-  ws.getCell(1, startRow).alignment = { horizontal: 'center' };
-  ws.getRow(startRow + 1).height = 6;
-  const headerRow = startRow + 2;
-  for (let i = 0; i < columns.length; i += 1) {
-    const cell = ws.getCell(columns[i].header, headerRow);
-    setHeaderCell(cell, columns[i].header, { align: 'center' });
-  }
-  const dataStart = headerRow + 1;
-  const sorted = [...dataset.defaulterRows].sort((a, b) => b.outstanding - a.outstanding);
-  if (!sorted.length) {
-    ws.mergeCells(1, dataStart, 9, dataStart);
-    ws.getCell(1, dataStart).value = 'No defaulters';
-    ws.getCell(1, dataStart).font = { name: 'Arial', size: 11, italic: true };
-    ws.getCell(1, dataStart).alignment = { horizontal: 'center' };
-  } else {
-    for (let i = 0; i < sorted.length; i += 1) {
-      const row = sorted[i];
-      const values = [
-        row.loanId, row.receiptNumber, row.borrower, formatKwacha(row.principalAmount),
-        formatDateDDMMYYYY(row.dueDate), formatKwacha(row.outstanding), formatKwacha(row.totalPaid), row.status, row.approvedBy
-      ];
-      for (let j = 0; j < values.length; j += 1) {
-        setDataCell(ws.getCell(j + 1, dataStart + i), values[j], { align: 'left' });
-      }
-      ws.getCell(8, dataStart + i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEB9C' } };
-    }
-  }
-  for (let i = 0; i < columns.length; i += 1) {
-    ws.getColumn(i + 1).width = columns[i].width;
-  }
-  return ws;
-}
-
-function buildAllLoansSheet(dataset) {
-  const ws = new ExcelJS.Worksheet();
-  const columns = [
-    { header: 'Loan ID', width: 10 }, { header: 'Receipt No.', width: 16 }, { header: 'Lender', width: 18 },
-    { header: 'Borrower', width: 18 }, { header: 'NRC/ID', width: 16 }, { header: 'Phone', width: 14 },
-    { header: 'Amount', width: 14, align: 'right' }, { header: 'Outstanding', width: 14, align: 'right' },
-    { header: 'Total Paid', width: 14, align: 'right' }, { header: 'Remaining Inst.', width: 12, align: 'right' },
-    { header: 'Status', width: 14 }, { header: 'Due Date', width: 12 }, { header: 'Approved By', width: 12 }
-  ];
-  const startRow = 1;
-  ws.mergeCells(1, startRow, 13, startRow);
-  ws.getCell(1, startRow).value = `All Loans — ${dataset.reportDate}`;
-  ws.getCell(1, startRow).font = { name: 'Arial', size: 14, bold: true };
-  ws.getCell(1, startRow).alignment = { horizontal: 'center' };
-  ws.getRow(startRow + 1).height = 6;
-  const headerRow = startRow + 2;
-  for (let i = 0; i < columns.length; i += 1) {
-    const cell = ws.getCell(columns[i].header, headerRow);
-    setHeaderCell(cell, columns[i].header, { align: 'center' });
-  }
-  const dataStart = headerRow + 1;
-  const sorted = [...dataset.allLoanRows].sort((a, b) => {
-    const groupOrder = { overdue: 0, defaulted: 1, liquidated: 2, settled: 3, pending: 4, active: 5, grace: 6, declined: 7 };
-    return (groupOrder[a.display.group] ?? 9) - (groupOrder[b.display.group] ?? 9) || new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-  });
-  if (!sorted.length) {
-    ws.mergeCells(1, dataStart, 13, dataStart);
-    ws.getCell(1, dataStart).value = 'No loan records available';
-    ws.getCell(1, dataStart).font = { name: 'Arial', size: 11, italic: true };
-    ws.getCell(1, dataStart).alignment = { horizontal: 'center' };
-  } else {
-    for (let i = 0; i < sorted.length; i += 1) {
-      const row = sorted[i];
-      const display = row.display || {};
-      const values = [
-        row.loanId, row.receiptNumber, row.lender, row.borrower, row.nrc, row.phone,
-        formatKwacha(row.principalAmount), formatKwacha(row.outstanding), formatKwacha(row.totalPaid),
-        row.remainingInstallments, display.label, formatDateDDMMYYYY(row.dueDate), row.approvedBy
-      ];
-      for (let j = 0; j < values.length; j += 1) {
-        setDataCell(ws.getCell(j + 1, dataStart + i), values[j], { align: 'left' });
-      }
-      if (display.group === 'overdue') ws.getCell(11, dataStart + i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } };
-      if (display.group === 'defaulted') ws.getCell(11, dataStart + i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEB9C' } };
-      if (display.group === 'settled') ws.getCell(11, dataStart + i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2CC' } };
-    }
-  }
-  for (let i = 0; i < columns.length; i += 1) {
-    ws.getColumn(i + 1).width = columns[i].width;
-  }
-  return ws;
-}
-
-function buildPaymentsTodaySheet(dataset) {
-  const ws = new ExcelJS.Worksheet();
-  const columns = [
-    { header: 'Payment Receipt', width: 16 }, { header: 'Loan ID', width: 10 }, { header: 'Borrower', width: 18 },
-    { header: 'Amount', width: 14, align: 'right' }, { header: 'Date Paid', width: 12 },
-    { header: 'Mode', width: 12 }, { header: 'Balance Before', width: 14, align: 'right' },
-    { header: 'Balance After', width: 14, align: 'right' }, { header: 'Recorded By', width: 14 }
-  ];
-  const startRow = 1;
-  ws.mergeCells(1, startRow, 9, startRow);
-  ws.getCell(1, startRow).value = `Payments Today — ${dataset.reportDate}`;
-  ws.getCell(1, startRow).font = { name: 'Arial', size: 14, bold: true };
-  ws.getCell(1, startRow).alignment = { horizontal: 'center' };
-  ws.getRow(startRow + 1).height = 6;
-  const headerRow = startRow + 2;
-  for (let i = 0; i < columns.length; i += 1) {
-    const cell = ws.getCell(columns[i].header, headerRow);
-    setHeaderCell(cell, columns[i].header, { align: 'center' });
-  }
-  const dataStart = headerRow + 1;
-  const sorted = [...dataset.paymentsTodayRows].sort((a, b) => b.amount - a.amount);
-  if (!sorted.length) {
-    ws.mergeCells(1, dataStart, 9, dataStart);
-    ws.getCell(1, dataStart).value = 'No payments recorded today';
-    ws.getCell(1, dataStart).font = { name: 'Arial', size: 11, italic: true };
-    ws.getCell(1, dataStart).alignment = { horizontal: 'center' };
-  } else {
-    for (let i = 0; i < sorted.length; i += 1) {
-      const row = sorted[i];
-      const values = [
-        row.paymentReceiptId, row.loanId, row.borrower, formatKwacha(row.amount),
-        row.paymentDate, row.mode, formatKwacha(row.balanceBefore), formatKwacha(row.balanceAfter), row.recordedBy
-      ];
-      for (let j = 0; j < values.length; j += 1) {
-        setDataCell(ws.getCell(j + 1, dataStart + i), values[j], { align: 'left' });
-      }
-    }
-  }
-  for (let i = 0; i < columns.length; i += 1) {
-    ws.getColumn(i + 1).width = columns[i].width;
-  }
-  return ws;
-}
-
-  if (type === 'repayment-performance') {
-    const sheetBuilders = {
-      'all-loans': buildAllLoansSheet,
-      'payments-today': buildPaymentsTodaySheet,
-      'overdue': buildOverdueSheet,
-      'defaulters': buildDefaultersSheet,
-      'monthly-collections': buildMonthlyCollectionsSheet,
-      'borrower-statements': buildBorrowerStatementsSheet,
-      'loan-approval-log': buildLoanApprovalLogSheet,
-      'interest-revenue': buildInterestRevenueSheet,
-      'repayment-performance': buildRepaymentPerformanceSheet
-    };
-    for (const [key, builder] of Object.entries(sheetBuilders)) {
-      const ws = builder(dataset);
-      ws.properties.pageSetup.orientation = 'landscape';
-      ws.getRow(1).height = 30;
-      ws.getRow(2).height = 22;
-      wb.addWorksheet(ws);
-      const renamed = wb.getWorksheet(ws.id);
-      if (renamed) renamed.name = dataProductName(key);
-    }
-    return wb;
-  }
-  } else if (type === 'borrower-statements') {
-    const ws = wb.addWorksheet('Repayment Tracker');
-    ws.properties.pageSetup.orientation = 'portrait';
-    ws.mergeCells('A1:H1');
-    ws.getCell('A1').value = `${name} — ${dataset.reportDate}`;
-    ws.getCell('A1').font = { name: 'Arial', size: 14, bold: true };
-    ws.getCell('A1').alignment = { horizontal: 'center' };
-    ws.mergeCells('A2:H2');
-    ws.getCell('A2').value = 'Loan payment tracker';
-    ws.getCell('A2').font = { name: 'Arial', size: 12, bold: true };
-    ws.getCell('A2').alignment = { horizontal: 'center' };
-    ws.getRow(3).height = 12;
-
-    const lender = dataset.borrowerStatements.map(s => s.email).filter((v, i, a) => a.indexOf(v) === i).map(email => {
-      const user = require(USERS_FILE).find(u => u.email === email);
-      return (user && user.username) || email;
-    })[0] || '—';
-
-    const titleRow = 4;
-    const titleCells = ['Lender', 'Borrower', 'NRC/ID', 'Phone', 'Loan Amount', 'Interest', 'Total Payable', 'Loan Date'];
-    for (let i = 0; i < titleCells.length; i += 1) {
-      const cell = ws.getCell(1 + i, titleRow);
-      cell.value = titleCells[i];
-      cell.font = { name: 'Arial', size: 11, bold: true };
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
-      cell.border = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER };
-    }
-    ws.mergeCells(2, titleRow, 2, titleRow);
-    ws.mergeCells(4, titleRow, 4, titleRow);
-    ws.mergeCells(8, titleRow, 8, titleRow);
-
-    const headerRow = titleRow + 1;
-    const columns = ['Status', 'Past Due', 'Paid', 'Date Paid', 'Balance', 'Installments Remaining', 'Note', 'Record By'];
-    for (let i = 0; i < columns.length; i += 1) {
-      const cell = ws.getCell(1 + i, headerRow);
-      cell.value = columns[i];
-      cell.font = { name: 'Arial', size: 11, bold: true };
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
-      cell.border = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER };
-    }
-
-    let r = headerRow + 1;
-    for (const statement of dataset.borrowerStatements) {
-      const loan = statement.loans[0] || {};
-      const events = statement.events || [];
-      const paidEvents = events.filter(e => e.status === 'paid');
-      const latestPaid = paidEvents.length ? paidEvents[paidEvents.length - 1] : null;
-      const pastDue = new Date(loan.dueDate || '').getTime() < new Date(dataset.reportDate).getTime() && Number(loan.outstanding || 0) > 0 ? new Date(loan.dueDate || '').toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
-      const balance = Number(loan.outstanding || 0);
-      const remaining = Number(loan.totalInstallments || 0) - Number(loan.paidInstallments || 0);
-      const note = latestPaid ? `#${latestPaid.id}` : '—';
-      const cells = [
-        loan.status || '—', pastDue, latestPaid ? 'Yes' : 'No', latestPaid ? formatDateDDMMYYYY(latestPaid.updatedAt) : '—', formatKwacha(balance), remaining, note, loan.recordedBy || '—'
-      ];
-      for (let i = 0; i < cells.length; i += 1) {
-        const cell = ws.getCell(1 + i, r);
-        cell.value = cells[i];
-        cell.font = { name: 'Arial', size: 11 };
-        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-        cell.border = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER };
-      }
-      ws.getRow(r).height = 20;
-      r += 1;
-    }
-
-    ws.getColumn(1).width = 12;
-    ws.getColumn(2).width = 10;
-    ws.getColumn(3).width = 16;
-    ws.getColumn(4).width = 14;
-    ws.getColumn(5).width = 14;
-    ws.getColumn(6).width = 12;
-    ws.getColumn(7).width = 24;
-    ws.getColumn(8).width = 14;
-    return wb;
-  }
+  const source = {
+    'all-loans': ['All Loans', ['Loan Receipt', 'Borrower', 'Email', 'Product', 'Principal', 'Interest', 'Total', 'Paid', 'Outstanding', 'Status', 'Loan Date', 'Due Date'], 'allLoanRows'],
+    'payments-today': ['Payments Today', ['Loan Receipt', 'Borrower', 'Amount', 'Date', 'Mode', 'Receipt', 'Recorded By'], 'paymentsTodayRows'],
+    overdue: ['Overdue', ['Loan Receipt', 'Borrower', 'Amount', 'Due Date', 'Days Overdue', 'Outstanding'], 'overdueRows'],
+    defaulters: ['Defaulters', ['Loan Receipt', 'Borrower', 'Amount', 'Due Date', 'Days Overdue', 'Outstanding'], 'defaulterRows'],
+    'monthly-collections': ['Monthly Collections', ['Month', 'Collected', 'Outstanding'], 'monthlyRows'],
+    'borrower-statements': ['Borrower Statements', ['Borrower', 'Email', 'Loan Count', 'Outstanding'], 'borrowerStatements'],
+    'approval-log': ['Approval Log', ['Loan Receipt', 'Borrower', 'Approved At', 'Approved By', 'Amount'], 'approvalLogRows'],
+    'loan-approval-log': ['Approval Log', ['Loan Receipt', 'Borrower', 'Approved At', 'Approved By', 'Amount'], 'approvalLogRows'],
+    'interest-revenue': ['Interest Revenue', ['Month', 'Interest Booked', 'Interest Paid'], 'revenueMonthly'],
+    'repayment-performance': ['Repayment Performance', ['Borrower', 'Email', 'Loan Count', 'Outstanding', 'Risk'], 'performanceRows']
+  }[type];
+  if (!source) throw new Error(`Unknown report type: ${type}`);
+  const rows = dataset[source[2]] || [];
+  const workbook = new ExcelJS.Workbook();
+  X.genericSheet(workbook, source[0], source[1], rows.map(row => Array.isArray(row) ? row : Object.values(row)));
+  return workbook;
 }
 
 function buildDailyWorkbook(dataset) {
-  const wb = new ExcelJS.Workbook();
-  const sheets = [
-    { name: 'Daily Summary' },
-    { name: 'All Loans' },
-    { name: 'Payments Today' },
-    { name: 'Overdue Loans' },
-    { name: 'Defaulters' },
-    { name: 'Monthly Collections' },
-    { name: 'Borrower Statements' },
-    { name: 'Loan Approval Log' },
-    { name: 'Interest & Revenue Report' },
-    { name: 'Repayment Performance Report' }
-  ];
-  for (const { name } of sheets) {
-    const ws = wb.addWorksheet(name);
-    ws.properties.pageSetup.orientation = 'landscape';
-    ws.getRow(1).height = 30;
-    ws.getRow(2).height = 22;
-    const renamed = wb.getWorksheet(ws.id);
-    if (renamed) renamed.name = name;
-  }
-  return wb;
+  return X.buildDailyWorkbook(dataset.loans || [], dataset.users || [], dataset.reportDate || todayIso());
 }
 
-  if (type === 'daily-report') {
-    // ── Sheet 1: Daily Summary ────────────────────────────────────────────
-    {
-      const ws = wb.addWorksheet(`${name} Summary`);
-      ws.properties.pageSetup.orientation = 'portrait';
-      ws.mergeCells('A1:H1');
-      ws.getCell('A1').value = 'Daily Business Report — Summary';
-      ws.getCell('A1').font = { name: 'Arial', size: 16, bold: true };
-      ws.getCell('A1').alignment = { horizontal: 'center' };
-      ws.mergeCells('A2:H2');
-      ws.getCell('A2').value = `Generated: ${formatDateDDMMYYYY(dataset.reportDate)}`;
-      ws.getCell('A2').font = { name: 'Arial', size: 11 };
-      ws.getCell('A2').alignment = { horizontal: 'center' };
+function buildBusinessPdf(dataset, reportDate = dataset.reportDate || todayIso()) {
+  return P.businessPdf([
+    { title: 'Portfolio Summary', headers: ['Metric', 'Value'], rows: Object.entries(dataset.summary || {}) },
+    { title: 'Loans', headers: ['Loan Receipt', 'Borrower', 'Amount', 'Outstanding', 'Status', 'Due Date'], rows: dataset.allLoanRows || [] },
+    { title: 'Payments Today', headers: ['Loan Receipt', 'Borrower', 'Amount', 'Date', 'Mode', 'Receipt', 'Recorded By'], rows: dataset.paymentsTodayRows || [] }
+  ], { title: 'Daily Business Report', date: reportDate });
+}
 
-      const summary = dataset.summary;
-      const metrics = [
-        ['Total Loans', summary.totalLoans],
-        ['Active Loans', summary.activeLoans],
-        ['Overdue Loans', summary.overdueLoans],
-        ['Overdue Total', summary.overdueTotal],
-        ['Defaulters', summary.defaulters],
-        ['Defaulters Total', summary.defaultersTotal],
-        ['Pending Payments', summary.pendingPayments],
-        ['Settled Loans', summary.settledLoans],
-        ['Loyal Customers', summary.loyalCustomers],
-        ['Cash Collected Today', summary.cashCollected]
-      ];
+function buildTablePdf(dataset, type = 'all-loans', reportDate = dataset.reportDate || todayIso()) {
+  const headers = type === 'payments-today'
+    ? ['Loan Receipt', 'Borrower', 'Amount', 'Date', 'Mode', 'Receipt', 'Recorded By']
+    : ['Loan Receipt', 'Borrower', 'Amount', 'Outstanding', 'Status', 'Due Date'];
+  const rows = type === 'payments-today' ? dataset.paymentsTodayRows : dataset.allLoanRows;
+  return P.businessPdf([{ title: type, headers, rows: rows || [] }], { title: 'BMF Report', date: reportDate });
+}
+
+function pdfToBuffer(value) {
+  if (Buffer.isBuffer(value)) return Promise.resolve(value);
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    value.on('data', chunk => chunks.push(chunk));
+    value.on('end', () => resolve(Buffer.concat(chunks)));
+    value.on('error', reject);
+    value.end();
+  });
+}
+
+function buildEmailSummary(type, dataset) {
+  return [`${type} report for ${dataset.reportDate || todayIso()}`, '',
+    ...Object.entries(dataset.summary || {}).map(([key, value]) => `${key}: ${value}`)
+  ].join('\n');
+}
+
+const legacyReportTypes = ['daily-report', 'loan-approval-log'];
+const REPORT_TYPES = Object.fromEntries([...config.REPORTS.REPORT_TYPES, ...legacyReportTypes].map(type => [type, {
+  key: type,
+  title: type,
+  type,
+  buildXlsx: dataset => buildWorkbook(dataset, type),
+  buildPdf: dataset => buildTablePdf(dataset, type),
+  summary: dataset => buildEmailSummary(type, dataset)
+}]));
+
 module.exports = {
   REPORT_TYPES,
   displayStatus,
@@ -687,623 +177,3 @@ module.exports = {
   buildEmailSummary,
   todayIso
 };
-
-// ─── Report registry ──────────────────────────────────────────────────────────
-
-const REPORT_TYPES = {
-  'daily-report': {
-    key: 'daily-report',
-    title: 'Daily Business Report',
-    type: 'daily-report',
-    fileBase: (reportDate, periodLabel) => `BMF-Daily-Report-${periodLabel || reportDate}`,
-    filename: (reportDate, periodLabel) => `${dataProductName('daily-report')}-${periodLabel || reportDate}.xlsx`,
-    buildXlsx: dataset => buildDailyWorkbook(dataset),
-    buildPdf: dataset => buildBusinessPdf(dataset, dataset.reportDate),
-    summary: dataset => buildEmailSummary('daily-report', dataset),
-    sheetCount: 10
-  },
-  'all-loans': {
-    key: 'all-loans',
-    title: 'All Loans',
-    type: 'all-loans',
-    fileBase: (reportDate, periodLabel) => `BMF-All-Loans-${periodLabel || reportDate}`,
-    filename: (reportDate, periodLabel) => `${dataProductName('all-loans')}-${periodLabel || reportDate}.xlsx`,
-    buildXlsx: dataset => buildWorkbook(dataset, 'all-loans'),
-    buildPdf: dataset => buildTablePdf(dataset, 'all-loans', dataset.reportDate),
-    summary: dataset => buildEmailSummary('all-loans', dataset),
-    sheetCount: 1
-  },
-  'payments-today': {
-    key: 'payments-today',
-    title: 'Payments Today',
-    type: 'payments-today',
-    fileBase: (reportDate, periodLabel) => `BMF-Payments-Today-${periodLabel || reportDate}`,
-    filename: (reportDate, periodLabel) => `${dataProductName('payments-today')}-${periodLabel || reportDate}.xlsx`,
-    buildXlsx: dataset => buildWorkbook(dataset, 'payments-today'),
-    buildPdf: dataset => buildTablePdf(dataset, 'payments-today', dataset.reportDate),
-    summary: dataset => buildEmailSummary('payments-today', dataset),
-    sheetCount: 1
-  },
-  'overdue': {
-    key: 'overdue',
-    title: 'Overdue Loans',
-    type: 'overdue',
-    fileBase: (reportDate, periodLabel) => `BMF-Overdue-Loans-${periodLabel || reportDate}`,
-    filename: (reportDate, periodLabel) => `${dataProductName('overdue')}-${periodLabel || reportDate}.xlsx`,
-    buildXlsx: dataset => buildWorkbook(dataset, 'overdue'),
-    buildPdf: dataset => buildTablePdf(dataset, 'overdue', dataset.reportDate),
-    summary: dataset => buildEmailSummary('overdue', dataset),
-    sheetCount: 1
-  },
-  'defaulters': {
-    key: 'defaulters',
-    title: 'Defaulters',
-    type: 'defaulters',
-    fileBase: (reportDate, periodLabel) => `BMF-Defaulters-${periodLabel || reportDate}`,
-    filename: (reportDate, periodLabel) => `${dataProductName('defaulters')}-${periodLabel || reportDate}.xlsx`,
-    buildXlsx: dataset => buildWorkbook(dataset, 'defaulters'),
-    buildPdf: dataset => buildTablePdf(dataset, 'defaulters', dataset.reportDate),
-    summary: dataset => buildEmailSummary('defaulters', dataset),
-    sheetCount: 1
-  },
-  'monthly-collections': {
-    key: 'monthly-collections',
-    title: 'Monthly Collections',
-    type: 'monthly-collections',
-    fileBase: (reportDate, periodLabel) => `BMF-Monthly-Collections-${periodLabel || reportDate}`,
-    filename: (reportDate, periodLabel) => `${dataProductName('monthly-collections')}-${periodLabel || reportDate}.xlsx`,
-    buildXlsx: dataset => buildWorkbook(dataset, 'monthly-collections'),
-    buildPdf: dataset => buildTablePdf(dataset, 'monthly-collections', dataset.reportDate),
-    summary: dataset => buildEmailSummary('monthly-collections', dataset),
-    sheetCount: 1
-  },
-  'borrower-statements': {
-    key: 'borrower-statements',
-    title: 'Borrower Statements',
-    type: 'borrower-statements',
-    fileBase: (reportDate, periodLabel) => `BMF-Borrower-Statements-${periodLabel || reportDate}`,
-    filename: (reportDate, periodLabel) => `${dataProductName('borrower-statements')}-${periodLabel || reportDate}.xlsx`,
-    buildXlsx: dataset => buildWorkbook(dataset, 'borrower-statements'),
-    buildPdf: dataset => buildTablePdf(dataset, 'borrower-statements', dataset.reportDate),
-    summary: dataset => buildEmailSummary('borrower-statements', dataset),
-    sheetCount: 1
-  },
-  'loan-approval-log': {
-    key: 'loan-approval-log',
-    title: 'Loan Approval Log',
-    type: 'loan-approval-log',
-    fileBase: (reportDate, periodLabel) => `BMF-Loan-Approval-Log-${periodLabel || reportDate}`,
-    filename: (reportDate, periodLabel) => `${dataProductName('loan-approval-log')}-${periodLabel || reportDate}.xlsx`,
-    buildXlsx: dataset => buildWorkbook(dataset, 'loan-approval-log'),
-    buildPdf: dataset => buildTablePdf(dataset, 'loan-approval-log', dataset.reportDate),
-    summary: dataset => buildEmailSummary('loan-approval-log', dataset),
-    sheetCount: 1
-  },
-  'interest-revenue': {
-    key: 'interest-revenue',
-    title: 'Interest & Revenue Report',
-    type: 'interest-revenue',
-    fileBase: (reportDate, periodLabel) => `BMF-Interest-Revenue-${periodLabel || reportDate}`,
-    filename: (reportDate, periodLabel) => `${dataProductName('interest-revenue')}-${periodLabel || reportDate}.xlsx`,
-    buildXlsx: dataset => buildWorkbook(dataset, 'interest-revenue'),
-    buildPdf: dataset => buildTablePdf(dataset, 'interest-revenue', dataset.reportDate),
-    summary: dataset => buildEmailSummary('interest-revenue', dataset),
-    sheetCount: 1
-  },
-  'repayment-performance': {
-    key: 'repayment-performance',
-    title: 'Repayment Performance Report',
-    type: 'repayment-performance',
-    fileBase: (reportDate, periodLabel) => `BMF-Repayment-Performance-${periodLabel || reportDate}`,
-    filename: (reportDate, periodLabel) => `${dataProductName('repayment-performance')}-${periodLabel || reportDate}.xlsx`,
-    buildXlsx: dataset => buildWorkbook(dataset, 'repayment-performance'),
-    buildPdf: dataset => buildTablePdf(dataset, 'repayment-performance', dataset.reportDate),
-    summary: dataset => buildEmailSummary('repayment-performance', dataset),
-    sheetCount: 1
-  }
-};
-
-// ─── Email summaries ──────────────────────────────────────────────────────────
-
-function buildEmailSummary(type, dataset) {
-  const s = dataset.summary;
-  const lines = [
-    `BMF Business Report — ${type} — ${formatDateDDMMYYYY(dataset.reportDate)}`,
-    `Store: Buraza Micro Finance  ·  Report date: ${formatDateDDMMYYYY(dataset.reportDate)}`,
-    `Total loans: ${s.totalLoans}  ·  Active: ${s.activeLoans}  ·  Overdue: ${s.overdueLoans} (K ${s.overdueTotal})`,
-    `Defaulters: ${s.defaulters} (K ${s.defaultersTotal})  ·  Cash collected today: K ${s.cashCollected}`,
-    `Pending payments: ${s.pendingPayments}  ·  Outstanding on active loans: K ${s.totalOutstanding}`,
-    '─────────────────────────────────────────────',
-    'Full report attached (Excel + PDF).'
-  ];
-  return lines.join('\n');
-}
-
-
-  // ── Page: sign-off ─────────────────────────────────────────────────────
-  doc.addPage({ size: 'A4', margin: 40 });
-  doc.fontSize(16).fontBold = true;
-  doc.text('Report Sign-off');
-  doc.moveDown(1);
-  doc.fontSize(10);
-  doc.text('Generated by the BMF reporting system.');
-  doc.text(`Report date: ${formatDateDDMMYYYY(reportDate)}`);
-  doc.text('For official use only — do not distribute outside Buraza Micro Finance.');
-  doc.moveDown(2);
-  doc.fontSize(9).fontStyle = 'italic';
-  doc.text('This report was produced automatically at 08:00 daily by the BMF reports engine.');
-
-  // ── Page numbering ─────────────────────────────────────────────────────
-  const totalPages = doc.bufferedPageRange().count;
-  for (let i = 0; i < totalPages; i += 1) {
-    doc.switchToPage(i);
-    doc.fontSize(8).fontStyle = 'italic';
-    doc.text(`Page ${i + 1} of ${totalPages}`, doc.page.width - 100, doc.page.height - 20, { align: 'right' });
-  }
-
-  return doc;
-}
-
-/** Single business-style table workbook (no cover page). */
-function buildTablePdf(dataset, type, reportDate) {
-  const doc = new PDFKit.Document({ autoFirstPage: true, bufferPages: true });
-  const title = dataProductName(type);
-  const columns = [
-    { header: 'Loan ID', width: 30 }, { header: 'Receipt No.', width: 55 }, { header: 'Borrower', width: 80 },
-    { header: 'Amount', width: 70, align: 'right' }, { header: 'Outstanding', width: 70, align: 'right' },
-    { header: 'Due Date', width: 55 }, { header: 'Status', width: 60 }
-  ];
-  doc.addPage({ size: 'A4', margin: 40 });
-  letterhead(doc, title, `Business report — generated from the BMF system`, `Date: ${formatDateDDMMYYYY(reportDate)}`);
-  doc.moveDown(0.5);
-  doc.fontSize(9).fontStyle = 'italic';
-  doc.text('All active loans and their current status, as recorded in the BMF system.');
-
-  const rows = {
-    'all-loans': dataset.allLoanRows,
-    'payments-today': dataset.paymentsTodayRows.map(p => [
-      p.paymentReceiptId, p.loanId, p.borrower, formatKwacha(p.amount), '—', p.paymentDate, p.mode
-    ]),
-    'overdue': dataset.overdueRows,
-    'defaulters': dataset.defaulterRows,
-    'monthly-collections': dataset.monthlyRows
-  }[type] || dataset.allLoanRows;
-
-  const mapped = rows.map(item => {
-    if (Array.isArray(item)) return item;
-    return [item.loanId, item.receiptNumber, item.borrower, formatKwacha(item.principalAmount), formatKwacha(item.outstanding), formatDateDDMMYYYY(item.dueDate), item.display?.label || item.status];
-  });
-
-  if (!mapped.length) {
-    doc.moveDown(1);
-    doc.fontSize(11).fontStyle = 'italic';
-    doc.text('No records available');
-  } else {
-    drawTable(doc, columns, mapped, doc.page.width - 80);
-  }
-
-  doc.moveDown(1);
-  doc.fontSize(9).fontStyle = 'italic';
-  doc.text('Generated by the BMF reports engine — ephemeral report, no archival required.');
-
-  const totalPages = doc.bufferedPageRange().count;
-  for (let i = 0; i < totalPages; i += 1) {
-    doc.switchToPage(i);
-    doc.fontSize(8).fontStyle = 'italic';
-    doc.text(`Page ${i + 1} of ${totalPages}`, doc.page.width - 100, doc.page.height - 20, { align: 'right' });
-  }
-
-  return doc;
-}
-
-function buildBusinessPdf(dataset, reportDate) {
-  const doc = new PDFKit.Document({ autoFirstPage: true, bufferPages: true });
-  const title = 'Daily Business Report';
-
-  // ── Page 1: cover ───────────────────────────────────────────────────────
-  {
-    doc.addPage({ size: 'A4', margin: 40 });
-    letterhead(doc, title, 'Business performance overview — generated from the BMF system', `Date: ${formatDateDDMMYYYY(reportDate)}`);
-    doc.moveDown(2);
-    doc.fontSize(11).fontBold = true;
-    doc.text('Portfolio Summary');
-    doc.fontSize(10);
-    doc.text(`Total loans: ${dataset.summary.totalLoans}`);
-    doc.text(`Active loans: ${dataset.summary.activeLoans}`);
-    doc.text(`Overdue loans: ${dataset.summary.overdueLoans} (K ${dataset.summary.overdueTotal})`);
-    doc.text(`Defaulters: ${dataset.summary.defaulters} (K ${dataset.summary.defaultersTotal})`);
-    doc.text(`Cash collected today: K ${dataset.summary.cashCollected}`);
-    doc.text(`Outstanding on active loans: K ${dataset.summary.totalOutstanding}`);
-    doc.moveDown(1);
-    doc.fontSize(11).fontBold = true;
-    doc.text('Payments Today');
-    doc.fontSize(10);
-    doc.text(`Payments received: ${dataset.paymentsTodayRows.length}`);
-    doc.text(`Total collected: K ${dataset.summary.cashCollected}`);
-    doc.text(`Pending payments: ${dataset.summary.pendingPayments}`);
-    doc.moveDown(1);
-    doc.fontSize(11).fontBold = true;
-    doc.text('Monthly Collections (all months to date)');
-    doc.fontSize(10);
-    for (const month of dataset.monthlyRows) {
-      doc.text(`${month.month}: issued K ${month.issuedValue} · collected K ${month.paymentsCollected} · outstanding K ${month.outstandingEnd}`);
-    }
-    doc.moveDown(2);
-    doc.fontSize(9).fontStyle = 'italic';
-    doc.text('Generated by the BMF reports engine — ephemeral report, no archival required.');
-  }
-
-  // ── Page 2: active & overdue loans (landscape) ─────────────────────────
-  {
-    doc.addPage({ size: 'A4', margin: 30, layout: 'landscape' });
-    doc.fontSize(16).fontBold = true;
-    doc.text('Active & Overdue Loans — Detail');
-    doc.moveDown(0.5);
-    doc.fontSize(9).fontStyle = 'italic';
-    doc.text(`Generated: ${formatDateDDMMYYYY(reportDate)}  ·  Store: Buraza Micro Finance`);
-    doc.moveDown(0.5);
-    const cols = [
-      { header: 'Loan ID', width: 30 }, { header: 'Receipt No.', width: 55 }, { header: 'Borrower', width: 80 },
-      { header: 'Amount', width: 70, align: 'right' }, { header: 'Outstanding', width: 70, align: 'right' },
-      { header: 'Due Date', width: 55 }, { header: 'Overdue', width: 55 }, { header: 'Status', width: 60 }
-    ];
-    const displayed = dataset.allLoanRows.filter(l => l.display.group !== 'settled');
-    drawTable(doc, cols, displayed.map(l => [
-      l.loanId, l.receiptNumber, l.borrower, formatKwacha(l.principalAmount),
-      formatKwacha(l.outstanding), formatDateDDMMYYYY(l.dueDate),
-      l.display.group === 'overdue' ? `Yes (${l.outstanding})` : 'No',
-      l.display.label
-    ]), doc.page.width - 80);
-    doc.moveDown(1);
-    doc.fontSize(9).fontStyle = 'italic';
-    doc.text(`Total active & overdue outstanding: K ${dataset.summary.totalOutstanding}`);
-  }
-
-function buildBusinessPdf(dataset, reportDate) {
-  const doc = new PDFKit.Document({ autoFirstPage: true, bufferPages: true });
-  const title = 'Daily Business Report';
-
-  // ── Page 1: cover ───────────────────────────────────────────────────────
-  {
-    doc.addPage({ size: 'A4', margin: 40 });
-    letterhead(doc, title, 'Business performance overview — generated from the BMF system', `Date: ${formatDateDDMMYYYY(reportDate)}`);
-    doc.moveDown(2);
-    doc.fontSize(11).fontBold = true;
-    doc.text('Portfolio Summary');
-    doc.fontSize(10);
-    doc.text(`Total loans: ${dataset.summary.totalLoans}`);
-    doc.text(`Active loans: ${dataset.summary.activeLoans}`);
-    doc.text(`Overdue loans: ${dataset.summary.overdueLoans} (K ${dataset.summary.overdueTotal})`);
-    doc.text(`Defaulters: ${dataset.summary.defaulters} (K ${dataset.summary.defaultersTotal})`);
-    doc.text(`Cash collected today: K ${dataset.summary.cashCollected}`);
-    doc.text(`Outstanding on active loans: K ${dataset.summary.totalOutstanding}`);
-    doc.moveDown(1);
-    doc.fontSize(11).fontBold = true;
-    doc.text('Payments Today');
-    doc.fontSize(10);
-    doc.text(`Payments received: ${dataset.paymentsTodayRows.length}`);
-    doc.text(`Total collected: K ${dataset.summary.cashCollected}`);
-    doc.text(`Pending payments: ${dataset.summary.pendingPayments}`);
-    doc.moveDown(1);
-    doc.fontSize(11).fontBold = true;
-    doc.text('Monthly Collections (all months to date)');
-    doc.fontSize(10);
-    for (const month of dataset.monthlyRows) {
-      doc.text(`${month.month}: issued K ${month.issuedValue} · collected K ${month.paymentsCollected} · outstanding K ${month.outstandingEnd}`);
-    }
-    doc.moveDown(2);
-    doc.fontSize(9).fontStyle = 'italic';
-    doc.text('Generated by the BMF reports engine — ephemeral report, no archival required.');
-  }
-
-  // ── Page 2: active & overdue loans (landscape) ─────────────────────────
-  {
-    doc.addPage({ size: 'A4', margin: 30, layout: 'landscape' });
-    doc.fontSize(16).fontBold = true;
-    doc.text('Active & Overdue Loans — Detail');
-    doc.moveDown(0.5);
-    doc.fontSize(9).fontStyle = 'italic';
-    doc.text(`Generated: ${formatDateDDMMYYYY(reportDate)}  ·  Store: Buraza Micro Finance`);
-    doc.moveDown(0.5);
-    const cols = [
-      { header: 'Loan ID', width: 30 }, { header: 'Receipt No.', width: 55 }, { header: 'Borrower', width: 80 },
-      { header: 'Amount', width: 70, align: 'right' }, { header: 'Outstanding', width: 70, align: 'right' },
-      { header: 'Due Date', width: 55 }, { header: 'Overdue', width: 55 }, { header: 'Status', width: 60 }
-    ];
-    const displayed = dataset.allLoanRows.filter(l => l.display.group !== 'settled');
-    drawTable(doc, cols, displayed.map(l => [
-      l.loanId, l.receiptNumber, l.borrower, formatKwacha(l.principalAmount),
-      formatKwacha(l.outstanding), formatDateDDMMYYYY(l.dueDate),
-      l.display.group === 'overdue' ? `Yes (${l.outstanding})` : 'No',
-      l.display.label
-    ]), doc.page.width - 80);
-    doc.moveDown(1);
-    doc.fontSize(9).fontStyle = 'italic';
-    doc.text(`Total active & overdue outstanding: K ${dataset.summary.totalOutstanding}`);
-  }
-
-// ─── PDF builders ─────────────────────────────────────────────────────────────
-
-/** Collect a pdfkit stream into a Buffer (for email attachments / downloads). */
-function pdfToBuffer(doc) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    doc.on('data', chunk => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-    doc.end();
-  });
-}
-
-function letterhead(doc, title, subtitle, meta) {
-  doc.font = 'Helvetica';
-  doc.fontSize(16).text('BMF — Buraza Micro Finance');
-  doc.fontSize(10).text('Daily Business Report  ·  Zambia  ·  Office: Lusaka  ·  Mobile: +260 955 000 000');
-  doc.moveDown();
-  doc.fontSize(20).fontBold = true;
-  doc.text(title);
-  if (subtitle) {
-    doc.fontSize(13).fontStyle = 'italic';
-    doc.text(subtitle);
-    doc.moveDown();
-  }
-  if (meta) {
-    doc.fontSize(10).text(meta);
-    doc.moveDown();
-  }
-}
-
-function drawTable(doc, columns, rows, pageWidth) {
-  const colWidths = columns.map(c => c.width);
-  const x = 40;
-  const y = doc.y;
-  const rowHeight = 16;
-
-  const drawCell = (text, width, align = 'left') => {
-    doc.fontSize(9).font('Helvetica');
-    const lines = String(text || '').split('\n');
-    let lineHeight = rowHeight / lines.length;
-    lines.forEach((line, i) => {
-      doc.text(line, x + (align === 'center' ? width / 2 : align === 'right' ? width - 4 : 2), y + lineHeight * (i + 0.5) - 5, { width, align });
-    });
-  };
-
-  // Header
-  doc.fontSize(9).fontBold = true;
-  let cursor = x;
-  for (let i = 0; i < columns.length; i += 1) {
-    doc.rect(cursor, y, colWidths[i], rowHeight).fillAndStroke('FF000000', 'FF000000');
-    doc.text(columns[i].header, cursor + 2, y + 2, { width: colWidths[i] - 4, align: 'center' });
-    cursor += colWidths[i];
-  }
-  doc.moveDown();
-
-  // Rows
-  for (let r = 0; r < rows.length; r += 1) {
-    const row = rows[r];
-    cursor = x;
-    doc.fontSize(9);
-    for (let i = 0; i < columns.length; i += 1) {
-      doc.rect(cursor, y, colWidths[i], rowHeight).fillAndStroke('FFD9D9D9', 'FFD9D9D9');
-      const align = columns[i].align || 'left';
-      drawCell(row[i], colWidths[i], align);
-      cursor += colWidths[i];
-    }
-    doc.moveDown();
-  }
-}
-
-      const start = 4;
-      ws.getRow(start).height = 20;
-      ws.getRow(start + 1).height = 420;
-      for (let i = 0; i < metrics.length; i += 2) {
-        const r = start + 2 + Math.floor(i / 2);
-        setHeaderCell(ws.getCell(1, r), metrics[i][0], { fill: 'FFD9E1F2', align: 'left' });
-        setHeaderCell(ws.getCell(4, r), formatKwacha(metrics[i][1]), { fill: 'FFD9E1F2', align: 'right' });
-        if (i + 1 < metrics.length) {
-          setHeaderCell(ws.getCell(6, r), metrics[i + 1][0], { fill: 'FFD9E1F2', align: 'left' });
-          setHeaderCell(ws.getCell(9, r), formatKwacha(metrics[i + 1][1]), { fill: 'FFD9E1F2', align: 'right' });
-        }
-      }
-      ws.getColumn(1).width = 26;
-      ws.getColumn(4).width = 18;
-      ws.getColumn(6).width = 26;
-      ws.getColumn(9).width = 18;
-    }
-
-// ─── Excel workbook builders ───────────────────────────────────────────────────
-
-const THIN_BORDER = { style: 'thin', color: { argb: 'FFB0B0B0' } };
-
-function setHeaderCell(cell, text, opts = {}) {
-  cell.value = text;
-  cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF000000' } };
-  cell.alignment = { horizontal: opts.align || 'left', vertical: 'middle', wrapText: true };
-  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: opts.fill || 'FFFF00' } };
-  cell.border = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER };
-}
-
-function setDataCell(cell, value, opts = {}) {
-  cell.value = value;
-  cell.font = { name: 'Arial', size: 11, color: { argb: 'FF000000' } };
-  cell.alignment = { horizontal: opts.align || 'left', vertical: 'middle', wrapText: true };
-  cell.border = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER };
-}
-
-function dataProductName(type) {
-  return {
-    'daily-report': 'Daily Business Report',
-    'all-loans': 'All Loans',
-    'payments-today': 'Payments Today',
-    'overdue': 'Overdue Loans',
-    'defaulters': 'Defaulters',
-    'monthly-collections': 'Monthly Collections',
-    'borrower-statements': 'Borrower Statements',
-    'loan-approval-log': 'Loan Approval Log',
-    'interest-revenue': 'Interest & Revenue Report',
-    'repayment-performance': 'Repayment Performance Report'
-  }[type];
-}
-
-function buildWorkbook(dataset, type) {
-  const wb = new ExcelJS.Workbook();
-  const name = dataProductName(type);
-  const rows = dataset[type === 'borrower-statements' ? 'borrowerStatements' : type === 'loan-approval-log' ? 'approvalLogRows' : type === 'interest-revenue' ? 'revenueMonthly' : type === 'repayment-performance' ? 'performanceRows' : type === 'payments-today' ? 'paymentsTodayRows' : 'allLoanRows'];
-
-    lender: l.lender,
-    approvalDate: l.approvedAt,
-    principal: l.principalAmount,
-    interest: l.interest,
-    totalPayable: l.totalPayable,
-    totalPaid: l.totalPaid,
-    outstanding: l.outstanding
-  }));
-
-  // ── Repayment performance ────────────────────────────────────────────────
-  const active = allLoanRows.filter(l => l.display.group === 'active' || l.businessStatus === 'active');
-  const overdue = overdueRows;
-  const defaulted = defaulterRows;
-  const totalOutstanding = Number(allLoanRows.reduce((s, l) => s + l.outstanding, 0).toFixed(2));
-  const performanceRows = borrowerStatements.map(entry => {
-    const loans = entry.loans;
-    const capital = loans.reduce((s, l) => s + Number(l.principalAmount || 0), 0);
-    const principalPaid = loans.reduce((s, l) => s + Number(l.paidAmount || 0) + Number(l.totalPaid || 0), 0);
-    const interestPaid = loans.reduce((s, l) => s + Number(l.interestPaid || 0), 0);
-    const outstanding = loans.reduce((s, l) => s + Number(l.outstanding || 0), 0);
-    const risk = outstanding > capital * 0.5 ? 'High' : outstanding > 0 ? 'Medium' : 'Low';
-    return {
-      email: entry.email,
-      borrower: entry.email,
-      loanCount: entry.loans.length,
-      capitalBooked: Number(capital.toFixed(2)),
-      principalPaid: Number(principalPaid.toFixed(2)),
-      interestPaid: Number(interestPaid.toFixed(2)),
-      outstanding: Number(outstanding.toFixed(2)),
-      status: entry.loans.length ? displayStatus(entry.loans[0], today).group : '—',
-      riskLevel: risk,
-      lastEvent: entry.events.length ? entry.events[entry.events.length - 1].updatedAt : '—'
-    };
-  });
-
-  const summary = {
-    customerAccounts: loansInScope.length,
-    totalLoans: allLoanRows.length,
-    totalCapital: Number(allLoanRows.reduce((s, l) => s + Number(l.principalAmount), 0).toFixed(2)),
-    totalInterestBooked: Number(allLoanRows.reduce((s, l) => s + Number(l.interest), 0).toFixed(2)),
-    totalPayable: Number(allLoanRows.reduce((s, l) => s + Number(l.totalPayable), 0).toFixed(2)),
-    totalPaid: Number(allLoanRows.reduce((s, l) => s + Number(l.totalPaid), 0).toFixed(2)),
-    totalOutstanding,
-    activeLoans: active.length,
-    overdueLoans: overdue.length,
-    overdueTotal: Number(overdue.reduce((s, l) => s + l.outstanding, 0).toFixed(2)),
-    defaulters: defaulterRows.length,
-    defaultersTotal: Number(defaulterRows.reduce((s, l) => s + l.outstanding, 0).toFixed(2)),
-    pendingPayments: allLoanRows.filter(l => l.remainingInstallments > 0).length,
-    partialPayments: allLoanRows.filter(l => l.remainingInstallments > 0 && l.paidInstallments > 0).length,
-    settledLoans: allLoanRows.filter(l => l.display.group === 'settled').length,
-    loyalCustomers: borrowerStatements.filter(e => e.loans.length > 1).length,
-    cashCollected: Number(allLoanRows.flatMap(l => (Array.isArray(l.payments) ? l.payments : [])).reduce((s, p) => s + Number(p.amount || 0), 0).toFixed(2))
-  };
-
-  return {
-    reportDate: today,
-    scope,
-    period,
-    summary,
-    allLoanRows,
-    overdueRows,
-    defaulterRows,
-    paymentsTodayRows,
-    monthlyRows,
-    borrowerStatements,
-    approvalLogRows,
-    revenueMonthly,
-    revenueLoanRows,
-    performanceRows,
-    lastUpdated: new Date().toISOString()
-  };
-}
-
-    borrowerStatements.push({ ...entry, events, totals });
-  }
-
-  // ── Loan approval log ────────────────────────────────────────────────────
-  const approvalLogRows = (allLoanRows.filter(l => l.approvedAt).map(l => ({
-    loanId: l.loanId,
-    receiptNumber: l.receiptNumber,
-    borrower: l.borrower,
-    lender: l.lender,
-    principalAmount: l.principalAmount,
-    interest: l.interest,
-    totalPayable: l.totalPayable,
-    approvedAt: l.approvedAt,
-    approvedBy: l.approvedBy || '—'
-  }))).sort((a, b) => new Date(b.approvedAt).getTime() - new Date(a.approvedAt).getTime());
-
-  // ── Interest & revenue ───────────────────────────────────────────────────
-  const revenueMonthly = monthLabels.map(month => {
-    const issued = loansInScope.filter(l =>
-      String(l.approvedAt || l.createdAt || '').startsWith(`${fixedYear}-${month.month}`)
-    );
-    const received = allLoanRows.flatMap(loan =>
-      Array.isArray(loan.payments) ? loan.payments : []
-    ).filter(p => String(p.paymentDate || '').startsWith(`${fixedYear}-${month.month}`));
-    const principal = issued.reduce((s, l) => s + Number(l.principalAmount || 0), 0);
-    const interestCharged = issued.reduce((s, l) => s + Number(l.interestDue || 0), 0);
-    const principalCollected = received.reduce((s, p) => s + Number(p.amount || 0), 0);
-    const interestCollected = received.reduce((s, p) => s + Number(p.amount || 0) * 0.35, 0);
-    return {
-      month: month.label,
-      monthIndex: Number(month.month),
-      principalBooked: Number(principal.toFixed(2)),
-      interestCharged: Number(interestCharged.toFixed(2)),
-      principalCollected: Number(principalCollected.toFixed(2)),
-      interestCollected: Number(interestCollected.toFixed(2)),
-      collectionRate: principal > 0 ? Number(((principalCollected / principal) * 100).toFixed(1)) : 0
-    };
-  });
-
-      Array.isArray(loan.payments) ? loan.payments : []
-    ).filter(p => {
-      const d = String(p.paymentDate || '');
-      return d.startsWith(`${fixedYear}-${month.month}`);
-    }));
-    const outstandingEnd = loansInScope
-      .filter(l => l.businessStatus === 'active')
-      .reduce((sum, loan) => {
-        const d = String(l.dueDate || '');
-        const monthDays = new Date(Date.UTC(fixedYear, Number(month.month), 0)).getDate();
-        const lastDay = new Date(Date.UTC(fixedYear, Number(month.month), monthDays)).toISOString().slice(0, 10);
-        const inclusive = d <= lastDay;
-        return sum + (inclusive ? Number(loan.outstanding || 0) : 0);
-      }, 0);
-    return {
-      month: month.label,
-      monthIndex: Number(month.month),
-      firstDay: month.first,
-      lastDay: month.last,
-      issuances: monthLoans.length,
-      issuedValue: monthLoans.reduce((sum, l) => sum + Number(l.principalAmount || 0), 0),
-      payments: monthPayments.length,
-      paymentsCollected: monthPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0),
-      outstandingEnd: Number(outstandingEnd.toFixed(2))
-    };
-  });
-
-      phone: user.phone,
-      nrc: user.nrc,
-      loanCount: customerLoans.length,
-      loans: customerLoans.map(loan => ({
-        id: loan.id,
-        receiptNumber: loan.receiptNumber,
-        amount: Number(loan.principalAmount),
-        status: displayStatus(loan, todayIso()).label,
-        dueDate: formatDateDDMMYYYY(loan.dueDate),
-        outstanding: Number(loan.outstanding)
-      }))
-}
-
-    });
-  }
-  return customers.slice(0, 20);
-}

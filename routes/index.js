@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const config = require('../config');
 const { logError } = require('../middleware/logger');
 const { getStatus, getHealth } = require('../controllers/statusController');
 const { getAccessLogs, getErrorLogs } = require('../controllers/logController');
@@ -57,7 +58,12 @@ router.get('/reports/analytics/tracking', getTrackingAnalytics);
 router.get('/reports/analytics/tracking/export', exportTrackingSheet);
 // Flat typed-report routes (static, must come before :scope dynamic routes)
 router.get('/reports/:type', getTypedReport);
-router.get('/reports/:type/export', getTypedReportExcel);
+router.get('/reports/:type/export', (req, res, next) => {
+  if (config.REPORTS.REPORT_TYPES.includes(req.params.type)) {
+    return getTypedReportExcel(req, res, next);
+  }
+  return exportReport(req, res, next);
+});
 router.get('/reports/:type/pdf', getTypedReportPdf);
 
 router.get('/reports/:scope/summary', getReportSummary);

@@ -693,24 +693,42 @@ async function getPaymentsReportExport(req, res) {
     return res.send(buffer);
   } catch (err) {
     logBreakage('reportController.js', 'getPaymentsReportExport', err, 'PAYMENTS REPORT EXPORT FAILED');
-    if (!res.headersSent) return res.status(500).json({ error: 'Unable to export the payments report.' });
+    if (!res.headersSent) return res.status(503).json({ error: 'Unable to export the payments report.' });
   }
 }
 
 // ─── Single-user report: loans + payments + balances for one borrower ────────
 function getUserReport(req, res) {
+  try {
   const email = String(req.params.email || req.query.email || '').trim().toLowerCase();
   if (!isAuthorizedUserReport(req, email)) {
     return res.status(403).json({ error: 'Access to this account report is not allowed.' });
   }
 
+  const scope = isAdminRole(req.authUser?.role)
+    ? getRequestedStoreId(req)
+    : getRecordStoreId(req.authUser);
   const users = readArray(USERS_FILE);
-  const profile = users.find(user => String(user.email || '').trim().toLowerCase() === email) || null;
+  const profile = users.find(user =>
+    String(user.email || '').trim().toLowerCase() === email &&
+    (scope === 'all' || getRecordStoreId(user) === scope)) || null;
   const profileSafe = profile ? { ...profile } : null;
-  if (profileSafe) delete profileSafe.password;
+  if (profileSafe) {
+    const trustedDevices = profileSafe.trustedDevices;
+    if (Array.isArray(trustedDevices) && trustedDevices.length) {
+      profileSafe._trustedDeviceCount = trustedDevices.length;
+      profileSafe._trustedDeviceLastSeen = trustedDevices.map(device => device.lastSeen || device.createdAt).sort().pop();
+    }
+    delete profileSafe.password;
+    delete profileSafe.tokens;
+    delete profileSafe.trustedDevices;
+  }
 
   const borrowersLoans = getEnrichedLoans()
-    .filter(loan => String(loan.email || '').trim().toLowerCase() === email);
+    .filter(loan => String(loan.email || '').trim().toLowerCase() === email &&
+      (scope === 'all' || getRecordStoreId(loan) === scope));
+
+  if (!profile && !borrowersLoans.length) return res.status(404).json({ error: 'Customer not found in this store.' });
 
   return res.json({
     email,
@@ -725,6 +743,10 @@ function getUserReport(req, res) {
       ...payment
     })))
   });
+  } catch (err) {
+    logBreakage('reportController.js', 'getUserReport', err, 'USER REPORT BUILD FAILED');
+    if (!res.headersSent) return res.status(503).json({ error: 'User report is temporarily unavailable.' });
+  }
 }
 
 // ─── Search by loan receipt ID or borrower email ─────────────────────────────
@@ -892,7 +914,7 @@ async function exportReport(req, res) {
     return res.send(Buffer.from(buffer));
   } catch (err) {
     logBreakage('reportController.js', 'exportReport', err, 'REPORT EXPORT FAILED');
-    if (!res.headersSent) return res.status(500).json({ error: 'Unable to export the report.' });
+    if (!res.headersSent) return res.status(503).json({ error: 'Unable to export the report.' });
   }
 }
 
@@ -931,10 +953,11 @@ function requireAdmin(req, res) {
   return true;
 }
 
-function collectLoansForEmail(email) {
+function collectLoansForEmail(email, scope = config.DEFAULT_STORE_ID) {
   const target = String(email || '').trim().toLowerCase();
   return getEnrichedLoans().filter(loan =>
-    String(loan.email || '').trim().toLowerCase() === target);
+    String(loan.email || '').trim().toLowerCase() === target &&
+    (scope === 'all' || getRecordStoreId(loan) === scope));
 }
 
 function interestPaidOf(loan) {
@@ -977,14 +1000,15 @@ function shapeLoan(loan) {
   };
 }
 
-function buildUserReportBody(email, from = '', to = '') {
-  const users = readArray(USERS_FILE);
+function buildUserReportBody(email, from = '', to = '', scope = config.DEFAULT_STORE_ID) {
+  const users = readArray(USERS_FILE).filter(user =>
+    scope === 'all' || getRecordStoreId(user) === scope);
   const target = String(email || '').trim().toLowerCase();
   const profile = users.find(user => String(user.email || '').trim().toLowerCase() === target) || null;
   const profileSafe = profile ? { ...profile } : null;
   if (profileSafe) delete profileSafe.password;
 
-  const loans = applyPeriodFilter(collectLoansForEmail(target), from, to).map(shapeLoan);
+  const loans = applyPeriodFilter(collectLoansForEmail(target, scope), from, to).map(shapeLoan);
   const summary = {
     totalBorrowed: loans.reduce((sum, loan) => sum + loan.amount, 0),
     totalPaid: loans.reduce((sum, loan) => sum + loan.totalPaid, 0),
@@ -1003,38 +1027,54 @@ function buildUserReportBody(email, from = '', to = '') {
 }
 
 function getSingleUserReport(req, res) {
+  try {
   if (!requireAdmin(req, res)) return;
+  const scope = getRequestedStoreId(req);
+  if (!canAccessStore(req, scope)) return res.status(403).json({ error: 'Access to this store is not allowed.' });
   const email = String(req.query.email || '').trim().toLowerCase();
   if (!email) return res.status(400).json({ error: 'email query parameter is required.' });
   const { from, to, invalid } = readPeriod(req);
   if (invalid) return res.status(400).json({ error: 'from/to must be YYYY-MM-DD dates.' });
 
-  const body = buildUserReportBody(email, from, to);
-  if (!body.loans.length && !body.name) {
+  const body = buildUserReportBody(email, from, to, scope);
+  const accountExists = readArray(USERS_FILE).some(user =>
+    String(user.email || '').trim().toLowerCase() === email &&
+    (scope === 'all' || getRecordStoreId(user) === scope));
+  if (!accountExists && !body.loans.length) {
     return res.status(404).json({ error: `No account found for ${email}.` });
   }
   return res.json(body);
+  } catch (err) {
+    logBreakage('reportController.js', 'getSingleUserReport', err, 'SINGLE USER REPORT BUILD FAILED');
+    if (!res.headersSent) return res.status(503).json({ error: 'User report is temporarily unavailable.' });
+  }
 }
 
 function getAllUsersReport(req, res) {
+  try {
   if (!requireAdmin(req, res)) return;
+  const scope = getRequestedStoreId(req);
+  if (!canAccessStore(req, scope)) return res.status(403).json({ error: 'Access to this store is not allowed.' });
   const { from, to, invalid } = readPeriod(req);
   if (invalid) return res.status(400).json({ error: 'from/to must be YYYY-MM-DD dates.' });
 
   const emails = [...new Set([
-    ...readArray(USERS_FILE).map(user => String(user.email || '').trim().toLowerCase()),
-    ...getEnrichedLoans().map(loan => String(loan.email || '').trim().toLowerCase())
+    ...readArray(USERS_FILE)
+      .filter(user => scope === 'all' || getRecordStoreId(user) === scope)
+      .map(user => String(user.email || '').trim().toLowerCase()),
+    ...getEnrichedLoans()
+      .filter(loan => scope === 'all' || getRecordStoreId(loan) === scope)
+      .map(loan => String(loan.email || '').trim().toLowerCase())
   ].filter(Boolean))];
 
-  const reports = emails.map(email => buildUserReportBody(email, from, to));
+  const reports = emails.map(email => buildUserReportBody(email, from, to, scope));
   const allLoans = reports.flatMap(report => report.loans);
 
   const grandTotals = {
     grandTotalBorrowed: allLoans.reduce((sum, loan) => sum + loan.amount, 0),
     grandTotalPaid: allLoans.reduce((sum, loan) => sum + loan.totalPaid, 0),
     grandTotalOutstanding: allLoans.reduce((sum, loan) => sum + loan.outstanding, 0),
-    grandTotalInterest: Number(applyPeriodFilter(getEnrichedLoans(), from, to).reduce((sum, loan) =>
-      sum + interestPaidOf(loan), 0).toFixed(2)),
+    grandTotalInterest: Number(allLoans.reduce((sum, loan) => sum + loan.interestPaid, 0).toFixed(2)),
     totalActiveLoans: allLoans.filter(loan => ['active', 'grace'].includes(loan.status)).length,
     totalOverdueLoans: allLoans.filter(loan => ['grace', 'defaulted'].includes(loan.status)).length,
     totalPaidLoans: allLoans.filter(loan => loan.status === 'paid').length,
@@ -1042,12 +1082,19 @@ function getAllUsersReport(req, res) {
   };
 
   return res.json({ generatedAt: new Date().toISOString(), period: { from: from || null, to: to || null }, users: reports, grandTotals });
+  } catch (err) {
+    logBreakage('reportController.js', 'getAllUsersReport', err, 'ALL USERS REPORT BUILD FAILED');
+    if (!res.headersSent) return res.status(503).json({ error: 'Portfolio report is temporarily unavailable.' });
+  }
 }
 
 function getAnalyticsReport(req, res) {
+  try {
   if (!requireAdmin(req, res)) return;
+  const scope = getRequestedStoreId(req);
+  if (!canAccessStore(req, scope)) return res.status(403).json({ error: 'Access to this store is not allowed.' });
 
-  const enriched = getEnrichedLoans();
+  const enriched = getEnrichedLoans().filter(loan => scope === 'all' || getRecordStoreId(loan) === scope);
   const isOverdue = loan => ['grace', 'defaulted'].includes(loan.businessStatus);
   const isPaid = loan => loan.businessStatus === 'paid';
   const isDefaulted = loan => loan.businessStatus === 'defaulted';
@@ -1119,6 +1166,10 @@ function getAnalyticsReport(req, res) {
       slowPayers: slowPayers.length
     }
   });
+  } catch (err) {
+    logBreakage('reportController.js', 'getAnalyticsReport', err, 'ANALYTICS REPORT BUILD FAILED');
+    if (!res.headersSent) return res.status(503).json({ error: 'Analytics report is temporarily unavailable.' });
+  }
 }
 
 // ─── Tracking sheet builder ────────────────────────────────────────────────────

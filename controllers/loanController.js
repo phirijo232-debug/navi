@@ -672,7 +672,7 @@ async function requestLoan(req, res) {
     });
   } catch (err) {
     logBreakage('loanController.js', 'requestLoan', err, 'LOANS REQUEST FAILED');
-    res.status(500).json({ error: 'Unable to submit loan request.' });
+    res.status(503).json({ error: 'Unable to submit loan request.' });
   }
 }
 

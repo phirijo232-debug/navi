@@ -540,12 +540,12 @@ async function downloadReport(format) {
       throw new Error(data.error || 'Unable to download report.');
     }
     const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
+    link.href = blobUrl;
     link.download = `BMF-${reportScope}-${reportType}-${new Date().toISOString().slice(0, 10)}.${format}`;
     link.click();
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(blobUrl);
     note.textContent = 'Report downloaded.';
   } catch (err) {
     note.textContent = err.message || 'Unable to download report.';

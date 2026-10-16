@@ -1,10 +1,16 @@
 const http = require('http');
+require('dotenv').config();
 
 const password = process.argv[2];
-const expectedKey = process.env.MASTER_KEY || 'phirii26';
+const expectedKey = process.env.MASTER_KEY || process.env.SHUTDOWN_KEY;
+
+if (!expectedKey) {
+  console.log('MASTER_KEY or SHUTDOWN_KEY is not configured.');
+  process.exit(1);
+}
 
 if (!password) {
-  console.log(`Usage: node stop.js ${expectedKey}`);
+  console.log('Usage: node stop.js <master-key>');
   process.exit(1);
 }
 

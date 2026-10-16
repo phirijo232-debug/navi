@@ -127,7 +127,7 @@ function restoreBackup(req, res) {
 
     const { id, key } = req.body || {};
     const masterKey = process.env.MASTER_KEY || config.SHUTDOWN_KEY;
-    if (!key || key !== masterKey) {
+    if (!masterKey || !key || key !== masterKey) {
       logError(`RESTORE REFUSED — invalid master key attempt by ${req.authUser?.email || 'unknown'}`);
       return res.status(401).json({ error: 'Invalid master key.' });
     }

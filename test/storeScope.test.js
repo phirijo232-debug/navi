@@ -3,7 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { getRecordStoreId, canAccessStore, canAccessRecord } = require('../middleware/storeScope');
-const { getReportData, getReportSummary } = require('../controllers/reportController');
+const {
+  getReportData, getReportSummary, getSingleUserReport,
+  getAllUsersReport, getAnalyticsReport, getUserReport
+} = require('../controllers/reportController');
 const { getLoans } = require('../controllers/loanController');
 const { getFeedback } = require('../controllers/feedbackController');
 const { updateLoanStatus } = require('../controllers/loanController');
@@ -60,6 +63,71 @@ test('BMF store admins cannot request the franchise-wide report', () => {
   getReportSummary(req, res);
   assert.equal(res.statusCode, 403);
   assert.match(res.body.error, /Admin access required/);
+});
+
+test('legacy portfolio, analytics, and borrower reports honor the caller store scope', () => {
+  const originals = [USERS_FILE, LOANS_FILE].map(file => fs.readFileSync(file, 'utf8'));
+  fs.writeFileSync(USERS_FILE, JSON.stringify([
+    {
+      id: 1, email: 'bmf@example.test', username: 'BMF Borrower', role: 'user', storeId: 'buraza',
+      password: 'hash', tokens: { laptop: 'legacy-token' }, trustedDevices: [{ token: 'live-token', lastSeen: '2026-10-15T10:00:00Z' }]
+    },
+    { id: 2, email: 'future@example.test', username: 'Future Borrower', role: 'user', storeId: 'future-store' }
+  ]));
+  fs.writeFileSync(LOANS_FILE, JSON.stringify([
+    { id: 1, email: 'bmf@example.test', storeId: 'buraza', status: 'active', dueDate: '2026-10-01', amount: 100, totalRepayment: 100, outstanding: 100 },
+    { id: 2, email: 'future@example.test', storeId: 'future-store', status: 'active', dueDate: '2026-10-01', amount: 200, totalRepayment: 200, outstanding: 200 }
+  ]));
+
+  try {
+    const storeAdmin = {
+      authUser: { role: 'store_admin', storeId: 'buraza', email: 'operator@example.test' },
+      query: {}, headers: {}, body: {}
+    };
+    const allUsersResponse = responseRecorder();
+    getAllUsersReport(storeAdmin, allUsersResponse);
+    assert.deepEqual(allUsersResponse.body.users.map(user => user.email), ['bmf@example.test']);
+    assert.equal(allUsersResponse.body.grandTotals.grandTotalOutstanding, 100);
+
+    const analyticsResponse = responseRecorder();
+    getAnalyticsReport(storeAdmin, analyticsResponse);
+    assert.equal(analyticsResponse.body.possibleLoss, 100);
+    assert.deepEqual(analyticsResponse.body.overdueLoans.map(loan => loan.email), ['bmf@example.test']);
+
+    const borrowerResponse = responseRecorder();
+    getSingleUserReport({ ...storeAdmin, query: { email: 'future@example.test' } }, borrowerResponse);
+    assert.equal(borrowerResponse.statusCode, 404);
+
+    const pathBorrowerResponse = responseRecorder();
+    getUserReport({
+      ...storeAdmin,
+      params: { email: 'future@example.test' }
+    }, pathBorrowerResponse);
+    assert.equal(pathBorrowerResponse.statusCode, 404);
+
+    const safeProfileResponse = responseRecorder();
+    getUserReport({
+      authUser: { role: 'admin', email: 'admin@example.test' },
+      params: { email: 'bmf@example.test' }, query: {}, headers: {}, body: {}
+    }, safeProfileResponse);
+    assert.equal(safeProfileResponse.body.profile.password, undefined);
+    assert.equal(safeProfileResponse.body.profile.tokens, undefined);
+    assert.equal(safeProfileResponse.body.profile.trustedDevices, undefined);
+    assert.equal(safeProfileResponse.body.profile._trustedDeviceCount, 1);
+
+    const allScopeResponse = responseRecorder();
+    getAllUsersReport({ ...storeAdmin, query: { storeId: 'all' } }, allScopeResponse);
+    assert.equal(allScopeResponse.statusCode, 403);
+
+    const franchiseResponse = responseRecorder();
+    getAllUsersReport({
+      authUser: { role: 'admin', email: 'admin@example.test' },
+      query: { storeId: 'all' }, headers: {}, body: {}
+    }, franchiseResponse);
+    assert.deepEqual(franchiseResponse.body.users.map(user => user.email), ['bmf@example.test', 'future@example.test']);
+  } finally {
+    [USERS_FILE, LOANS_FILE].forEach((file, index) => fs.writeFileSync(file, originals[index]));
+  }
 });
 
 test('BMF store admins only receive BMF loans and customer feedback', () => {
