@@ -37,7 +37,8 @@ test('regular user reset verifies the account mailbox, rejects a wrong OTP, and 
     await requestPasswordReset({ body: { email: ' RESET-USER@example.test ' } }, requestResponse);
 
     assert.equal(requestResponse.statusCode, 200);
-    assert.equal(requestResponse.body.otpSentTo, 'reset-user@example.test');
+    assert.match(requestResponse.body.message, /if an eligible account exists/i);
+    assert.equal(requestResponse.body.otpSentTo, undefined);
     assert.equal(sendOtp.mock.calls[0].arguments[1], 'reset-user@example.test');
 
     const otp = otpService.generateOTP('reset-user@example.test:Password Reset');
@@ -88,8 +89,9 @@ test('store-admin reset sends and verifies OTP through the registered account ma
     await requestPasswordReset({ body: { email: 'bmf-admin@example.test' } }, requestResponse);
 
     assert.equal(requestResponse.statusCode, 200);
-    assert.equal(requestResponse.body.otpChannel, 'account');
-    assert.equal(requestResponse.body.otpSentTo, 'bmf-admin@example.test');
+    assert.match(requestResponse.body.message, /if an eligible account exists/i);
+    assert.equal(requestResponse.body.otpChannel, undefined);
+    assert.equal(requestResponse.body.otpSentTo, undefined);
     assert.equal(sendOtp.mock.calls[0].arguments[1], 'bmf-admin@example.test');
     assert.equal(sendOtp.mock.calls[0].arguments[3], 'bmf-admin@example.test');
 
@@ -109,7 +111,7 @@ test('store-admin reset sends and verifies OTP through the registered account ma
   }
 });
 
-test('admin-only reset refuses customer accounts without sending an OTP', async (t) => {
+test('admin-only reset uses the same generic response for customer accounts without sending an OTP', async (t) => {
   const original = fs.readFileSync(USERS_FILE, 'utf8');
   fs.writeFileSync(USERS_FILE, JSON.stringify([{
     id: 1,
@@ -124,7 +126,25 @@ test('admin-only reset refuses customer accounts without sending an OTP', async 
     const sendOtp = t.mock.method(otpService, 'sendOTP', async () => '123456');
     const response = responseRecorder();
     await requestPasswordReset({ body: { email: 'customer@example.test', adminOnly: true } }, response);
-    assert.equal(response.statusCode, 400);
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body.message, /if an eligible account exists/i);
+    assert.equal(sendOtp.mock.calls.length, 0);
+  } finally {
+    fs.writeFileSync(USERS_FILE, original);
+  }
+});
+
+test('unknown email receives the same generic password-reset response without sending an OTP', async (t) => {
+  const original = fs.readFileSync(USERS_FILE, 'utf8');
+  fs.writeFileSync(USERS_FILE, JSON.stringify([]));
+  try {
+    const sendOtp = t.mock.method(otpService, 'sendOTP', async () => '123456');
+    const response = responseRecorder();
+    await requestPasswordReset({ body: { email: 'missing@example.test' } }, response);
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.body, {
+      message: 'If an eligible account exists, a reset code will be sent to its registered email.'
+    });
     assert.equal(sendOtp.mock.calls.length, 0);
   } finally {
     fs.writeFileSync(USERS_FILE, original);

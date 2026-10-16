@@ -87,7 +87,7 @@ function submitFeedback(req, res) {
     res.json({ message: 'Feedback submitted successfully.', feedback: item });
   } catch (err) {
     logError(`FEEDBACK SUBMIT FAILED: ${err.message}`);
-    res.status(500).json({ error: 'Unable to submit feedback right now.' });
+    res.status(503).json({ error: 'Unable to submit feedback right now.' });
   }
 }
 
@@ -133,7 +133,7 @@ function getFeedback(req, res) {
     res.json({ feedback: filtered, summary });
   } catch (err) {
     logError(`FEEDBACK FETCH FAILED: ${err.message}`);
-    res.status(500).json({ error: 'Unable to load feedback.' });
+    res.status(503).json({ error: 'Unable to load feedback.' });
   }
 }
 
@@ -166,7 +166,7 @@ function updateFeedbackStatus(req, res) {
     res.json({ message: 'Feedback updated.', feedback: feed[index] });
   } catch (err) {
     logError(`FEEDBACK UPDATE FAILED: ${err.message}`);
-    res.status(500).json({ error: 'Unable to update feedback.' });
+    res.status(503).json({ error: 'Unable to update feedback.' });
   }
 }
 

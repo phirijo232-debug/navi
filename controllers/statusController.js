@@ -44,27 +44,24 @@ const getStatus = circuitBreaker('getStatus', async (req, res) => {
   const minutes = Math.floor((uptime % 3600) / 60);
   const seconds = Math.floor(uptime % 60);
 
-  // LEAK TIGHTENING: /status is a PUBLIC path (no deviceAuth), so it must not
-  // expose machine identity. Hostname/platform/CPU model were removed — the
-  // dashboard only renders status, uptime, ram.used and cpu.cores.
+  // /status is public, so keep operational capacity and configuration in the
+  // authenticated admin tier only. Anonymous callers need just liveness.
   const status = {
     server: 'Navi Server',
     status: 'running',
-    uptime: `${hours}h ${minutes}m ${seconds}s`,
-    cpu: {
-      cores: os.cpus().length
-    },
-    ram: {
-      total: `${Math.round(os.totalmem() / 1024 / 1024)}MB`,
-      free: `${Math.round(os.freemem() / 1024 / 1024)}MB`,
-      used: `${Math.round((os.totalmem() - os.freemem()) / 1024 / 1024)}MB`
-    }
+    uptime: `${hours}h ${minutes}m ${seconds}s`
   };
 
   const token = req.headers && req.headers['x-device-token'];
   const user = token ? findUserByDeviceToken(token) : null;
   if (user && isAdminRole(user.role)) {
     status.serverMode = typeof getServerMode === 'function' ? getServerMode() : 'private';
+    status.cpu = { cores: os.cpus().length };
+    status.ram = {
+      total: `${Math.round(os.totalmem() / 1024 / 1024)}MB`,
+      free: `${Math.round(os.freemem() / 1024 / 1024)}MB`,
+      used: `${Math.round((os.totalmem() - os.freemem()) / 1024 / 1024)}MB`
+    };
   }
 
   res.json(status);

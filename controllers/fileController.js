@@ -86,7 +86,7 @@ function serveFile(req, res) {
     return res.sendFile(abs);
   } catch (err) {
     logError(`FILE SERVE FAILED: ${err.message}`);
-    return res.status(500).send('Unable to serve file.');
+    return res.status(503).send('Unable to serve file.');
   }
 }
 

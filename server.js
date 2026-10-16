@@ -12,6 +12,7 @@ const { startScheduler } = require('./scheduler');
 const { ensureDataIntegrity } = require('./middleware/dataStore');
 const { startHealthWatch } = require('./middleware/healthWatch');
 const { errorAudit, captureOrigin, appendAudit } = require('./middleware/errorAudit');
+const { isPrivateControlClient } = require('./middleware/localControl');
 
 const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || null;
 const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
@@ -95,6 +96,10 @@ function hasValidAdminKey(req) {
 
 app.post('/vault/request', async (req, res) => {
   try {
+    if (!isPrivateControlClient(req.ip)) {
+      logError(`VAULT REQUEST BLOCKED — public-network request from ${req.ip}`);
+      return res.status(403).json({ error: 'Vault access is available only from the private network.' });
+    }
     const { password } = req.body || {};
     const submittedKey = password || req.headers['x-admin-key'] || req.headers['x-shutdown-key'];
     if (!ADMIN_KEY || !submittedKey || submittedKey !== ADMIN_KEY) {
@@ -105,12 +110,16 @@ app.post('/vault/request', async (req, res) => {
     return res.json({ message: 'Vault OTP sent to the configured admin email.' });
   } catch (err) {
     logError(`VAULT REQUEST FAILED: ${err.message}`);
-    return res.status(500).json({ error: 'Vault request failed.' });
+    return res.status(503).json({ error: 'Vault request failed.' });
   }
 });
 
 app.post('/vault/authorize', (req, res) => {
   try {
+    if (!isPrivateControlClient(req.ip)) {
+      logError(`VAULT AUTH BLOCKED — public-network request from ${req.ip}`);
+      return res.status(403).json({ error: 'Vault access is available only from the private network.' });
+    }
     const { password, otp } = req.body || {};
     const submittedKey = password || req.headers['x-admin-key'] || req.headers['x-shutdown-key'];
     if (!ADMIN_KEY || !submittedKey || submittedKey !== ADMIN_KEY) {
@@ -123,11 +132,15 @@ app.post('/vault/authorize', (req, res) => {
     return res.json({ authorized: true, message: 'Vault access approved.' });
   } catch (err) {
     logError(`VAULT AUTH FAILED: ${err.message}`);
-    return res.status(500).json({ error: 'Vault authorization failed.' });
+    return res.status(503).json({ error: 'Vault authorization failed.' });
   }
 });
 
 app.post('/internal-shutdown', (req, res) => {
+  if (!isPrivateControlClient(req.ip)) {
+    logError(`UNAUTHORIZED SHUTDOWN ATTEMPT from public IP ${req.ip}`);
+    return res.status(403).send('Denied');
+  }
   const key = req.headers['x-admin-key'] || req.headers['x-shutdown-key'];
   if (!ADMIN_KEY || key !== ADMIN_KEY) {
     logError(`UNAUTHORIZED SHUTDOWN ATTEMPT from ${req.ip}`);

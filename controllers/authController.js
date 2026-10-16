@@ -540,12 +540,8 @@ async function requestPasswordReset(req, res) {
     const users = getUsers();
     const user = users.find(u => String(u.email || '').trim().toLowerCase() === email);
 
-    if (!user) {
-      return res.status(400).json({ error: 'Email not found.' });
-    }
-
-    if (req.body?.adminOnly && !isAdminRole(user.role)) {
-      return res.status(400).json({ error: 'No admin account was found for that email.' });
+    if (!user || (req.body?.adminOnly && !isAdminRole(user.role))) {
+      return res.json({ message: 'If an eligible account exists, a reset code will be sent to its registered email.' });
     }
 
     const otpEmail = String(user.email || '').trim();
@@ -560,11 +556,7 @@ async function requestPasswordReset(req, res) {
       expiresAt: Date.now() + 5 * 60 * 1000,
       createdAt: Date.now()
     };
-    return res.json({
-      message: 'OTP sent for password reset.',
-      otpSentTo: otpEmail,
-      otpChannel: 'account'
-    });
+    return res.json({ message: 'If an eligible account exists, a reset code will be sent to its registered email.' });
 
   } catch (err) {
     const { status, error } = classifyMailError(err, 'send the password reset OTP');
@@ -636,7 +628,7 @@ async function createInvite(req, res) {
     return res.json({ message: 'Invite generated.', inviteToken: token, signupUrl: `/signup.html?invite=${token}` });
   } catch (err) {
     logBreakage('authController.js', 'createInvite', err, 'INVITE GENERATION FAILED');
-    res.status(500).json({ error: 'Unable to generate invite token.' });
+    res.status(503).json({ error: 'Unable to generate invite token.' });
   }
 }
 
@@ -713,7 +705,7 @@ async function createAdminUser(req, res) {
     });
   } catch (err) {
     logBreakage('authController.js', 'createAdminUser', err, 'ADMIN USER CREATION FAILED');
-    return res.status(500).json({ error: 'Unable to create the user.' });
+    return res.status(503).json({ error: 'Unable to create the user.' });
   }
 }
 
@@ -741,7 +733,7 @@ function getAllUsers(req, res) {
     res.json(users);
   } catch (err) {
     logError(`GET ALL USERS FAILED: ${err.message}`);
-    res.status(500).json({ error: 'Unable to load users.' });
+    res.status(503).json({ error: 'Unable to load users.' });
   }
 }
 
@@ -787,7 +779,7 @@ async function sendAdminAnnouncement(req, res) {
     });
   } catch (err) {
     logBreakage('authController.js', 'sendAdminAnnouncement', err, 'ADMIN ANNOUNCEMENT FAILED');
-    return res.status(500).json({ error: 'Unable to send the announcement.' });
+    return res.status(503).json({ error: 'Unable to send the announcement.' });
   }
 }
 
@@ -802,7 +794,7 @@ function validateInvite(req, res) {
     res.json({ valid: true, email: invite.email, expiresAt: invite.expiresAt });
   } catch (err) {
     logError(`INVITE VALIDATION FAILED: ${err.message}`);
-    res.status(500).json({ error: 'Unable to validate invite token.' });
+    res.status(503).json({ error: 'Unable to validate invite token.' });
   }
 }
 
@@ -825,7 +817,7 @@ function listInvites(req, res) {
     res.json({ invites });
   } catch (err) {
     logError(`INVITE LIST FAILED: ${err.message}`);
-    res.status(500).json({ error: 'Unable to load invites.' });
+    res.status(503).json({ error: 'Unable to load invites.' });
   }
 }
 
@@ -880,7 +872,7 @@ function listEmployees(req, res) {
     res.json({ employees });
   } catch (err) {
     logError(`HR LIST EMPLOYEES FAILED: ${err.message}`);
-    res.status(500).json({ error: 'Unable to load employees.' });
+    res.status(503).json({ error: 'Unable to load employees.' });
   }
 }
 
@@ -929,7 +921,7 @@ async function editEmployee(req, res) {
     res.json({ message: 'Employee updated successfully.', employee: publicEmployee(target) });
   } catch (err) {
     logBreakage('authController.js', 'editEmployee', err, 'HR EDIT EMPLOYEE FAILED');
-    res.status(500).json({ error: 'Unable to update the employee.' });
+    res.status(503).json({ error: 'Unable to update the employee.' });
   }
 }
 
@@ -969,7 +961,7 @@ function setEmployeeRestriction(req, res) {
     res.json({ message: 'Permissions updated.', employee: publicEmployee(target) });
   } catch (err) {
     logBreakage('authController.js', 'setEmployeeRestriction', err, 'HR SET RESTRICTION FAILED');
-    res.status(500).json({ error: 'Unable to update permissions.' });
+    res.status(503).json({ error: 'Unable to update permissions.' });
   }
 }
 
@@ -1005,7 +997,7 @@ async function requestStoreSwitch(req, res) {
     });
   } catch (err) {
     logBreakage('authController.js', 'requestStoreSwitch', err, 'HR STORE SWITCH REQUEST FAILED');
-    res.status(500).json({ error: 'Unable to start the store switch.' });
+    res.status(503).json({ error: 'Unable to start the store switch.' });
   }
 }
 
@@ -1027,7 +1019,7 @@ function verifyStoreSwitch(req, res) {
     res.json({ authorized: true, storeId: targetStore, message: 'Store switch approved.' });
   } catch (err) {
     logBreakage('authController.js', 'verifyStoreSwitch', err, 'HR STORE SWITCH VERIFY FAILED');
-    res.status(500).json({ error: 'Unable to verify the store switch.' });
+    res.status(503).json({ error: 'Unable to verify the store switch.' });
   }
 }
 

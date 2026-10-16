@@ -682,9 +682,10 @@ function getLoans(req, res) {
     const filter = req.query.filter;
     const authEmail = req.authUser?.email;
     const isAdmin = isAdminRole(req.authUser?.role);
-    const storeId = getRequestedStoreId(req);
+    const requestedStoreId = getRequestedStoreId(req);
+    const storeId = isAdmin ? requestedStoreId : getRecordStoreId(req.authUser);
 
-    if (isAdmin && !canAccessStore(req, storeId)) {
+    if (isAdmin && !canAccessStore(req, requestedStoreId)) {
       return res.status(403).json({ error: 'Access to this store is not allowed.' });
     }
 
@@ -692,13 +693,13 @@ function getLoans(req, res) {
       return res.status(400).json({ error: 'Email is required to retrieve loans.' });
     }
 
-    if (email && authEmail && authEmail !== email && !isAdmin) {
+    if (email && authEmail && String(authEmail).trim().toLowerCase() !== String(email).trim().toLowerCase() && !isAdmin) {
       return res.status(403).json({ error: 'Request denied. Device token does not match this account.' });
     }
 
     let loans = getLoansData().filter(loan => storeId === 'all' || getRecordStoreId(loan) === storeId);
     if (email) {
-      loans = loans.filter(loan => loan.email === email);
+      loans = loans.filter(loan => String(loan.email || '').trim().toLowerCase() === String(email).trim().toLowerCase());
     }
 
     if (filter && filter !== 'all') {
@@ -726,7 +727,7 @@ function getLoans(req, res) {
     });
   } catch (err) {
     logError(`LOANS ROUTE FAILED: ${err.message}`);
-    res.status(500).json({ error: 'Unable to load loan information.' });
+    res.status(503).json({ error: 'Unable to load loan information.' });
   }
 }
 
@@ -738,13 +739,19 @@ function searchByReceiptId(req, res) {
       return res.status(400).json({ error: 'receiptId query parameter is required.' });
     }
 
-    const loans = searchLoansByReceipt(getEnrichedLoans(), receiptId);
+    const isAdmin = isAdminRole(req.authUser?.role);
+    const storeId = isAdmin ? getRequestedStoreId(req) : getRecordStoreId(req.authUser);
+    if (isAdmin && !canAccessStore(req, storeId)) {
+      return res.status(403).json({ error: 'Access to this store is not allowed.' });
+    }
+
+    const loans = searchLoansByReceipt(getEnrichedLoans(), receiptId)
+      .filter(loan => storeId === 'all' || getRecordStoreId(loan) === storeId);
     if (!loans.length) {
       return res.status(404).json({ error: `No loan found for receipt ID "${receiptId}".` });
     }
 
     // Non-admins may only pull up their own loans.
-    const isAdmin = isAdminRole(req.authUser?.role);
     const requester = String(req.authUser?.email || '').trim().toLowerCase();
     const visible = isAdmin ? loans : loans.filter(loan =>
       String(loan.email || '').trim().toLowerCase() === requester);
@@ -764,7 +771,7 @@ function searchByReceiptId(req, res) {
     });
   } catch (err) {
     logError(`RECEIPT SEARCH FAILED: ${err.message}`);
-    return res.status(500).json({ error: 'Unable to search receipts.' });
+    return res.status(503).json({ error: 'Unable to search receipts.' });
   }
 }
 
@@ -789,6 +796,9 @@ function getLoanById(req, res) {
     if (isAdmin && !canAccessRecord(req, loan)) {
       return res.status(403).json({ error: 'Access to this store is not allowed.' });
     }
+    if (!isAdmin && authEmail && getRecordStoreId(req.authUser) !== getRecordStoreId(loan)) {
+      return res.status(403).json({ error: 'Access to this store is not allowed.' });
+    }
 
     // Rebuild the ledger here too (not just in getLoans) so the single-loan
     // detail view can never show stale paidTotal/outstanding — recorded
@@ -800,7 +810,7 @@ function getLoanById(req, res) {
     res.json({ loan: { ...detail, businessStatus: deriveLoanStatus(detail, today) } });
   } catch (err) {
     logError(`GET LOAN FAILED: ${err.message}`);
-    res.status(500).json({ error: 'Unable to load loan.' });
+    res.status(503).json({ error: 'Unable to load loan.' });
   }
 }
 
@@ -929,7 +939,7 @@ async function updateLoanStatus(req, res) {
     res.json({ message: 'Loan updated.', loan });
   } catch (err) {
     logBreakage('loanController.js', 'updateLoanStatus', err, 'UPDATE LOAN FAILED');
-    res.status(500).json({ error: 'Unable to update loan.' });
+    res.status(503).json({ error: 'Unable to update loan.' });
   }
 }
 
@@ -958,7 +968,7 @@ function getAllLoans(req, res) {
     res.json({ summary, loans });
   } catch (err) {
     logError(`ADMIN LOANS FETCH ERROR: ${err.message}`);
-    res.status(500).json({ error: 'Could not load loans.' });
+    res.status(503).json({ error: 'Could not load loans.' });
   }
 }
 
@@ -1015,7 +1025,7 @@ function recordPayment(req, res) {
     res.json({ message: 'Payment recorded.', outstanding: loans[index].outstanding, payment });
   } catch (err) {
     logBreakage('loanController.js', 'recordPayment', err, 'PAYMENT RECORD ERROR');
-    res.status(500).json({ error: 'Could not record payment.' });
+    res.status(503).json({ error: 'Could not record payment.' });
   }
 }
 
@@ -1053,7 +1063,7 @@ async function sendLoanNotification(req, res) {
     res.json({ message: 'Notification sent successfully.' });
   } catch (err) {
     logBreakage('loanController.js', 'sendLoanNotification', err, 'NOTIFICATION SEND ERROR');
-    res.status(500).json({ error: 'Could not send notification.' });
+    res.status(503).json({ error: 'Could not send notification.' });
   }
 }
 
@@ -1112,7 +1122,7 @@ async function notifyUser(req, res) {
     });
   } catch (err) {
     logError(`NOTIFY USER FAILED: ${err.message}`);
-    return res.status(500).json({ error: 'Unable to send the notification.' });
+    return res.status(503).json({ error: 'Unable to send the notification.' });
   }
 }
 
@@ -1172,7 +1182,7 @@ async function notifyAllOverdue(req, res) {
     });
   } catch (err) {
     logBreakage('loanController.js', 'notifyAllOverdue', err, 'BULK OVERDUE NOTIFICATION FAILED');
-    return res.status(500).json({ error: 'Unable to send overdue notices.' });
+    return res.status(503).json({ error: 'Unable to send overdue notices.' });
   }
 }
 
@@ -1301,7 +1311,7 @@ async function createAdminLoan(req, res) {
     });
   } catch (err) {
     logBreakage('loanController.js', 'createAdminLoan', err, 'ADMIN LOAN CREATE FAILED');
-    res.status(500).json({ error: 'Unable to create the loan.' });
+    res.status(503).json({ error: 'Unable to create the loan.' });
   }
 }
 

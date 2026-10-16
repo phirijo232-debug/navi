@@ -115,7 +115,7 @@ function listBackups(req, res) {
     return res.json({ backups });
   } catch (err) {
     logError(`BACKUP LIST FAILED: ${err.message}`);
-    return res.status(500).json({ error: 'Unable to list backups.' });
+    return res.status(503).json({ error: 'Unable to list backups.' });
   }
 }
 

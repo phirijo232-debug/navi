@@ -33,6 +33,12 @@
 
 ## Operations / infrastructure
 
+- [ ] Full public-access and consistency hardening (requested 2026-10-16):
+  - [x] Fix receipt-search and customer loan-list store scoping; keep public `/status` to liveness data; make password-reset responses generic; align controller/server failure catches with the required 503 behavior.
+  - [x] Keep vault and shutdown controls on private client networks while the customer platform is in PUBLIC mode.
+  - [x] Add the public-page/API access map and expand route-wiring regression coverage.
+  - [ ] Complete the remaining full route × identity audit and verify the configured HTTPS public URL from a second device, including signup/login, static assets, role denials, and signed upload expiry.
+
 - [x] Core organs shipped (2026-10-13): **Heart** = SQLite document store (`middleware/db.js`) behind the unchanged `dataStore` API via `DB_MODE` json|dual|sqlite (live stays `json`; migration-verified, cutover deferred); **Kidneys** = `middleware/kidneys.js` hourly sweep of expired OTPs, dead pending-auth, stale sessions/devices (cron + boot sweep); **Immune** = `GET /health` two-tier + `healthWatch` heartbeat/outage alerts. Also tightened `/status` (no host/platform/CPU to anon) and `/sessions` (masked tokens + store scoping). Suite 98/98.
 - [ ] When ready to cut the Heart over to SQLite reads: soak in `dual` first, then set `DB_MODE=sqlite` in `.env` and restart; JSON stays as the crash fallback (rollback = flip back to `json`).
 - [ ] Run the Navi server hidden in the background with Windows auto-start (Task Scheduler at logon, or a proper Windows service) so no terminal window has to stay open; interim option is the double-click `start-server.cmd`. Decide the account/rights (user logon vs system service) and confirm the daily 23:58/23:59 Lusaka jobs fire reliably while no one is logged in.

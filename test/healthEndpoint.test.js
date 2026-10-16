@@ -66,17 +66,34 @@ test('GET /health admin tier adds detail only for a valid admin token', async ()
   }
 });
 
-test('GET /status no longer exposes machine identity', async () => {
+test('GET /status public tier exposes liveness only', async () => {
   const res = recorder();
   await getStatus({}, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.status, 'running');
   assert.ok(res.body.uptime);
-  assert.ok(res.body.ram.used);      // dashboard renders this
-  assert.ok(res.body.cpu.cores);     // dashboard renders this
+  assert.deepEqual(Object.keys(res.body).sort(), ['server', 'status', 'uptime']);
+  const flat = JSON.stringify(res.body);
+  for (const forbidden of ['ram', 'cpu', 'serverMode', 'hostname', 'platform']) {
+    assert.ok(!flat.includes(forbidden), `public /status must not expose "${forbidden}"`);
+  }
+});
 
-  assert.ok(!('hostname' in res.body), 'hostname must be stripped');
-  assert.ok(!('platform' in res.body), 'platform must be stripped');
-  assert.ok(!res.body.cpu.model, 'cpu model must be stripped');
+test('GET /status admin tier retains operational dashboard metrics', async () => {
+  const usersFile = require('../middleware/dataStore').paths.users;
+  const original = fs.readFileSync(usersFile, 'utf8');
+  fs.writeFileSync(usersFile, JSON.stringify([
+    { email: 'status.admin@example.test', role: 'store_admin', storeId: 'buraza',
+      trustedDevices: [{ token: 'status-admin-token' }] }
+  ]));
+  try {
+    const res = recorder();
+    await getStatus({ headers: { 'x-device-token': 'status-admin-token' } }, res);
+    assert.ok(res.body.ram.used);
+    assert.ok(res.body.cpu.cores);
+    assert.ok(['public', 'private'].includes(res.body.serverMode));
+  } finally {
+    fs.writeFileSync(usersFile, original);
+  }
 });

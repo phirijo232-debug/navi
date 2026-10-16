@@ -1143,7 +1143,7 @@ async function requestAdminPasswordReset(event) {
     if (!response.ok) throw new Error(data.error || 'Unable to send a reset code.');
 
     pendingResetEmail = email;
-    document.getElementById('resetOtpSentTo').textContent = `Reset code sent to: ${data.otpSentTo}`;
+    document.getElementById('resetOtpSentTo').textContent = 'If an eligible account exists, a reset code will arrive at its registered email.';
     document.getElementById('passwordResetRequestForm').classList.add('hidden');
     document.getElementById('passwordResetConfirmForm').classList.remove('hidden');
     document.getElementById('resetOtp').focus();

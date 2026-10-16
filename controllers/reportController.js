@@ -1286,7 +1286,7 @@ async function getTypedReportExcel(req, res) {
     const loans = applyPeriodFilter(readArray(LOANS_FILE), from, to)
       .filter(l => scope === 'all' || getRecordStoreId(l) === scope);
 
-    const wb = new (require('exceljs')).Workbook();
+    const wb = new ExcelJS.Workbook();
     wb.creator = 'BMF';
 
     if (type === 'daily') {

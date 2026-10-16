@@ -81,19 +81,25 @@ test('router registers the core authentication and data endpoints', () => {
     ['POST', '/login'], ['POST', '/login/confirm'],
     ['POST', '/password-reset'], ['POST', '/password-reset/confirm'],
     ['GET', '/loans'], ['GET', '/loans/all'], ['GET', '/loans/:id'],
+    ['GET', '/loans/search'], ['GET', '/payments'], ['GET', '/payments/export'],
     ['POST', '/loans/request'], ['POST', '/loans/:id/action'], ['POST', '/loans/payment'],
-    ['POST', '/loans/notify-overdue'], ['POST', '/loans/:id/notify-overdue'],
-    ['GET', '/users'], ['POST', '/admin/users'], ['POST', '/admin/announcements'],
+    ['POST', '/loans/notify-overdue'], ['POST', '/loans/notify-user'], ['POST', '/loans/:id/notify-overdue'],
+    ['POST', '/uploads/sign'], ['GET', '/users'], ['POST', '/admin/users'], ['POST', '/admin/loans'],
+    ['POST', '/admin/announcements'], ['GET', '/invites'], ['POST', '/invites/create'],
     ['GET', '/feedback'], ['POST', '/feedback'], ['POST', '/feedback/:id/status'],
     ['GET', '/reports/:scope/summary'], ['GET', '/reports/:scope/export'],
     ['GET', '/status'], ['GET', '/health'], ['GET', '/sessions'],
     ['GET', '/logs/access'], ['GET', '/logs/errors'],
-    ['POST', '/invites/create'],
     ['POST', '/admin/backup'], ['GET', '/admin/backups'], ['POST', '/admin/restore'],
     ['GET', '/invites/validate/:token'], ['POST', '/invites/validate'],
     ['GET', '/reports/:scope/profits'], ['GET', '/reports/:scope/defaulters'],
-    ['GET', '/reports/:scope/overdue'], ['GET', '/reports/:scope/paid'],
-    ['GET', '/reports/search'], ['GET', '/reports/user/:email']
+    ['GET', '/reports/:scope/overdue'], ['GET', '/reports/:scope/paid'], ['GET', '/reports/:scope/tracking'],
+    ['GET', '/reports/search'], ['GET', '/reports/user'], ['GET', '/reports/all'], ['GET', '/reports/analytics'],
+    ['GET', '/reports/analytics/tracking'], ['GET', '/reports/analytics/tracking/export'], ['GET', '/reports/user/:email'],
+    ['GET', '/reports/:type'], ['GET', '/reports/:type/export'], ['GET', '/reports/:type/pdf'],
+    ['GET', '/reports/:scope/users/:id'], ['GET', '/hr/employees'], ['PATCH', '/hr/employees/:id'],
+    ['POST', '/hr/employees/:id/restrictions'], ['POST', '/hr/store-switch/request'], ['POST', '/hr/store-switch/verify'],
+    ['GET', '/admin/server-mode'], ['POST', '/admin/server-mode']
   ];
 
   for (const [method, routePath] of expected) {
