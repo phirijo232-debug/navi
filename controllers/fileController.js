@@ -41,6 +41,9 @@ function canViewFile(user, filename) {
   return getLoansData().some(loan => {
     const referenced = loan.collateralFront === filename
       || loan.collateralBack === filename
+      || loan.nrcFront === filename
+      || loan.nrcBack === filename
+      || (Array.isArray(loan.paymentSubmissions) && loan.paymentSubmissions.some(s => s.screenshot === filename))
       || (Array.isArray(loan.payments) && loan.payments.some(p => p.screenshot === filename));
     if (!referenced) return false;
     if (admin) return canAccessRecord({ authUser: user, headers: {} }, loan);

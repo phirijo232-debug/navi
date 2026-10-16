@@ -28,6 +28,9 @@ test('uploaded images are viewable only by the owning borrower or an in-scope ad
       email: 'borrower@example.test',
       storeId: 'buraza',
       collateralFront: filename,
+      nrcFront: '1700000000003-nrc-front.jpg',
+      nrcBack: '1700000000004-nrc-back.jpg',
+      paymentSubmissions: [{ screenshot: '1700000000005-transfer-proof.png', status: 'pending' }],
       payments: [{ screenshot: '1700000000001-y8m3-proof.png' }]
     },
     {
@@ -54,8 +57,13 @@ test('uploaded images are viewable only by the owning borrower or an in-scope ad
     // Borrower sees their own collateral and their own payment proof.
     assert.equal(canViewFile(borrower, filename), true);
     assert.equal(canViewFile(borrower, '1700000000001-y8m3-proof.png'), true);
+    assert.equal(canViewFile(borrower, '1700000000003-nrc-front.jpg'), true);
+    assert.equal(canViewFile(borrower, '1700000000004-nrc-back.jpg'), true);
+    assert.equal(canViewFile(borrower, '1700000000005-transfer-proof.png'), true);
     // A different customer cannot see it.
     assert.equal(canViewFile(other, filename), false);
+    assert.equal(canViewFile(other, '1700000000003-nrc-front.jpg'), false);
+    assert.equal(canViewFile(other, '1700000000005-transfer-proof.png'), false);
     // In-store admin can; an admin scoped elsewhere cannot.
     assert.equal(canViewFile(bmfAdmin, filename), true);
     assert.equal(canViewFile(outsideAdmin, filename), false);

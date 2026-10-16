@@ -10,17 +10,19 @@ Skin (admin/customer pages, styles, shared feedback), Brain (loan/payment/notifi
 - [x] (2026-10-16) Read both full supplied design prompts and compare their endpoint assumptions with the current API and authorization rules.
 - [x] (2026-10-16) Inspect existing loan upload, payment ledger, file signing, notification storage, customer/admin pages, and relevant tests.
 - [x] (2026-10-16) Record design and money-flow decisions before implementation.
-- [ ] Reorganize the admin portal using real endpoints and derived data; preserve all working staff actions and role-specific controls.
-- [ ] Reorganize the customer portal, add a secure payment submission and history experience, and separate NRC front/back uploads.
-- [ ] Implement pending payment submission, admin approval/decline, audit fields, notifications, duplicate-reference checks, and strict scope gates.
-- [ ] Add consistent on-screen feedback to auth, loan, payment, and admin actions; remove sensitive credential display and protect dynamic text from injection.
-- [ ] Add tests for payment state transitions, authorization, uploads, notifications, and both dashboard route contracts.
-- [ ] Run tests, syntax checks, `git diff --check`, inspect browser pages at desktop/mobile sizes, and verify `node server.js` starts.
-- [ ] Update `AGENTS.md`, `docs/ROUTES.md`, and `TODO.md` for the new routes and final behavior.
+- [x] Reorganize the admin request queue around pending loans and pending transfer reviews; preserve staff actions and role-specific controls.
+- [x] Reorganize the customer loan detail flow with secure transfer submission and separate NRC front/back uploads.
+- [x] Implement pending payment submission, admin approval/decline, audit fields, notifications, duplicate-reference checks, and strict scope gates.
+- [x] Add on-screen success feedback to authentication and loan/payment actions; remove device-token display and escape customer loan content.
+- [x] Add payment lifecycle/authorization tests and route wiring coverage.
+- [x] Run the automated suite, inline/page and controller syntax checks, `git diff --check`, and verify `node server.js` starts.
+- [x] Update `AGENTS.md`, `docs/ROUTES.md`, and `TODO.md` for the new routes and final behavior.
+- [ ] Inspect authenticated dashboard pages at desktop/mobile sizes. The computer-use browser inventory is empty and the in-app browser reports `iab` unavailable, so only DOM/HTML, script parsing, route wiring, and app tests could be verified here.
 
 ## Decision Log
 - 2026-10-16: Treat both pasted prompts as design references, not API contracts. Keep current route names and exact AGENTS role gates unless a new route is required for the payment feature.
 - 2026-10-16: Bank/mobile-money proof submission creates a `pending` payment submission. Only an authenticated, in-scope staff approval can append a payment ledger record and change outstanding balance. A decline never changes the ledger.
+- 2026-10-16: Admin approval requires a deliberate confirmation that the proof image was inspected and the transaction was verified with the provider; the server rejects approval without that attestation.
 - 2026-10-16: Approval uses the amount, mode, reference, and image already stored with the submission; approval requests cannot replace them. Require a valid transaction reference and proof image; reject duplicate references per loan/store.
 - 2026-10-16: Keep physical cash payments on the existing staff-only `POST /loans/payment` flow. Customer self-service is limited to Airtel/MTN mobile money and bank transfer, which need proof review.
 - 2026-10-16: Store NRC front/back in distinct loan fields and include them in signed-file ownership checks. Do not serve uploaded documents from the public static mount.
@@ -62,4 +64,4 @@ Skin (admin/customer pages, styles, shared feedback), Brain (loan/payment/notifi
 - `npm.cmd test`, `node --check` on project JavaScript, `git diff --check`, visual browser review, then `node server.js` startup.
 
 ## Outcomes and Retrospective
-In progress.
+The pending-transfer accounting and access boundaries are implemented and covered by tests. Both portals now expose the requested payment, report, notification, review, NRC, and portfolio summary flows. Automated checks pass. Browser visual QA and checking the deployment's actual public URL remain for an environment with a browser surface and the deployment hostname.

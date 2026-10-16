@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const multer = require('multer');
 const { logError, logBreakage } = require('../middleware/logger');
 const emailService = require('../middleware/email');
@@ -9,6 +10,146 @@ const { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, 
 
 const LOANS_FILE = dataStore.paths.loans;
 const USERS_FILE = dataStore.paths.users;
+const NOTIFICATIONS_FILE = dataStore.paths.notifications;
+
+function addInAppNotification(recipientEmail, type, message, loanId, extra = {}) {
+  const email = String(recipientEmail || '').trim().toLowerCase();
+  if (!email) return;
+  const records = dataStore.readJson(NOTIFICATIONS_FILE, [], Array.isArray);
+  records.push({ id: crypto.randomUUID(), kind: 'in-app', recipientEmail: email, type,
+    message: String(message).slice(0, 500), loanId: Number(loanId), createdAt: new Date().toISOString(),
+    readAt: null, ...extra });
+  dataStore.writeJson(NOTIFICATIONS_FILE, records);
+}
+
+function getNotifications(req, res) {
+  try {
+    const user = req.authUser;
+    if (!user?.email) return res.status(401).json({ error: 'Sign in required.' });
+    const records = dataStore.readJson(NOTIFICATIONS_FILE, [], Array.isArray);
+    const email = String(user.email).toLowerCase();
+    const loans = getLoansData();
+    const allowedLoanIds = new Set(loans.filter(loan => isAdminRole(user.role)
+      ? canAccessRecord({ authUser: user, headers: {} }, loan)
+      : String(loan.email || '').toLowerCase() === email).map(loan => Number(loan.id)));
+    return res.json(records.filter(n => n.kind === 'in-app' &&
+      ((n.recipientEmail === email) || (isAdminRole(user.role) && n.type === 'payment-review' && allowedLoanIds.has(Number(n.loanId))))));
+  } catch (err) {
+    logError(`GET_NOTIFICATIONS FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Notifications are temporarily unavailable.' });
+  }
+}
+
+function markNotificationRead(req, res) {
+  try {
+    const user = req.authUser;
+    if (!user?.email) return res.status(401).json({ error: 'Sign in required.' });
+    const records = dataStore.readJson(NOTIFICATIONS_FILE, [], Array.isArray);
+    const item = records.find(n => n.kind === 'in-app' && n.id === req.params.id);
+    if (!item) return res.status(404).json({ error: 'Notification not found.' });
+    const own = item.recipientEmail === String(user.email).toLowerCase();
+    const loan = getLoansData().find(l => Number(l.id) === Number(item.loanId));
+    const scoped = isAdminRole(user.role) && item.type === 'payment-review' && loan && canAccessRecord({ authUser: user, headers: {} }, loan);
+    if (!own && !scoped) return res.status(404).json({ error: 'Notification not found.' });
+    item.readAt = item.readAt || new Date().toISOString();
+    dataStore.writeJson(NOTIFICATIONS_FILE, records);
+    return res.json({ message: 'Notification marked as read.' });
+  } catch (err) {
+    logError(`MARK_NOTIFICATION_READ FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Could not update notification.' });
+  }
+}
+
+function submitPaymentProof(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const loans = getLoansData();
+    const loan = loans.find(item => Number(item.id) === id);
+    if (!loan) return res.status(404).json({ error: 'Loan not found.' });
+    if (isAdminRole(req.authUser?.role) || String(loan.email || '').toLowerCase() !== String(req.authUser?.email || '').toLowerCase()) {
+      return res.status(403).json({ error: 'Only the borrower can submit proof for this loan.' });
+    }
+    if (String(getRecordStoreId(loan)).toLowerCase() !== String(req.authUser?.storeId || config.DEFAULT_STORE_ID).toLowerCase()) {
+      return res.status(403).json({ error: 'This loan is outside your assigned store.' });
+    }
+    if (!['active', 'grace', 'defaulted'].includes(normalizeLoanStatus(loan.status))) return res.status(409).json({ error: 'Payments can only be submitted for an active loan.' });
+    const amount = Number(req.body?.amount);
+    const mode = normalizePaymentMode(req.body?.mode);
+    const reference = String(req.body?.transactionReference || '').trim().toUpperCase();
+    const screenshot = req.files?.paymentProof?.[0]?.filename;
+    const outstanding = Number(getEnrichedLoans().find(item => Number(item.id) === id)?.outstanding || 0);
+    if (!Number.isFinite(amount) || amount < 0.01 || amount > outstanding || amount !== Number(amount.toFixed(2))) {
+      return res.status(400).json({ error: 'Enter an amount with up to two decimal places within the current outstanding balance.' });
+    }
+    if (!['Airtel Money', 'MTN MoMo', 'Bank Transfer'].includes(mode)) return res.status(400).json({ error: 'Choose Airtel Money, MTN MoMo, or Bank Transfer.' });
+    if (!/^[A-Z0-9][A-Z0-9._/-]{3,63}$/.test(reference)) return res.status(400).json({ error: 'Enter a valid transaction reference (4–64 letters, numbers, or - _ . /).' });
+    if (!screenshot) return res.status(400).json({ error: 'Attach a clear payment proof image.' });
+    const duplicates = loans.some(item => String(item.storeId || config.DEFAULT_STORE_ID) === String(loan.storeId || config.DEFAULT_STORE_ID) &&
+      ((item.paymentSubmissions || []).some(s => String(s.transactionReference || '').toUpperCase() === reference && ['pending', 'approved'].includes(s.status)) ||
+        (item.payments || []).some(payment => String(payment.transactionReference || '').toUpperCase() === reference)));
+    if (duplicates) return res.status(409).json({ error: 'That transaction reference has already been submitted.' });
+    const submission = { id: crypto.randomUUID(), amount: Number(amount.toFixed(2)), mode, transactionReference: reference,
+      screenshot, status: 'pending', submittedAt: new Date().toISOString(), submittedBy: req.authUser.email };
+    loan.paymentSubmissions = Array.isArray(loan.paymentSubmissions) ? loan.paymentSubmissions : [];
+    loan.paymentSubmissions.push(submission);
+    saveLoansData(loans);
+    addInAppNotification(loan.email, 'payment-submitted', `Payment proof for ${formatCurrency(amount)} is awaiting review.`, loan.id, { submissionId: submission.id });
+    const notifications = dataStore.readJson(NOTIFICATIONS_FILE, [], Array.isArray);
+    notifications.push({ id: crypto.randomUUID(), kind: 'in-app', recipientEmail: '', type: 'payment-review',
+      message: `Payment proof submitted for loan ${loan.receiptNumber || loan.id}.`, loanId: Number(loan.id),
+      submissionId: submission.id, createdAt: submission.submittedAt, readAt: null });
+    dataStore.writeJson(NOTIFICATIONS_FILE, notifications);
+    return res.status(201).json({ message: 'Payment proof submitted for review. Your balance will change after approval.', submission });
+  } catch (err) {
+    logBreakage('loanController.js', 'submitPaymentProof', err, 'PAYMENT SUBMISSION FAILED');
+    return res.status(503).json({ error: 'Could not submit payment proof.' });
+  }
+}
+
+function decidePaymentSubmission(req, res) {
+  try {
+    if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'BMF store admin access required.' });
+    const loans = getLoansData();
+    const loan = loans.find(item => Number(item.id) === Number(req.params.id));
+    if (!loan) return res.status(404).json({ error: 'Loan not found.' });
+    if (!canAccessRecord(req, loan)) return res.status(403).json({ error: 'Access to this store is not allowed.' });
+    const submission = (loan.paymentSubmissions || []).find(item => item.id === req.params.submissionId);
+    if (!submission) return res.status(404).json({ error: 'Payment submission not found.' });
+    if (submission.status !== 'pending') return res.status(409).json({ error: 'This payment submission has already been reviewed.' });
+    const action = req.params.decision;
+    if (!['approve', 'decline'].includes(action)) return res.status(404).json({ error: 'Review action not found.' });
+    if (action === 'approve' && req.body?.physicalVerificationConfirmed !== true) {
+      return res.status(400).json({ error: 'Confirm that the transfer was verified with the bank or mobile money provider before approval.' });
+    }
+    const now = new Date().toISOString();
+    if (action === 'approve') {
+      const freshOutstanding = Number(getEnrichedLoans().find(item => Number(item.id) === Number(loan.id))?.outstanding || 0);
+      if (Number(submission.amount) > freshOutstanding) return res.status(409).json({ error: 'The submitted amount now exceeds the outstanding balance.' });
+      loan.payments = Array.isArray(loan.payments) ? loan.payments : [];
+      const used = new Set(loans.flatMap(item => (item.payments || []).map(p => String(p.paymentReceiptId || '')).filter(Boolean)));
+      const payment = { paymentReceiptId: generatePaymentReceiptId(used, new Date()), amount: Number(submission.amount), paymentDate: now,
+        balanceBefore: freshOutstanding, balanceAfter: Number(Math.max(0, freshOutstanding - Number(submission.amount)).toFixed(2)),
+        mode: submission.mode, note: `Verified transfer ${submission.transactionReference}`, transactionReference: submission.transactionReference,
+        screenshot: submission.screenshot, recordedBy: req.authUser.email };
+      loan.payments.push(payment);
+      rebuildPaymentLedger(loan);
+      if (loan.outstanding === 0) { loan.status = 'paid'; loan.settledAt = now; }
+      submission.status = 'approved'; submission.reviewedAt = now; submission.reviewedBy = req.authUser.email; submission.paymentReceiptId = payment.paymentReceiptId;
+    } else {
+      const reason = String(req.body?.reason || '').trim().slice(0, 300);
+      if (reason.length < 3) return res.status(400).json({ error: 'Provide a clear reason for declining this submission.' });
+      submission.status = 'declined'; submission.reviewedAt = now; submission.reviewedBy = req.authUser.email; submission.reviewReason = reason;
+    }
+    loan.updatedAt = now; loan.updatedBy = req.authUser.email;
+    saveLoansData(loans);
+    const detail = action === 'approve' ? 'Payment proof verified and payment approved.' : `Payment proof declined: ${submission.reviewReason}`;
+    addInAppNotification(loan.email, `payment-${action}d`, detail, loan.id, { submissionId: submission.id });
+    return res.json({ message: detail, outstanding: loan.outstanding, submission });
+  } catch (err) {
+    logBreakage('loanController.js', 'decidePaymentSubmission', err, 'PAYMENT REVIEW FAILED');
+    return res.status(503).json({ error: 'Could not review payment submission.' });
+  }
+}
 
 // ─── Receipt IDs (Task 1) ────────────────────────────────────────────────────
 // Loan receipts:   BMF-YYYYMMDD-XXXX  (creation date + 4 random digits)
@@ -588,6 +729,9 @@ async function requestLoan(req, res) {
     const approvalDeadline = getApprovalDeadline(normalizedUrgency);
 
     const files = req.files || {};
+    const nrcFront = files.nrcFront?.[0]?.filename || null;
+    const nrcBack = files.nrcBack?.[0]?.filename || null;
+    if (!nrcFront || !nrcBack) return res.status(400).json({ error: 'Attach clear front and back images of your NRC.' });
     const collateralFront = files.collateralFront?.[0]?.filename || null;
     const collateralBack = files.collateralBack?.[0]?.filename || null;
 
@@ -615,6 +759,8 @@ async function requestLoan(req, res) {
       collateralDescription: collateralDescription || null,
       collateralFront,
       collateralBack,
+      nrcFront,
+      nrcBack,
       collateralGrade: collateralGrade || null,
       collateralVerified: false,
       agreedToTerms: true,
@@ -633,13 +779,13 @@ async function requestLoan(req, res) {
 
     loans.push(newLoan);
     saveLoansData(loans);
+    addInAppNotification(email, 'loan-request', 'Your loan request was received and is awaiting review.', newLoan.id);
 
-    const requestEmail = emailService.buildRequestReceivedMessage(product, normalizedUrgency, email, newLoan);
-    await emailService.sendCustomerEmail({
-      to: email,
-      subject: requestEmail.subject,
-      text: requestEmail.body
-    });
+    try {
+      const requestEmail = emailService.buildRequestReceivedMessage(product, normalizedUrgency, email, newLoan);
+      const customerMail = await emailService.sendCustomerEmail({ to: email, subject: requestEmail.subject, text: requestEmail.body });
+      if (!customerMail?.ok && !customerMail?.skipped) logError(`LOAN REQUEST CUSTOMER EMAIL FAILED for loan ${newLoan.id}: ${customerMail?.reason || 'delivery failed'}`);
+    } catch (mailErr) { logBreakage('loanController.js', 'requestLoanEmail', mailErr, 'LOAN REQUEST EMAIL FAILED'); }
 
     const adminRecipients = emailService.getNotificationRecipients(email).filter(recipient => recipient.toLowerCase() !== String(email).trim().toLowerCase());
     if (adminRecipients.length) {
@@ -652,11 +798,10 @@ async function requestLoan(req, res) {
           'Please review the request in the admin dashboard.'
       };
 
-      await emailService.sendCustomerEmail({
-        to: adminRecipients,
-        subject: adminAlert.subject,
-        text: adminAlert.text
-      });
+      try {
+        const adminMail = await emailService.sendCustomerEmail({ to: adminRecipients, subject: adminAlert.subject, text: adminAlert.text });
+        if (!adminMail?.ok && !adminMail?.skipped) logError(`LOAN REQUEST ADMIN EMAIL FAILED for loan ${newLoan.id}: ${adminMail?.reason || 'delivery failed'}`);
+      } catch (mailErr) { logBreakage('loanController.js', 'requestLoanAdminEmail', mailErr, 'LOAN REQUEST ADMIN ALERT FAILED'); }
     }
 
     res.json({
@@ -912,13 +1057,13 @@ async function updateLoanStatus(req, res) {
     loan.reviewedAt = new Date().toISOString();
     loans[idx] = loan;
     saveLoansData(loans);
+    addInAppNotification(loan.email, 'loan-update', `Your loan ${loan.receiptNumber || `#${loan.id}`} was updated: ${decisionText}`, loan.id);
 
-    const decisionEmail = emailService.buildLoanStatusNotification(normalizedAction, loan.product, decisionText, loan.email, loan);
-    await emailService.sendCustomerEmail({
-      to: loan.email,
-      subject: decisionEmail.subject,
-      text: decisionEmail.body
-    });
+    try {
+      const decisionEmail = emailService.buildLoanStatusNotification(normalizedAction, loan.product, decisionText, loan.email, loan);
+      const delivery = await emailService.sendCustomerEmail({ to: loan.email, subject: decisionEmail.subject, text: decisionEmail.body });
+      if (!delivery?.ok && !delivery?.skipped) logBreakage('loanController.js', 'updateLoanStatusEmail', new Error(delivery?.reason || 'delivery failed'), 'LOAN STATUS EMAIL FAILED');
+    } catch (mailErr) { logBreakage('loanController.js', 'updateLoanStatusEmail', mailErr, 'LOAN STATUS EMAIL FAILED'); }
 
     const adminRecipients = emailService.getNotificationRecipients(loan.email).filter(recipient => recipient.toLowerCase() !== String(loan.email).trim().toLowerCase());
     if (adminRecipients.length) {
@@ -1323,6 +1468,10 @@ module.exports = {
   updateLoanStatus,
   getAllLoans,
   recordPayment,
+  submitPaymentProof,
+  decidePaymentSubmission,
+  getNotifications,
+  markNotificationRead,
   sendLoanNotification,
   notifyUser,
   notifyAllOverdue,

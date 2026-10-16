@@ -16,6 +16,7 @@
   </style>
 </head>
 <body>
+  <div id="bmfToast" class="bmf-toast" role="status" aria-live="polite"></div>
   <a href="index.html" class="toggle-mode back-corner">← Back</a>
   <button class="toggle-mode" id="modeBtn">Switch Mode</button>
 
@@ -48,6 +49,15 @@
   </div>
 
   <script>
+    let bmfToastTimer;
+    function bmfSuccess(message) {
+      const toast = document.getElementById('bmfToast');
+      if (!toast) return;
+      toast.textContent = `BMF success: ${message}`;
+      toast.classList.add('visible');
+      clearTimeout(bmfToastTimer);
+      bmfToastTimer = setTimeout(() => toast.classList.remove('visible'), 4000);
+    }
     function applyTheme(theme) {
       document.documentElement.classList.remove('dark', 'light');
       document.body.classList.remove('dark', 'light');
@@ -106,6 +116,7 @@
         document.getElementById('message').textContent = data.message || data.error;
 
         if (data.message) {
+          bmfSuccess(data.message);
           pendingEmail = email;
           localStorage.setItem('userEmail', email);
           document.getElementById('otpSentTo').textContent = `OTP sent to: ${email}`;
@@ -136,6 +147,8 @@
         document.getElementById('message').textContent = data.message || data.error;
 
         if (data.message === 'Login successful.') {
+          document.getElementById('message').textContent = 'BMF success: Login verified. Opening your dashboard…';
+          bmfSuccess('Login verified. Opening your dashboard…');
           localStorage.setItem('username', data.username);
           localStorage.setItem('userEmail', pendingEmail);
           localStorage.setItem('userRole', data.role);
@@ -145,7 +158,7 @@
           localStorage.setItem('lastAppPage', nextPage);
           applyTheme(preferredMode);
           localStorage.setItem('justLoggedIn', 'true');
-          window.location.href = nextPage;
+          setTimeout(() => { window.location.href = nextPage; }, 650);
         }
       } catch (err) {
         document.getElementById('loader').classList.remove('active');

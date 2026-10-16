@@ -7,7 +7,8 @@ const { getAccessLogs, getErrorLogs } = require('../controllers/logController');
 const { getActiveSessions } = require('../controllers/sessionController');
 const {
   upload, getLoans, requestLoan, getLoanById,
-  updateLoanStatus, getAllLoans, recordPayment,
+  updateLoanStatus, getAllLoans, recordPayment, submitPaymentProof, decidePaymentSubmission,
+  getNotifications, markNotificationRead,
   notifyAllOverdue, searchByReceiptId, sendLoanNotification, notifyUser,
   createAdminLoan
 } = require('../controllers/loanController');
@@ -77,6 +78,9 @@ router.get('/reports/:scope/users/:id', getUserTracking);
 
 router.get('/users', getAllUsers);
 
+router.get('/notifications', getNotifications);
+router.patch('/notifications/:id/read', markNotificationRead);
+
 router.get('/loans', getLoans);
 router.get('/loans/all', getAllLoans);
 router.get('/loans/search', searchByReceiptId);
@@ -84,10 +88,16 @@ router.get('/payments', getPaymentsLedger);
 router.get('/payments/export', getPaymentsReportExport);
 router.post('/loans/notify-overdue', notifyAllOverdue);
 router.post('/loans/notify-user', notifyUser);
+router.post('/loans/:id/payment-submissions', upload.fields([
+  { name: 'paymentProof', maxCount: 1 }
+]), submitPaymentProof);
+router.post('/loans/:id/payment-submissions/:submissionId/:decision', decidePaymentSubmission);
 router.get('/loans/:id', getLoanById);
 router.post('/loans/request', upload.fields([
   { name: 'collateralFront', maxCount: 1 },
-  { name: 'collateralBack', maxCount: 1 }
+  { name: 'collateralBack', maxCount: 1 },
+  { name: 'nrcFront', maxCount: 1 },
+  { name: 'nrcBack', maxCount: 1 }
 ]), requestLoan);
 router.post('/loans/:id/action', updateLoanStatus);
 router.post('/loans/:id/notify-overdue', sendLoanNotification);

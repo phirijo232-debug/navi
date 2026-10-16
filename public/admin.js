@@ -35,8 +35,21 @@ const REPORT_ENDPOINT = {
 let storeFeedback = [];
 let activeFeedbackFilter = 'all';
 let portfolioLoans = [];
+let pendingPaymentReviews = [];
 let pendingEmail = '';
 let pendingResetEmail = '';
+let adminToastTimer;
+let portfolioRefreshTimer = null;
+
+function showAdminSuccess(message) {
+  const toast = document.getElementById('bmfToast');
+  if (!toast) return;
+  toast.textContent = `BMF success: ${message}`;
+  toast.dataset.kind = 'success';
+  toast.classList.add('visible');
+  clearTimeout(adminToastTimer);
+  adminToastTimer = setTimeout(() => toast.classList.remove('visible'), 4200);
+}
 
 function applyTheme(theme) {
   document.documentElement.classList.remove('dark', 'light');
@@ -137,6 +150,10 @@ function showDashboard() {
   document.getElementById('adminDashboard').classList.remove('hidden');
   renderLoggedInAdmin();
   initServerMode();
+  if (portfolioRefreshTimer) clearInterval(portfolioRefreshTimer);
+  portfolioRefreshTimer = setInterval(() => {
+    if (!document.getElementById('adminDashboard').classList.contains('hidden')) fetchNewRequests();
+  }, 60000);
 }
 
 function showCustomersView() {
@@ -332,14 +349,20 @@ async function fetchNewRequests() {
       .filter(loan => String(loan.status || '').trim().toLowerCase().replace(/\s+/g, '_') === 'pending')
       .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
     portfolioLoans = Array.isArray(data.loans) ? data.loans : [];
+    pendingPaymentReviews = portfolioLoans.flatMap(loan => (loan.paymentSubmissions || [])
+      .filter(submission => submission.status === 'pending').map(submission => ({ loan, submission })));
     renderNewRequests();
+    renderPortfolioOverview();
     // Loan data drives the "loyal vs all" customer view, so refresh it now that
     // portfolioLoans is populated.
     applyUserFilterAndSort();
     if (note) note.textContent = '';
   } catch (err) {
     pendingRequests = [];
+    portfolioLoans = [];
+    pendingPaymentReviews = [];
     if (badge) badge.textContent = '0';
+    renderPortfolioOverview();
     if (list) list.innerHTML = `<p>${escapeHtml(err.message || 'Unable to load requests.')}</p>`;
   }
 }
@@ -349,13 +372,13 @@ function renderNewRequests() {
   const badge = document.getElementById('newRequestsBadge');
   if (!list || !badge) return;
 
-  badge.textContent = String(pendingRequests.length);
-  if (!pendingRequests.length) {
+  badge.textContent = String(pendingRequests.length + pendingPaymentReviews.length);
+  if (!pendingRequests.length && !pendingPaymentReviews.length) {
     list.innerHTML = '<p>No new requests awaiting review.</p>';
     return;
   }
 
-  list.innerHTML = pendingRequests.map((loan, index) => {
+  const loanRequestsHtml = pendingRequests.map((loan, index) => {
     const customer = findCustomerForLoan(loan) || {};
     return `
     <div class="request-row">
@@ -373,6 +396,85 @@ function renderNewRequests() {
       </div>
     </div>`;
   }).join('');
+  const paymentReviewsHtml = pendingPaymentReviews.map(({ loan, submission }, index) => {
+    const customer = findCustomerForLoan(loan) || {};
+    return `<div class="request-row payment-review-row">
+      <div><span class="request-seq">P${index + 1}</span>
+        <strong style="margin-left: 8px;">Transfer payment review · ${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</strong>
+        <p><strong>Customer:</strong> ${escapeHtml(customer.username || loan.email || 'Unknown')} · ${escapeHtml(customer.email || loan.email || '')}</p>
+        <p><strong>Amount:</strong> ${formatCurrency(submission.amount)} · <strong>Method:</strong> ${escapeHtml(submission.mode)} · <strong>Reference:</strong> ${escapeHtml(submission.transactionReference)}</p>
+        <p>Open customer loan details to inspect the proof image before approval.</p>
+      </div><div class="button-row"><button class="toggle-mode" type="button" data-request-user="${escapeHtml(customer.id ?? '')}" ${customer.id == null ? 'disabled' : ''}>Review payment</button></div>
+    </div>`;
+  }).join('');
+  list.innerHTML = `${paymentReviewsHtml}${loanRequestsHtml}`;
+}
+
+function renderPortfolioOverview() {
+  const kpis = document.getElementById('portfolioKpis');
+  const chart = document.getElementById('collectionsChart');
+  const activityList = document.getElementById('recentActivity');
+  const loyalList = document.getElementById('loyalBorrowers');
+  if (!kpis || !chart || !activityList || !loyalList) return;
+  const activeStatuses = ['active', 'grace', 'defaulted', 'liquidated'];
+  const active = portfolioLoans.filter(loan => activeStatuses.includes(getLoanStatus(loan)));
+  const overdue = portfolioLoans.filter(loan => ['grace', 'defaulted'].includes(getLoanStatus(loan)));
+  const outstanding = active.reduce((sum, loan) => sum + Math.max(0, Number(loan.outstanding) || 0), 0);
+  const collected = portfolioLoans.reduce((sum, loan) => sum + (loan.payments || []).reduce((loanSum, payment) => loanSum + (Number(payment.amount) || 0), 0), 0);
+  const values = [
+    ['Cash collected', formatCurrency(collected)],
+    ['Active loans', String(active.length)],
+    ['Overdue accounts', String(overdue.length)],
+    ['Outstanding balance', formatCurrency(outstanding)],
+    ['Transfers awaiting review', String(pendingPaymentReviews.length)]
+  ];
+  kpis.innerHTML = values.map(([label, value]) => `<div class="report-metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (6 - index));
+    const key = date.toISOString().slice(0, 10);
+    const amount = portfolioLoans.reduce((sum, loan) => sum + (Array.isArray(loan.payments) ? loan.payments : []).reduce((loanSum, payment) => {
+      const stamp = payment.paymentDate || payment.date;
+      const parsed = stamp ? new Date(stamp) : null;
+      return parsed && !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === key ? loanSum + (Number(payment.amount) || 0) : loanSum;
+    }, 0), 0);
+    return { date, key, amount };
+  });
+  const max = Math.max(1, ...days.map(day => day.amount));
+  const barWidth = 46;
+  const gap = 24;
+  const svgBars = days.map((day, index) => {
+    const height = Math.max(3, (day.amount / max) * 112);
+    const x = 28 + index * (barWidth + gap);
+    const y = 130 - height;
+    const label = day.date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+    return `<g><title>${escapeHtml(label)}: ${escapeHtml(formatCurrency(day.amount))}</title><rect x="${x}" y="${y}" width="${barWidth}" height="${height}" rx="6" fill="#2f81f7"/><text x="${x + barWidth / 2}" y="151" text-anchor="middle">${escapeHtml(label)}</text></g>`;
+  }).join('');
+  chart.innerHTML = `<svg class="collections-svg" viewBox="0 0 500 172" role="img" aria-label="Daily collections over the last seven days"><line x1="16" y1="130" x2="490" y2="130" stroke="currentColor" opacity=".24"/>${svgBars}</svg><p>Collected: <strong>${formatCurrency(days.reduce((sum, day) => sum + day.amount, 0))}</strong></p>`;
+
+  const activities = portfolioLoans.flatMap(loan => {
+    const latestHistory = Array.isArray(loan.statusHistory) ? loan.statusHistory.at(-1) : null;
+    const events = [];
+    if (latestHistory) events.push({ at: latestHistory.updatedAt || loan.updatedAt, text: `${loan.receiptNumber || `Loan #${loan.id}`} · ${formatStatus(latestHistory.status)} · ${latestHistory.reason || 'Status updated'}` });
+    (Array.isArray(loan.payments) ? loan.payments : []).forEach(payment => events.push({ at: payment.paymentDate || payment.date, text: `${loan.receiptNumber || `Loan #${loan.id}`} · payment received ${formatCurrency(payment.amount)}` }));
+    return events;
+  }).filter(item => item.at).sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 6);
+  activityList.innerHTML = activities.length ? activities.map(item => `<li><span>${escapeHtml(item.text)}</span><small>${escapeHtml(formatDate(item.at))}</small></li>`).join('') : '<li>No recent loan activity.</li>';
+
+  const customers = new Map();
+  portfolioLoans.forEach(loan => {
+    const key = String(loan.email || '').toLowerCase();
+    if (!key) return;
+    const entry = customers.get(key) || { email: loan.email, count: 0, paid: 0 };
+    entry.count += 1;
+    entry.paid += Number(loan.paidTotal) || (Array.isArray(loan.payments) ? loan.payments : []).reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+    customers.set(key, entry);
+  });
+  const loyal = [...customers.values()].filter(customer => customer.count > 1).sort((a, b) => b.count - a.count || b.paid - a.paid).slice(0, 4);
+  loyalList.innerHTML = loyal.length ? loyal.map(customer => `<div class="report-metric"><span>${escapeHtml(customer.email)}</span><strong>${customer.count} loans · ${formatCurrency(customer.paid)} repaid</strong></div>`).join('') : '<p>No returning borrowers yet.</p>';
 }
 
 async function notifySelectedUser() {
@@ -659,7 +761,7 @@ function getLoanStatus(loan) {
 
 function renderLoanDetails(loan) {
   const status = getLoanStatus(loan);
-  const canManageStore = ['admin', 'store_admin'].includes(localStorage.getItem('userRole'));
+  const canManageStore = ['admin', 'franchise_admin', 'store_admin'].includes(localStorage.getItem('userRole'));
   const history = Array.isArray(loan.statusHistory) && loan.statusHistory.length
     ? loan.statusHistory.map(entry => `
         <li>
@@ -680,9 +782,17 @@ function renderLoanDetails(loan) {
       ${payment.screenshot ? `${fileLink(payment.screenshot)}View proof of payment</a>` : '<span>No proof attached</span>'}
     </li>
   `).join('') : '<li>No payments recorded.</li>';
-  const proofLinks = [loan.collateralFront, loan.collateralBack].filter(Boolean).map((filename, index) =>
-    `${fileLink(filename)}View collateral ${index ? 'back' : 'front'}</a>`
-  ).join('');
+  const proofLinks = [
+    ['collateral front', loan.collateralFront], ['collateral back', loan.collateralBack],
+    ['NRC front', loan.nrcFront], ['NRC back', loan.nrcBack]
+  ].filter(([, filename]) => filename).map(([label, filename]) => `${fileLink(filename)}View ${label}</a>`).join('');
+  const paymentReviews = (loan.paymentSubmissions || []).map(item => `
+    <li class="payment-review-item"><strong>${formatCurrency(item.amount)}</strong> · ${escapeHtml(item.mode)} · Ref: ${escapeHtml(item.transactionReference)} · <strong>${escapeHtml(item.status)}</strong>
+      <div>${escapeHtml(formatDate(item.submittedAt))} · Submitted by ${escapeHtml(item.submittedBy || 'borrower')}</div>
+      ${item.screenshot ? `${fileLink(item.screenshot)}View transfer proof</a>` : ''}
+      ${item.status === 'pending' && canManageStore ? `<div class="button-row"><button type="button" class="enter-btn" data-payment-review="approve" data-loan-id="${escapeHtml(loan.id)}" data-submission-id="${escapeHtml(item.id)}">Approve verified payment</button><button type="button" class="toggle-mode" data-payment-review="decline" data-loan-id="${escapeHtml(loan.id)}" data-submission-id="${escapeHtml(item.id)}">Decline</button></div>` : ''}
+      ${item.reviewReason ? `<p>Review note: ${escapeHtml(item.reviewReason)}</p>` : ''}
+    </li>`).join('');
   const outstanding = Number(loan.outstanding || 0);
   // Payments: admin or store_admin (both may record money). Decisions: the
   // assigned store_admin only — mirrors the backend's franchise-scoping gate.
@@ -723,6 +833,7 @@ function renderLoanDetails(loan) {
         ${loan.verifiedOverdueAt ? `<p><strong>Overdue verified:</strong> ${escapeHtml(formatDate(loan.verifiedOverdueAt))} by ${escapeHtml(loan.verifiedOverdueBy || 'admin')}</p>` : ''}
       </div>
       ${proofLinks ? `<div>${proofLinks}</div>` : ''}
+      ${paymentReviews ? `<section class="payment-review-panel"><h3>Transfer payment review</h3><ul>${paymentReviews}</ul></section>` : ''}
       ${canReview ? `
         <input type="text" class="modal-input" data-decision-reason="${escapeHtml(loan.id)}" maxlength="300" value="${escapeHtml(loan.adminReason || '')}" placeholder="Decision reason" style="margin-top: 12px;">
         <div class="button-row" style="margin-top: 12px;">
@@ -941,6 +1052,7 @@ async function submitPayment(event, form) {
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Could not record payment.');
     document.getElementById('detailFeedback').textContent = result.message || 'Payment recorded.';
+    showAdminSuccess(result.message || 'Payment recorded.');
     if (selectedUserId !== null) {
       await viewUserDetails(selectedUserId);
     }
@@ -968,6 +1080,7 @@ async function updateLoanStatus(loanId, action, reason, graceUntil) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Could not update loan status.');
     document.getElementById('detailFeedback').textContent = data.message || 'Loan status updated.';
+    showAdminSuccess(data.message || 'Loan status updated.');
     await viewUserDetails(selectedUserId);
     await fetchNewRequests();
   } catch (err) {
@@ -1087,6 +1200,7 @@ async function handleAdminLogin(event) {
     setLoader(false);
 
     if (data.message) {
+      showAdminSuccess(data.message);
       pendingEmail = email;
       document.getElementById('otpSentTo').textContent = `OTP sent to: ${data.otpSentTo || email}`;
       document.getElementById('adminLoginForm').classList.add('hidden');
@@ -1209,6 +1323,7 @@ async function handleAdminOtp(event) {
     setLoader(false);
 
     if (data.message === 'Login successful.') {
+      showAdminSuccess('Admin login verified. Dashboard ready.');
       if (!['admin', 'store_admin'].includes(data.role)) {
         setAuthMessage('This account is not an admin account.', true);
         document.getElementById('adminOtpForm').classList.add('hidden');
@@ -1779,6 +1894,11 @@ document.getElementById('hrEmployeeList')?.addEventListener('click', event => {
 });
 
 document.getElementById('modalBody').addEventListener('click', event => {
+  const paymentReview = event.target.closest('[data-payment-review]');
+  if (paymentReview) {
+    reviewPaymentSubmission(paymentReview.dataset.loanId, paymentReview.dataset.submissionId, paymentReview.dataset.paymentReview);
+    return;
+  }
   if (event.target.closest('[data-notify-user]')) {
     notifySelectedUser();
     return;
@@ -1811,6 +1931,33 @@ document.getElementById('modalBody').addEventListener('click', event => {
     updateLoanStatus(actionButton.dataset.loanId, actionButton.dataset.loanAction, reasonInput?.value, graceInput?.value);
   }
 });
+
+async function reviewPaymentSubmission(loanId, submissionId, decision) {
+  let reason;
+  if (decision === 'approve' && !window.confirm('Confirm you inspected the proof image and verified this transaction with the bank or mobile money provider. Approving will update the customer balance.')) return;
+  if (decision === 'decline') {
+    reason = window.prompt('Reason for declining this payment proof:');
+    if (reason === null) return;
+    if (reason.trim().length < 3) {
+      document.getElementById('detailFeedback').textContent = 'A clear decline reason is required.';
+      return;
+    }
+  }
+  try {
+    const response = await fetch(`/loans/${encodeURIComponent(loanId)}/payment-submissions/${encodeURIComponent(submissionId)}/${decision}`, {
+      method: 'POST', headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(decision === 'decline' ? { reason } : { physicalVerificationConfirmed: true })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Could not review payment proof.');
+    document.getElementById('detailFeedback').textContent = `BMF success: ${result.message}`;
+    showAdminSuccess(result.message);
+    if (selectedUserId !== null) await viewUserDetails(selectedUserId);
+    await fetchNewRequests();
+  } catch (error) {
+    document.getElementById('detailFeedback').textContent = error.message || 'Could not review payment proof.';
+  }
+}
 document.getElementById('modalBody').addEventListener('change', event => {
   if (event.target.id === 'timeframeFrom') {
     customTimeframeFrom = event.target.value;
@@ -1847,6 +1994,12 @@ function applyUserFilterAndSort() {
 document.getElementById('userSearch').addEventListener('input', applyUserFilterAndSort);
 document.getElementById('userSort')?.addEventListener('change', applyUserFilterAndSort);
 document.getElementById('refreshRequestsBtn').addEventListener('click', fetchNewRequests);
+document.getElementById('refreshPortfolioBtn')?.addEventListener('click', fetchNewRequests);
+document.querySelector('.section-jump-nav')?.addEventListener('click', event => {
+  const button = event.target.closest('[data-admin-jump]');
+  if (button) document.getElementById(button.dataset.adminJump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+document.getElementById('jumpCustomersBtn')?.addEventListener('click', showCustomersView);
 document.getElementById('newRequestsList').addEventListener('click', event => {
   const requestButton = event.target.closest('[data-request-user]');
   if (requestButton && requestButton.dataset.requestUser) {

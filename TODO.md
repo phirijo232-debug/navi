@@ -24,6 +24,10 @@
 - [x] Enrich breakage alerts with [file → handler] prefixes, expand notify coverage to every money/silence-critical circuit (auth, loans, reports, schedulers), and queue unsent alerts to logs/pending-alerts.log when Gmail is down.
 - [ ] Add UI polish for status badges, summary cards, and error messages for faster admin use.
 - [ ] Add a strict release checklist before deployment: env checks, login flow, invite checks, and data integrity checks.
+- [x] BMF customer transfer payment review: borrower proof submissions stay pending until scoped staff approval records one ledger payment; duplicate references and replayed decisions are rejected.
+- [x] Add required separate NRC front/back images to customer loan requests and keep access behind signed ownership/store-checked file links.
+- [x] Add scoped in-app customer and staff review notifications, customer payment history/forms, and transfer review controls in the admin request queue.
+- [ ] Finish visual organization of both portals against the supplied Aura reference prompts and run desktop/mobile visual QA.
 - [x] Partial `?token=` hardening (LAN mitigation): redact the device token from `logs/access.log`, set `Cache-Control: no-store` + `Referrer-Policy: no-referrer` on image responses, and log a warning when a file is opened via the URL token.
 - [x] Deployment gate (blocking): `server.js` refuses `PUBLIC_DEPLOY=true` boot unless `SIGNING_SECRET` is set AND `MASTER_KEY` is a non-default value.
 - [x] Deployment security: replaced the `?token=` image fallback with short-lived signed URLs — `POST /uploads/sign` issues a 10-minute HMAC link only after the ownership/store check passes; `serveFile` rejects raw `?token=` with 403. The device token no longer appears in any URL.

@@ -83,6 +83,8 @@ test('router registers the core authentication and data endpoints', () => {
     ['GET', '/loans'], ['GET', '/loans/all'], ['GET', '/loans/:id'],
     ['GET', '/loans/search'], ['GET', '/payments'], ['GET', '/payments/export'],
     ['POST', '/loans/request'], ['POST', '/loans/:id/action'], ['POST', '/loans/payment'],
+    ['POST', '/loans/:id/payment-submissions'], ['POST', '/loans/:id/payment-submissions/:submissionId/:decision'],
+    ['GET', '/notifications'], ['PATCH', '/notifications/:id/read'],
     ['POST', '/loans/notify-overdue'], ['POST', '/loans/notify-user'], ['POST', '/loans/:id/notify-overdue'],
     ['POST', '/uploads/sign'], ['GET', '/users'], ['POST', '/admin/users'], ['POST', '/admin/loans'],
     ['POST', '/admin/announcements'], ['GET', '/invites'], ['POST', '/invites/create'],

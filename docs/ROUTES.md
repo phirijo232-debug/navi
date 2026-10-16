@@ -30,6 +30,9 @@ All API routes below require `x-device-token` and resolve a real user in `users.
 | `GET /loans`, `GET /loans/:id`, `GET /loans/search` | Customers see their own loans in their assigned store; staff are store-scoped; main admin may request `storeId=all` |
 | `GET /loans/all`, `POST /loans/notify-overdue`, `POST /loans/notify-user`, `POST /loans/:id/notify-overdue` | Staff role and assigned store; main admin may span stores where the handler permits it |
 | `POST /loans/request`, `POST /loans/:id/action`, `POST /loans/payment`, `POST /admin/loans` | Authenticated customer ownership or the exact staff role required by the loan lifecycle policy |
+| `POST /loans/:id/payment-submissions` | Borrower on that loan only; submits a proof image, transaction reference, amount, and mobile/bank method as pending. It does not change the ledger or balance. |
+| `POST /loans/:id/payment-submissions/:submissionId/approve`, `/decline` | In-scope staff role only; approval requires provider-verification attestation and posts the stored submission once, decline requires a reason and does not change the ledger. |
+| `GET /notifications`, `PATCH /notifications/:id/read` | Returns and updates only the caller's notification, or an in-scope staff payment-review alert. |
 | `/reports/*`, `/payments`, `/payments/export` | Staff role and store scope; customer report routes verify ownership |
 | `GET /users`, `POST /admin/users`, `/invites*`, `/admin/announcements` | Staff role gates; response fields and store scope are enforced in controllers |
 | `/feedback*` | Authenticated submission, scoped staff reads, store-admin status updates |

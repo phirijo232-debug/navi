@@ -74,6 +74,9 @@ GET  /loans/:id
 POST /loans/request
 POST /loans/:id/action
 POST /loans/payment
+POST /loans/:id/payment-submissions
+POST /loans/:id/payment-submissions/:submissionId/approve
+POST /loans/:id/payment-submissions/:submissionId/decline
 POST /loans/:id/notify-overdue
 POST /loans/notify-overdue
 POST /uploads/sign
@@ -92,6 +95,8 @@ GET  /reports/:scope/paid
 GET  /reports/search
 GET  /reports/user/:email
 GET  /users
+GET  /notifications
+PATCH /notifications/:id/read
 POST /signup
 POST /signup/confirm
 POST /signup/resend
