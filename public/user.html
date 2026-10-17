@@ -5,8 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BMF — My Account</title>
   <link rel="stylesheet" href="style.css?v=20261017-shared-theme-refresh">
+  <style>
+    body.customer-portal { background:#0d1117; color:#e8edf5; }
+    .customer-portal .dashboard { max-width:1120px; margin:0 auto; padding:18px; }
+    .customer-portal .dash-header { display:flex; align-items:center; justify-content:space-between; min-height:44px; }
+    .customer-portal .brand { margin:0; font-size:20px; }
+    .customer-portal .loan-tabs { display:flex; align-items:center; gap:8px; overflow-x:auto; padding:8px 0 14px; border-bottom:1px solid #29313b; }
+    .customer-portal .loan-tab { border:0; border-radius:7px; padding:10px 16px; white-space:nowrap; color:#9aa8b8; background:transparent; }
+    .customer-portal .loan-tab.active { color:white; background:#2f80ed; }
+    .customer-portal .screen-section { padding-top:16px; }
+    .customer-portal .welcome-card,.customer-portal .board-card,.customer-portal .loan-summary-card,.customer-portal .panel { background:#161b22; border:1px solid #29313b; border-radius:10px; box-shadow:none; }
+    .customer-portal .welcome-card { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 24px; margin-bottom:18px; border-left:4px solid #2f80ed; }
+    .customer-portal .welcome-card h2 { margin:0 0 5px; font-size:20px; }
+    .customer-portal .welcome-card p { margin:0; color:#8b99aa; }
+    .customer-portal .standing-badge { color:#4ade80; border:1px solid #23633d; border-radius:20px; padding:8px 13px; white-space:nowrap; }
+    .customer-portal .portal-kpis { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:0 0 18px; }
+    .customer-portal .portal-kpis .loan-summary-card { padding:17px 20px; }
+    .customer-portal .portal-kpis h3 { font-size:12px; color:#8b99aa; text-transform:uppercase; letter-spacing:.05em; }
+    .customer-portal .portal-kpis .summary-value { font-size:26px; font-weight:700; margin:6px 0; }
+    .customer-portal .portal-kpis .summary-label { color:#8b99aa; }
+    .customer-portal #statusSummaryCards { display:none; }
+    .customer-portal .board-card { padding:18px; margin-bottom:16px; }
+    .customer-portal .overview-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+    .customer-portal .summary-inline-card { background:#1b2129; border:1px solid #29313b; border-radius:9px; padding:15px; }
+    .customer-portal .history-filters { display:none; }
+    .customer-portal .loan-list { padding:0; list-style:none; }
+    .customer-portal .loan-card { background:#161b22; border:1px solid #29313b; border-radius:10px; margin:10px 0; padding:16px; cursor:pointer; }
+    .customer-portal .loan-meta { color:#a9b4c1; margin-top:9px; }
+    .customer-portal .request-field-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .customer-portal .request-field-grid:first-child { grid-template-columns:1fr; }
+    .customer-portal .field-label { display:block; margin-bottom:6px; }
+    @media(max-width:650px) { .customer-portal .dashboard{padding:12px}.customer-portal .portal-kpis,.customer-portal .overview-grid{grid-template-columns:1fr}.customer-portal .welcome-card{align-items:flex-start;flex-direction:column}.customer-portal .request-field-grid{grid-template-columns:1fr} }
+  </style>
 </head>
-<body>
+<body class="customer-portal">
   <div id="bmfToast" class="bmf-toast" role="status" aria-live="polite"></div>
   <button class="menu-toggle" id="menuBtn">⋮</button>
   <div class="dropdown-menu" id="menuDropdown">
@@ -31,32 +63,31 @@
       <button class="loan-tab active" data-tab="summary">Loan Summary</button>
       <button class="loan-tab" data-tab="loans">My Loans</button>
       <button class="loan-tab" data-tab="request">New Request</button>
-      <button class="loan-tab" data-tab="payments">Payments</button>
+      <button class="loan-tab" data-tab="payments">Record Payment &amp; Support</button>
       <button class="loan-tab" data-tab="reports">Reports</button>
     </div>
 
     <div class="screen-sections">
       <div id="summarySection" class="screen-section active">
-        <div class="loan-summary-grid">
+        <div class="welcome-card">
+          <div><h2><span id="greetingLabel">Welcome back</span>, <span id="welcomeName">--</span> 👋</h2><p>Logged in as <span id="welcomeAccount">--</span> · Buraza Micro Finance</p></div>
+          <span class="standing-badge">✓ Good Standing</span>
+        </div>
+        <div class="loan-summary-grid portal-kpis">
           <div class="loan-summary-card">
-            <h3 id="greetingLabel">Welcome Back</h3>
-            <p class="summary-label">Logged in as</p>
-            <p class="summary-value" id="welcomeName">--</p>
-          </div>
-          <div class="loan-summary-card">
-            <h3>Loan Summary</h3>
-            <p class="summary-value" id="loanTotal">--</p>
-            <p class="summary-label">Total loans</p>
+            <h3>Total loans</h3>
+            <p class="summary-value" id="loanTotal">0</p>
+            <p class="summary-label" id="totalRequestedLabel">K 0.00 total requested</p>
           </div>
           <div class="loan-summary-card">
             <h3>Outstanding</h3>
-            <p class="summary-value" id="loanOutstanding">--</p>
-            <p class="summary-label">Total balance</p>
+            <p class="summary-value" id="loanOutstanding">K 0.00</p>
+            <p class="summary-label">Balance remaining</p>
           </div>
           <div class="loan-summary-card">
-            <h3>Server Status</h3>
-            <p class="summary-value">RUNNING</p>
-            <p class="summary-label">Connection active</p>
+            <h3>Settled</h3>
+            <p class="summary-value" id="loanSettled">0</p>
+            <p class="summary-label" id="settledTotalLabel">K 0.00 fully paid</p>
           </div>
         </div>
         <div class="loan-summary-grid" id="statusSummaryCards">
@@ -102,9 +133,45 @@
 
       <div id="paymentsSection" class="screen-section hidden">
         <div class="board-card">
-          <h2>Payments</h2>
+          <h2>Record Payment &amp; Support</h2>
+          <p>To record a payment, open a running loan and submit your payment proof. Track your payment history or contact BMF below.</p>
+          <div class="loan-filters support-tabs" role="tablist" aria-label="Payments and support">
+            <button type="button" class="loan-filter active" data-support-view="history">Payment History</button>
+            <button type="button" class="loan-filter" data-support-view="inquiry">Inquiries</button>
+            <button type="button" class="loan-filter" data-support-view="dispute">Dispute Payment</button>
+            <button type="button" class="loan-filter" data-support-view="schedule">Due Schedule</button>
+            <button type="button" class="toggle-mode support-refresh" id="refreshSupportBtn">Refresh</button>
+          </div>
+          <p id="supportMessage" class="message-text" role="status"></p>
+          <section data-support-panel="history">
           <div class="overview-grid" id="paymentSummary"></div>
           <div class="table-scroll"><table class="customer-payment-table"><thead><tr><th>Date</th><th>Loan</th><th>Amount</th><th>Method</th><th>Receipt</th><th>Proof</th></tr></thead><tbody id="customerPaymentHistory"></tbody></table></div>
+          </section>
+          <section data-support-panel="inquiry" class="hidden">
+            <h3>Submit an Inquiry</h3>
+            <form id="customerInquiryForm" class="auth-form">
+              <div class="request-field-grid two-up">
+                <label class="field-label">Inquiry type<select id="inquiryType" class="auth-input" required><option value="">Select type...</option><option>Payment not recorded</option><option>Balance discrepancy</option><option>Loan status query</option><option>Extension request</option><option>Receipt request</option><option>Other</option></select></label>
+                <label class="field-label">Related loan ID (optional)<select id="inquiryLoanId" class="auth-input"><option value="">Choose a loan...</option></select></label>
+              </div>
+              <label class="field-label">Details<textarea id="inquiryDetails" class="auth-input" rows="4" required placeholder="Tell us how we can help."></textarea></label>
+              <button class="enter-btn" type="submit" id="submitInquiryBtn">Submit Inquiry</button>
+            </form>
+            <h3>Previous Inquiries</h3><div id="customerInquiryHistory"><p>Loading inquiries...</p></div>
+          </section>
+          <section data-support-panel="dispute" class="hidden">
+            <h3>Dispute a Payment</h3><p>Use this if a payment was recorded incorrectly or your balance seems wrong.</p>
+            <form id="customerDisputeForm" class="auth-form">
+              <div class="request-field-grid two-up">
+                <label class="field-label">Receipt no. in dispute<input id="disputeReceipt" class="auth-input" required placeholder="e.g. PAY-YYYYMMDD-0001"></label>
+                <label class="field-label">Expected amount (K)<input id="disputeExpected" class="auth-input" type="number" min="0" step="0.01" required></label>
+                <label class="field-label">Recorded amount (K)<input id="disputeRecorded" class="auth-input" type="number" min="0" step="0.01" required></label>
+              </div>
+              <label class="field-label">Details<textarea id="disputeDetails" class="auth-input" rows="4" required placeholder="Explain the discrepancy."></textarea></label>
+              <button class="enter-btn" type="submit">Submit Dispute</button>
+            </form>
+          </section>
+          <section data-support-panel="schedule" class="hidden"><h3>Due Schedule</h3><div id="customerDueSchedule"></div></section>
         </div>
       </div>
 
@@ -321,6 +388,7 @@
 
 
     document.getElementById('welcomeName').textContent = username;
+    document.getElementById('welcomeAccount').textContent = username;
 
     if (isNewSignup) {
       document.getElementById('greetingLabel').textContent = 'Welcome Aboard!';
@@ -551,7 +619,7 @@
       if (tab === 'loans') {
         renderLoanList();
       }
-      if (tab === 'payments') renderPaymentOverview();
+      if (tab === 'payments') { renderPaymentOverview(); loadCustomerSupport(); }
       if (tab === 'reports') loadCustomerReport();
     }
 
@@ -599,7 +667,9 @@
       const paymentRows = document.getElementById('customerReportPayments');
       const token = localStorage.getItem('deviceToken');
       if (!summary || !loanRows || !paymentRows || !userEmail || !token) return;
-      summary.textContent = 'Loading your report…';
+      summary.innerHTML = '<p role="status">Refreshing your report…</p>';
+      loanRows.innerHTML = '<tr><td colspan="5">Loading loans…</td></tr>';
+      paymentRows.innerHTML = '<tr><td colspan="6">Loading payments…</td></tr>';
       try {
         const response = await fetch(`/reports/user/${encodeURIComponent(userEmail)}`, { headers: { 'x-device-token': token } });
         const report = await response.json().catch(() => ({}));
@@ -612,6 +682,33 @@
         loanRows.innerHTML = report.loans?.length ? report.loans.map(loan => `<tr><td>${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</td><td>${escapeHtml(loan.product || 'Loan')}</td><td>${escapeHtml(loan.businessStatus || loan.status || 'pending')}</td><td>${escapeHtml(formatDateDisplay(loan.approvedAt || loan.borrowedDate || loan.createdAt))}</td><td>${formatKwacha(loan.outstanding || 0)}</td></tr>`).join('') : '<tr><td colspan="5">No loan records found.</td></tr>';
         paymentRows.innerHTML = report.payments?.length ? report.payments.slice().reverse().map(payment => `<tr><td>${escapeHtml(formatDateDisplay(payment.paymentDate || payment.date))}</td><td>${escapeHtml(payment.loanReceiptNumber || '')}</td><td>${formatKwacha(payment.amount)}</td><td>${escapeHtml(payment.mode || 'Payment')}</td><td>${escapeHtml(payment.paymentReceiptId || payment.paymentReceiptNumber || '—')}</td><td>${payment.screenshot ? `<a href="#" data-upload-filename="${escapeHtml(payment.screenshot)}">View proof</a>` : '—'}</td></tr>`).join('') : '<tr><td colspan="6">No payment records found.</td></tr>';
       } catch (error) { summary.textContent = error.message || 'Unable to load your report.'; }
+    }
+
+    async function loadCustomerSupport() {
+      const history = document.getElementById('customerInquiryHistory');
+      const loanSelect = document.getElementById('inquiryLoanId');
+      const schedule = document.getElementById('customerDueSchedule');
+      const token = localStorage.getItem('deviceToken') || '';
+      if (loanSelect) loanSelect.innerHTML = '<option value="">Choose a loan...</option>' + allLoans.map(loan => `<option value="${escapeHtml(loan.id)}">${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)} · ${escapeHtml(loan.product || 'Loan')}</option>`).join('');
+      if (schedule) {
+        const dueLoans = allLoans.filter(loan => Number(loan.outstanding) > 0).sort((a,b) => String(a.dueDate || '').localeCompare(String(b.dueDate || '')));
+        schedule.innerHTML = dueLoans.length ? `<div class="table-scroll"><table class="customer-payment-table"><thead><tr><th>Loan</th><th>Due date</th><th>Balance</th><th>Status</th></tr></thead><tbody>${dueLoans.map(loan => `<tr><td>${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</td><td>${escapeHtml(formatDateDisplay(loan.dueDate))}</td><td>${formatKwacha(loan.outstanding)}</td><td>${escapeHtml(formatStatusLabel(loanStatusOf(loan)))}</td></tr>`).join('')}</tbody></table></div>` : '<p>No outstanding loans.</p>';
+      }
+      if (!history || !token || !userEmail) return false;
+      history.innerHTML = '<p>Loading inquiries…</p>';
+      try {
+        const response = await fetch(`/feedback?email=${encodeURIComponent(userEmail)}`, { headers: { 'x-device-token': token } });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Unable to load inquiries.');
+        const records = Array.isArray(data.feedback) ? data.feedback.slice().reverse() : [];
+        history.innerHTML = records.length ? records.map(item => { const linkedLoan = allLoans.find(loan => String(loan.id) === String(item.relatedLoanId)); return `<article class="loan-card"><strong>${escapeHtml(item.category || 'Inquiry')}${item.relatedLoanId ? ` — ${escapeHtml(linkedLoan?.receiptNumber || `BMF-${item.relatedLoanId}`)}` : ''}</strong><span class="loan-badge ${escapeHtml(item.status || 'new')}">${escapeHtml(formatStatusLabel(item.status || 'new'))}</span><p>${escapeHtml(item.message || '')}</p><small>Submitted: ${escapeHtml(formatDateDisplay(item.createdAt))}${item.reviewNote ? ` · ${escapeHtml(item.reviewNote)}` : ''}</small></article>`; }).join('') : '<p>No previous inquiries.</p>';
+        return true;
+      } catch (error) { history.textContent = error.message || 'Unable to load inquiries.'; return false; }
+    }
+
+    function selectSupportView(view) {
+      document.querySelectorAll('[data-support-panel]').forEach(panel => panel.classList.toggle('hidden', panel.dataset.supportPanel !== view));
+      document.querySelectorAll('[data-support-view]').forEach(button => button.classList.toggle('active', button.dataset.supportView === view));
     }
 
     function renderOverviewSummary(loans) {
@@ -807,15 +904,16 @@
         document.getElementById('loanTotal').textContent = '0 loans';
         document.getElementById('loanOutstanding').textContent = 'K0';
         renderLoanSummaryCounts([]);
-        return;
+        return false;
       }
 
       if (!deviceToken) {
         loanList.innerHTML = '<li>Device token missing. Please login again.</li>';
-        return;
+        return false;
       }
 
       try {
+        loanList.innerHTML = '<li class="loan-empty">Loading your loans…</li>';
         const params = new URLSearchParams({ email: userEmail });
         if (filterDays && filterDays !== 'all') params.set('filter', String(filterDays));
         const res = await fetch(`/loans?${params.toString()}`, {
@@ -827,7 +925,7 @@
 
         if (data.error) {
           loanList.innerHTML = `<li>${escapeHtml(data.error)}</li>`;
-          return;
+          return false;
         }
 
         allLoans = data.loans || [];
@@ -835,12 +933,18 @@
         const outstanding = data.summary?.outstanding || 0;
         document.getElementById('loanTotal').textContent = `${totalLoans} loan${totalLoans === 1 ? '' : 's'}`;
         document.getElementById('loanOutstanding').textContent = formatKwacha(outstanding);
+        document.getElementById('totalRequestedLabel').textContent = `${formatKwacha(data.summary?.totalRequested || 0)} total requested`;
+        const settledLoans = allLoans.filter(loan => loanStatusOf(loan) === 'paid');
+        document.getElementById('loanSettled').textContent = String(settledLoans.length);
+        document.getElementById('settledTotalLabel').textContent = `${formatKwacha(settledLoans.reduce((sum, loan) => sum + Number(loan.totalRepayment || loan.amount || 0), 0))} fully paid`;
         renderLoanSummaryCounts(allLoans);
         renderLoanList();
         renderPaymentOverview();
         loadCustomerNotifications();
+        return true;
       } catch (err) {
         loanList.innerHTML = '<li>Unable to load loan information. Please try again later.</li>';
+        return false;
       }
     }
 
@@ -934,7 +1038,46 @@
     document.querySelectorAll('.history-filter').forEach(btn => {
       btn.addEventListener('click', () => setHistoryFilter(btn.dataset.range));
     });
-    document.getElementById('refreshCustomerReport')?.addEventListener('click', loadCustomerReport);
+    document.getElementById('refreshCustomerReport')?.addEventListener('click', async event => {
+      const button = event.currentTarget;
+      button.disabled = true; button.textContent = 'Refreshing…';
+      try { await loadCustomerReport(); } finally { button.disabled = false; button.textContent = 'Refresh report'; }
+    });
+    document.querySelectorAll('[data-support-view]').forEach(button => button.addEventListener('click', () => selectSupportView(button.dataset.supportView)));
+    document.getElementById('refreshSupportBtn')?.addEventListener('click', async event => {
+      const button = event.currentTarget; const note = document.getElementById('supportMessage');
+      button.disabled = true; button.textContent = 'Refreshing…'; note.textContent = 'Refreshing payment history and support…';
+      try { const loansLoaded = await loadLoans(currentHistoryFilter); const supportLoaded = await loadCustomerSupport(); note.textContent = loansLoaded && supportLoaded ? 'Updated just now.' : 'Some information could not be refreshed. Please try again.'; }
+      catch { note.textContent = 'Refresh failed. Please try again.'; }
+      finally { button.disabled = false; button.textContent = 'Refresh'; }
+    });
+    document.getElementById('customerInquiryForm')?.addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = document.getElementById('submitInquiryBtn'); const note = document.getElementById('supportMessage');
+      button.disabled = true; button.textContent = 'Sending…'; note.textContent = 'Sending inquiry…';
+      try {
+        const category = document.getElementById('inquiryType').value;
+        const relatedLoanId = document.getElementById('inquiryLoanId').value;
+        const details = document.getElementById('inquiryDetails').value.trim();
+        const response = await fetch('/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-device-token': localStorage.getItem('deviceToken') || '' }, body: JSON.stringify({ email: userEmail, category: 'inquiry', relatedLoanId, message: `${category}: ${details}` }) });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Inquiry could not be sent.');
+        event.currentTarget.reset(); note.textContent = 'Inquiry sent successfully.'; await loadCustomerSupport();
+      } catch (error) { note.textContent = `Could not send inquiry: ${error.message}`; }
+      finally { button.disabled = false; button.textContent = 'Submit Inquiry'; }
+    });
+    document.getElementById('customerDisputeForm')?.addEventListener('submit', async event => {
+      event.preventDefault();
+      const note = document.getElementById('supportMessage'); const button = event.currentTarget.querySelector('button[type="submit"]');
+      button.disabled = true; button.textContent = 'Sending…'; note.textContent = 'Sending payment dispute…';
+      try {
+        const message = `Payment dispute for receipt ${document.getElementById('disputeReceipt').value.trim()}. Expected K ${document.getElementById('disputeExpected').value}; recorded K ${document.getElementById('disputeRecorded').value}. ${document.getElementById('disputeDetails').value.trim()}`;
+        const response = await fetch('/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-device-token': localStorage.getItem('deviceToken') || '' }, body: JSON.stringify({ email: userEmail, category: 'complaint', message }) });
+        const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error || 'Dispute could not be sent.');
+        event.currentTarget.reset(); note.textContent = 'Payment dispute sent successfully. BMF will review it.'; await loadCustomerSupport();
+      } catch (error) { note.textContent = `Could not send dispute: ${error.message}`; }
+      finally { button.disabled = false; button.textContent = 'Submit Dispute'; }
+    });
 
     document.getElementById('submitComplaintBtn').addEventListener('click', async () => {
       const field = document.getElementById('complaintMessage');

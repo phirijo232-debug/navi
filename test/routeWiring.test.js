@@ -38,10 +38,13 @@ function collectFrontendCalls() {
       while ((match = pattern.exec(source)) !== null) {
         const raw = match[2];
         if (!raw.startsWith('/')) continue;
-        // Skip template literals with interpolations (can't be statically resolved)
-        if (raw.includes('${')) continue;
-        const clean = raw.split('?')[0].split('#')[0];
-        calls.push({ file: name, raw, clean });
+        // Replace template interpolation with a path segment so routes such
+        // as /loans/${id} are still checked against /loans/:id.
+        const clean = raw.split('?')[0].split('#')[0].replace(/\$\{[^}]+\}/g, '__dynamic__');
+        const callEnd = source.indexOf(');', match.index);
+        const callText = source.slice(match.index, callEnd < 0 ? match.index + 600 : callEnd);
+        const methodMatch = callText.match(/\bmethod\s*:\s*(['"`])(GET|POST|PATCH|PUT|DELETE)\1/i);
+        calls.push({ file: name, raw, clean, method: methodMatch ? methodMatch[2].toUpperCase() : 'GET' });
       }
     }
   }
@@ -53,22 +56,22 @@ function matchesRoute(frontendPath, routePath) {
   const routeSegs = routePath.split('/').filter(Boolean);
   if (frontendSegs.length !== routeSegs.length) return false;
   return frontendSegs.every((seg, i) =>
-    routeSegs[i].startsWith(':') || routeSegs[i].startsWith('${') || routeSegs[i] === seg
+    routeSegs[i].startsWith(':') || seg === '__dynamic__' || routeSegs[i] === seg
   );
 }
 
-test('every frontend fetch target resolves to a registered backend route', () => {
+test('every frontend fetch target resolves to a registered backend route with the same method', () => {
   const registered = collectRegisteredRoutes();
   const calls = collectFrontendCalls();
 
   assert.ok(calls.length > 0, 'expected to find frontend fetch calls in public/');
 
   const unmatched = calls.filter(call =>
-    !registered.some(route => matchesRoute(call.clean, route.path))
+    !registered.some(route => route.method === call.method && matchesRoute(call.clean, route.path))
   );
 
   assert.deepEqual(
-    unmatched.map(call => `${call.file}: ${call.raw}`),
+    unmatched.map(call => `${call.file}: ${call.method} ${call.raw}`),
     [],
     'frontend calls with no matching backend route'
   );
@@ -124,4 +127,35 @@ test('every registered route points at a real controller function', () => {
       }
     }
   }
+});
+
+test('registered method and path pairs are unique', () => {
+  const registered = collectRegisteredRoutes();
+  const seen = new Set();
+  const duplicates = [];
+  for (const route of registered) {
+    const key = `${route.method} ${route.path}`;
+    if (seen.has(key)) duplicates.push(key);
+    seen.add(key);
+  }
+  assert.deepEqual(duplicates, [], 'duplicate method/path registrations make handler ownership ambiguous');
+});
+
+test('same-length static routes are registered before any dynamic route that could capture them', () => {
+  const stack = collectRegisteredRoutes();
+  const conflicts = [];
+  for (let index = 0; index < stack.length; index++) {
+    const current = stack[index];
+    const currentSegments = current.path.split('/').filter(Boolean);
+    if (currentSegments.some(segment => segment.startsWith(':'))) continue;
+    for (const earlier of stack.slice(0, index)) {
+      if (earlier.method !== current.method) continue;
+      const earlierSegments = earlier.path.split('/').filter(Boolean);
+      if (earlierSegments.length !== currentSegments.length) continue;
+      if (earlierSegments.every((segment, segmentIndex) =>
+        segment.startsWith(':') || segment === currentSegments[segmentIndex]
+      )) conflicts.push(`${earlier.method} ${earlier.path} shadows ${current.method} ${current.path}`);
+    }
+  }
+  assert.deepEqual(conflicts, [], 'a dynamic route must not precede a static route it can capture');
 });

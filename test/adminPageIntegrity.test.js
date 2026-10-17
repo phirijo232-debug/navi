@@ -55,6 +55,25 @@ test('every data-attribute selector used by admin.js exists in admin.html', () =
   assert.deepEqual(missing, [], `admin.html is missing data attributes used by admin.js: ${missing.join(', ')}`);
 });
 
+test('customer cards render before unrelated report, feedback, and loan requests finish', () => {
+  const start = js.indexOf('async function fetchUsers()');
+  const end = js.indexOf('// ─── New Requests', start);
+  const fetchUsers = js.slice(start, end);
+  const renderIndex = fetchUsers.indexOf('applyUserFilterAndSort();');
+  const enrichmentIndex = fetchUsers.indexOf('Promise.allSettled([');
+  assert.ok(start >= 0 && end > start, 'fetchUsers function must exist');
+  assert.ok(renderIndex >= 0 && enrichmentIndex > renderIndex,
+    'the customer directory must render before secondary API requests are awaited');
+});
+
+test('HR employee loading has a timeout and a visible timeout message', () => {
+  const start = js.indexOf('async function fetchHrEmployees()');
+  const end = js.indexOf('const HR_ROLE_LABELS', start);
+  const fetchHr = js.slice(start, end);
+  assert.match(fetchHr, /setTimeout\(\(\) => controller\.abort\(\), 12000\)/);
+  assert.match(fetchHr, /Employee records took too long to load/);
+});
+
 test('all public HTML pages are non-trivial and start with a doctype', () => {
   const pages = ['admin.html', 'dashboard.html', 'index.html', 'login.html', 'signup.html', 'forgot-password.html', 'user.html'];
   for (const page of pages) {

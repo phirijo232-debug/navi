@@ -44,6 +44,18 @@ let adminNotifications = [];
 let usersLoaded = false;
 let usersLoading = false;
 let usersRequestController = null;
+let createUserMode = 'customer';
+
+function openCreateUserModal(mode = 'customer') {
+  createUserMode = mode === 'hr' ? 'hr' : 'customer';
+  const title = document.getElementById('createUserTitle');
+  const roleSelect = document.getElementById('newUserRole');
+  const customerRole = roleSelect.querySelector('option[value="user"]');
+  if (customerRole) customerRole.hidden = createUserMode === 'hr';
+  if (title) title.textContent = createUserMode === 'hr' ? 'Create Staff Account' : 'Create New User';
+  roleSelect.value = createUserMode === 'hr' ? 'store_admin' : 'user';
+  document.getElementById('createUserModal').style.display = 'block';
+}
 
 function showAdminSuccess(message) {
   const toast = document.getElementById('bmfToast');
@@ -268,6 +280,21 @@ function getStoreHeaders(extraHeaders = {}) {
   };
 }
 
+async function runRefresh(button, task, label = 'Refresh') {
+  if (!button) return task();
+  const original = button.dataset.idleLabel || button.textContent.trim() || label;
+  button.dataset.idleLabel = original;
+  button.disabled = true;
+  button.textContent = 'Refreshing…';
+  button.setAttribute('aria-busy', 'true');
+  try { return await task(); }
+  finally {
+    button.disabled = false;
+    button.textContent = original;
+    button.removeAttribute('aria-busy');
+  }
+}
+
 // ─── Signed image links (?token= removed for public access) ──────────────────
 // <a> clicks cannot attach the x-device-token header, so on click we ask the
 // server for a 10-minute signed URL (POST /uploads/sign — ownership-checked
@@ -364,7 +391,21 @@ async function fetchUsers() {
     if (!users) throw new Error('The customer service returned data in an unexpected format.');
     allUsers = users.filter(user => !user.role || user.role === 'user');
     usersLoaded = true;
-    const [, , loanDetailsLoaded] = await Promise.all([fetchReportData(), fetchStoreFeedback(), fetchNewRequests()]);
+    // Draw the directory as soon as its own endpoint succeeds. Reports,
+    // feedback, and loan management enrich the cards, but a slow/failing
+    // secondary endpoint must never leave valid customers invisible.
+    applyUserFilterAndSort();
+    if (directoryStatus) {
+      directoryStatus.textContent = allUsers.length
+        ? `${allUsers.length} customer accounts in this store · loading loan details...`
+        : 'No customer accounts have been added to this store yet.';
+    }
+    const enrichmentResults = await Promise.allSettled([
+      fetchReportData(),
+      fetchStoreFeedback(),
+      fetchNewRequests()
+    ]);
+    const loanDetailsLoaded = enrichmentResults[2].status === 'fulfilled' && enrichmentResults[2].value === true;
     if (directoryStatus) {
       directoryStatus.textContent = allUsers.length
         ? `${allUsers.length} customer accounts in this store${loanDetailsLoaded ? ' · loan details loaded from Loan Management.' : ' · loan details are temporarily unavailable.'}`
@@ -676,6 +717,8 @@ async function notifySelectedUser() {
     document.getElementById('detailFeedback').textContent = 'Open a customer first.';
     return;
   }
+  const notifyButton = document.querySelector('[data-notify-user]');
+  if (notifyButton) { notifyButton.disabled = true; notifyButton.textContent = 'Sending…'; }
   try {
     document.getElementById('detailFeedback').textContent = `Sending notification to ${selectedUser.email}...`;
     const response = await fetch('/loans/notify-user', {
@@ -685,9 +728,14 @@ async function notifySelectedUser() {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Unable to send notification.');
-    document.getElementById('detailFeedback').textContent = data.message || `Notification sent to ${selectedUser.email}.`;
+    const resultText = data.skipped
+      ? `NOT SENT: Email delivery is disabled in this environment for ${selectedUser.email}.`
+      : `SUCCESS: Notification sent to ${selectedUser.email}.`;
+    document.getElementById('detailFeedback').textContent = resultText;
   } catch (err) {
-    document.getElementById('detailFeedback').textContent = err.message || 'Unable to send notification.';
+    document.getElementById('detailFeedback').textContent = `FAILED: ${err.message || 'Unable to send notification.'}`;
+  } finally {
+    if (notifyButton) { notifyButton.disabled = false; notifyButton.textContent = 'Notify this customer'; }
   }
 }
 
@@ -1307,9 +1355,10 @@ async function sendOverdueNotice(loanId) {
     });
 
     const result = await response.json().catch(() => ({}));
-    alert(result.message || result.error || 'Notification sent');
+    if (!response.ok) throw new Error(result.error || 'Notification could not be sent.');
+    alert(`SUCCESS: ${result.message || 'Notification sent.'}`);
   } catch (err) {
-    alert('Error sending notification');
+    alert(`FAILED: ${err.message || 'Error sending notification.'}`);
   }
 }
 
@@ -1320,6 +1369,9 @@ function closeModal() {
 function closeCreateUserModal() {
   document.getElementById('createUserModal').style.display = 'none';
   document.getElementById('createUserForm').reset();
+  document.getElementById('newUserRole').querySelector('option[value="user"]').hidden = false;
+  document.getElementById('createUserTitle').textContent = 'Create New User';
+  createUserMode = 'customer';
   setCreateUserMessage('');
 }
 
@@ -1343,6 +1395,8 @@ async function handleAnnouncementSubmit(event) {
   if (!window.confirm(`Send this announcement to ${recipients} registered Buraza customers?`)) return;
 
   const feedback = document.getElementById('announcementFeedback');
+  const submitButton = document.querySelector('#announcementForm button[type="submit"]');
+  if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Sending…'; }
   feedback.textContent = 'Sending announcement...';
 
   try {
@@ -1353,9 +1407,13 @@ async function handleAnnouncementSubmit(event) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Unable to send announcement.');
-    feedback.textContent = data.message || `Sent to ${data.sent} customers; ${data.failed} failed.`;
+    feedback.textContent = data.failed
+      ? `PARTIAL: ${data.sent || 0} sent, ${data.failed} failed of ${data.total || recipients}. Reason: ${(data.failureReasons || []).join('; ') || 'Delivery failed for some recipients.'}`
+      : `SUCCESS: ${data.message || `Sent to ${data.sent || 0} customers.`}`;
   } catch (err) {
-    feedback.textContent = err.message || 'Unable to send announcement.';
+    feedback.textContent = `FAILED: ${err.message || 'Unable to send announcement.'}`;
+  } finally {
+    if (submitButton) { submitButton.disabled = false; submitButton.textContent = 'Send to all customers'; }
   }
 }
 
@@ -1365,6 +1423,8 @@ async function notifyAllOverdue() {
 
   const button = document.getElementById('notifyOverdueBtn');
   button.disabled = true;
+  const originalLabel = button.textContent;
+  button.textContent = 'Sending…';
   try {
     const response = await fetch('/loans/notify-overdue', {
       method: 'POST',
@@ -1373,11 +1433,15 @@ async function notifyAllOverdue() {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Unable to send overdue notices.');
-    window.alert(data.message || `Sent: ${data.sent}; failed: ${data.failed}; overdue loans: ${data.overdueLoans}.`);
+    const result = data.failed
+      ? `PARTIAL SUCCESS: ${data.sent} sent; ${data.failed} failed. Reason: ${(data.failureReasons || []).join('; ') || 'Delivery failed for some recipients.'}`
+      : `SUCCESS: ${data.message || `Sent to ${data.sent} customers.`}`;
+    window.alert(`${result}\nOverdue loans: ${data.overdueLoans}.`);
   } catch (err) {
-    window.alert(err.message || 'Unable to send overdue notices.');
+    window.alert(`FAILED: ${err.message || 'Unable to send overdue notices.'}`);
   } finally {
     button.disabled = false;
+    button.textContent = originalLabel;
   }
 }
 
@@ -1614,7 +1678,8 @@ async function handleCreateUser(event) {
 
     setCreateUserMessage(data.message || 'User created successfully.');
     document.getElementById('createUserForm').reset();
-    await fetchUsers();
+    if (createUserMode === 'hr') await fetchHrEmployees();
+    else await fetchUsers();
     setTimeout(closeCreateUserModal, 700);
   } catch (err) {
     setCreateUserMessage(err.message || 'User creation failed.', true);
@@ -1743,8 +1808,10 @@ async function fetchHrEmployees() {
   if (summary) summary.textContent = 'Loading staff and security details…';
   list.innerHTML = '<div class="directory-empty">Loading employee records…</div>';
   setHrMessage('');
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
   try {
-    const response = await fetch('/hr/employees', { headers: getStoreHeaders() });
+    const response = await fetch('/hr/employees', { headers: getStoreHeaders(), signal: controller.signal });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(data.error || 'Unable to load employee records.');
@@ -1756,7 +1823,9 @@ async function fetchHrEmployees() {
     renderHrEmployees();
     setHrMessage('');
   } catch (err) {
-    const message = err.status === 403
+    const message = controller.signal.aborted
+      ? 'Employee records took too long to load. Please retry.'
+      : err.status === 403
       ? 'Your role does not have permission to view employee records.'
       : err.status === 401
         ? 'Your admin session expired. Please sign in again.'
@@ -1772,6 +1841,8 @@ async function fetchHrEmployees() {
       showAuthScreen();
       setAuthMessage(message, true);
     }
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -1791,9 +1862,14 @@ function renderHrEmployees() {
     const roleLabel = HR_ROLE_LABELS[emp.role] || formatStatus(emp.role);
     const deviceCount = Number(emp.trustedDeviceCount || 0);
     const lastSeen = emp.trustedDeviceLastSeen ? formatDateTime(emp.trustedDeviceLastSeen) : 'No trusted device activity';
-    const restrictions = Array.isArray(emp.restrictions) && emp.restrictions.length
-      ? emp.restrictions.map(formatStatus).join(', ')
+    const otherRestrictions = Array.isArray(emp.restrictions)
+      ? emp.restrictions.filter(action => action !== 'notifyAll')
+      : [];
+    const restrictions = otherRestrictions.length
+      ? otherRestrictions.map(formatStatus).join(', ')
       : 'No additional restrictions';
+    const canEditEmployee = localStorage.getItem('userRole') === 'admin' || emp.role !== 'admin';
+    const canRestrictEmployee = emp.role !== 'admin';
     return `
     <article class="panel hr-employee-card">
       <h3>${escapeHtml(emp.username || 'Unknown')}</h3>
@@ -1805,15 +1881,15 @@ function renderHrEmployees() {
           <div><dt>Store</dt><dd>${escapeHtml(getStoreName(emp.storeId) || formatStatus(emp.storeId || 'buraza'))}</dd></div>
           <div><dt>Account created</dt><dd>${escapeHtml(formatDate(emp.createdAt))}</dd></div>
           <div><dt>Trusted devices</dt><dd>${deviceCount} registered · ${escapeHtml(lastSeen)}</dd></div>
-          <div><dt>Bulk overdue notifications</dt><dd>${restrictedNotify ? 'Restricted' : 'Allowed'}</dd></div>
+          <div><dt>Bulk customer notifications</dt><dd>${restrictedNotify ? 'Restricted' : 'Allowed'}</dd></div>
           <div><dt>Other restrictions</dt><dd>${escapeHtml(restrictions)}</dd></div>
         </dl>
       </details>
       <div class="button-row" style="margin-top:10px;">
-        <button type="button" class="toggle-mode" data-hr-edit="${escapeHtml(emp.id)}">Edit</button>
-        <button type="button" class="toggle-mode" data-hr-restrict="${escapeHtml(emp.id)}" data-restricted="${restrictedNotify ? '1' : '0'}">
-          ${restrictedNotify ? 'Allow notifications' : 'Restrict notifications'}
-        </button>
+        ${canEditEmployee ? `<button type="button" class="toggle-mode" data-hr-edit="${escapeHtml(emp.id)}">Edit</button>` : ''}
+        ${canRestrictEmployee ? `<button type="button" class="toggle-mode" data-hr-restrict="${escapeHtml(emp.id)}" data-restricted="${restrictedNotify ? '1' : '0'}">
+          ${restrictedNotify ? 'Allow customer broadcasts' : 'Restrict customer broadcasts'}
+        </button>` : ''}
       </div>
     </article>`;
   }).join('');
@@ -2054,7 +2130,7 @@ document.getElementById('backToStoresDashboard').addEventListener('click', () =>
   showStoreSelection();
 });
 document.getElementById('createUserBtn').addEventListener('click', () => {
-  document.getElementById('createUserModal').style.display = 'block';
+  openCreateUserModal('customer');
 });
 document.getElementById('announcementBtn').addEventListener('click', () => {
   document.getElementById('announcementModal').style.display = 'block';
@@ -2106,7 +2182,7 @@ if (reportToEl) {
   });
 }
 if (refreshReportBtn) {
-  refreshReportBtn.addEventListener('click', () => fetchReportData());
+  refreshReportBtn.addEventListener('click', () => runRefresh(refreshReportBtn, fetchReportData));
 }
 document.querySelectorAll('[data-feedback-filter]').forEach(button => {
   button.addEventListener('click', () => {
@@ -2144,9 +2220,9 @@ document.getElementById('userList').addEventListener('click', event => {
 
 // ─── HR / menu event wiring ─────────────────────────────────────────────────
 setupAdminMenu();
-document.getElementById('hrRefreshBtn')?.addEventListener('click', fetchHrEmployees);
+document.getElementById('hrRefreshBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchHrEmployees));
 document.getElementById('hrCreateBtn')?.addEventListener('click', () => {
-  document.getElementById('createUserModal').style.display = 'block';
+  openCreateUserModal('hr');
 });
 document.getElementById('hrSwitchStoreBtn')?.addEventListener('click', requestStoreSwitchOtp);
 document.getElementById('hrSwitchForm')?.addEventListener('submit', verifyStoreSwitchOtp);
@@ -2260,9 +2336,9 @@ function applyUserFilterAndSort() {
 }
 document.getElementById('userSearch').addEventListener('input', applyUserFilterAndSort);
 document.getElementById('userSort')?.addEventListener('change', applyUserFilterAndSort);
-document.getElementById('refreshCustomerDirectory')?.addEventListener('click', fetchUsers);
-document.getElementById('refreshRequestsBtn').addEventListener('click', fetchNewRequests);
-document.getElementById('refreshPortfolioBtn')?.addEventListener('click', fetchNewRequests);
+document.getElementById('refreshCustomerDirectory')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchUsers));
+document.getElementById('refreshRequestsBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchNewRequests));
+document.getElementById('refreshPortfolioBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchNewRequests));
 document.getElementById('adminDashboard')?.addEventListener('click', event => {
   const button = event.target.closest('[data-admin-jump]');
   if (button) document.getElementById(button.dataset.adminJump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });

@@ -770,12 +770,15 @@ async function sendAdminAnnouncement(req, res) {
     })));
     const sent = results.filter(result => result?.ok).length;
     const failed = results.length - sent;
+    const failureReasons = results.filter(result => !result?.ok && !result?.skipped)
+      .map(result => String(result?.reason || 'Delivery failed.').slice(0, 240));
 
     return res.status(failed ? 207 : 200).json({
       message: `Announcement sent to ${sent} customer${sent === 1 ? '' : 's'}${failed ? `; ${failed} failed` : ''}.`,
       sent,
       failed,
-      total: recipients.length
+      total: recipients.length,
+      failureReasons: [...new Set(failureReasons)]
     });
   } catch (err) {
     logBreakage('authController.js', 'sendAdminAnnouncement', err, 'ADMIN ANNOUNCEMENT FAILED');
@@ -869,6 +872,9 @@ function listEmployees(req, res) {
 
     const employees = getUsers()
       .filter(user => ['admin', 'franchise_admin', 'store_admin'].includes(user.role))
+      // The main admin is cross-store by policy, so the HR directory must not
+      // silently hide staff whose record is assigned to the franchise id or a
+      // different store. Franchise admins remain confined to their own store.
       .filter(user => req.authUser.role === 'admin' || storeId === 'all' || getRecordStoreId(user) === storeId)
       .map(publicEmployee);
 

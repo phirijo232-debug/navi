@@ -49,7 +49,7 @@ function normalizeCategory(category) {
 
 function submitFeedback(req, res) {
   try {
-    const { email, message, category } = req.body || {};
+    const { email, message, category, relatedLoanId } = req.body || {};
     const authEmail = req.authUser?.email || email;
 
     if (!req.authUser || !authEmail) {
@@ -75,6 +75,7 @@ function submitFeedback(req, res) {
       storeId: req.authUser.storeId || config.DEFAULT_STORE_ID,
       category: finalCategory,
       message: content,
+      relatedLoanId: relatedLoanId ? String(relatedLoanId).trim().slice(0, 80) : null,
       status: 'new',
       createdAt: new Date().toISOString(),
       reviewedBy: null,
@@ -84,7 +85,7 @@ function submitFeedback(req, res) {
     feedbackEntries.push(item);
     saveFeedbackData(feedbackEntries);
 
-    res.json({ message: 'Feedback submitted successfully.', feedback: item });
+    res.status(201).json({ message: 'Feedback submitted successfully.', feedback: item });
   } catch (err) {
     logError(`FEEDBACK SUBMIT FAILED: ${err.message}`);
     res.status(503).json({ error: 'Unable to submit feedback right now.' });

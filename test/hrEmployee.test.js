@@ -23,9 +23,9 @@ function responseRecorder() {
 
 function seedUsers() {
   return JSON.stringify([
-    { id: 1, email: 'main@example.test', username: 'Main', role: 'admin', storeId: 'buraza', restrictions: [], trustedDevices: [] },
-    { id: 2, email: 'franchise@example.test', username: 'Franchise', role: 'franchise_admin', storeId: 'buraza', restrictions: [], trustedDevices: [] },
-    { id: 3, email: 'operator@example.test', username: 'Operator', role: 'store_admin', storeId: 'buraza', restrictions: [], trustedDevices: [] }
+    { id: 1, email: 'main@example.test', username: 'Main', role: 'admin', storeId: 'buraza', restrictions: [], password: 'hash', tokens: { laptop: 'legacy-token' }, trustedDevices: [{ token: 'main-live-token', lastSeen: '2026-10-16T10:00:00.000Z' }] },
+    { id: 2, email: 'franchise@example.test', username: 'Franchise', role: 'franchise_admin', storeId: 'buraza', restrictions: [], password: 'hash', tokens: { laptop: 'legacy-token' }, trustedDevices: [{ token: 'franchise-live-token', lastSeen: '2026-10-16T11:00:00.000Z' }] },
+    { id: 3, email: 'operator@example.test', username: 'Operator', role: 'store_admin', storeId: 'buraza', restrictions: [], password: 'hash', tokens: { laptop: 'legacy-token' }, trustedDevices: [{ token: 'operator-live-token', lastSeen: '2026-10-16T12:00:00.000Z' }] }
   ]);
 }
 
@@ -42,6 +42,9 @@ test('only franchise-level admins can list employees; restricted store admins ar
     assert.equal(allowed.statusCode, 200);
     assert.equal(allowed.body.employees.length, 3);
     assert.ok(allowed.body.employees.every(e => ['admin', 'franchise_admin', 'store_admin'].includes(e.role)));
+    assert.ok(allowed.body.employees.every(e => typeof e.trustedDeviceCount === 'number' && Array.isArray(e.restrictions)));
+    assert.equal(allowed.body.employees[0].trustedDeviceLastSeen, '2026-10-16T10:00:00.000Z');
+    assert.ok(allowed.body.employees.every(e => !('password' in e) && !('tokens' in e) && !('trustedDevices' in e)));
   } finally {
     fs.writeFileSync(USERS_FILE, original);
   }

@@ -1314,6 +1314,7 @@ async function notifyAllOverdue(req, res) {
 
     let sent = 0;
     let failed = 0;
+    const failureReasons = [];
     for (const [email, customerLoans] of loansByEmail) {
       const loanDetails = customerLoans.map(loan =>
         `- ${loan.product || 'Loan'} #${loan.id}: outstanding ${formatCurrency(loan.outstanding)}, due ${loan.dueDate || 'date unavailable'}`
@@ -1324,7 +1325,7 @@ async function notifyAllOverdue(req, res) {
         text: `Dear customer,\n\nOur records show the following Buraza loan balance(s) are overdue:\n${loanDetails}\n\nPlease contact Buraza Micro Finance to arrange payment. If you have already paid, please disregard this notice.\n\nRegards,\nBuraza Micro Finance (BMF), a Pryme Vertex subsidiary.`
       });
       if (result?.ok) sent += 1;
-      else failed += 1;
+      else { failed += 1; failureReasons.push(String(result?.reason || 'Delivery failed.').slice(0, 240)); }
     }
 
     return res.status(failed ? 207 : 200).json({
@@ -1334,7 +1335,8 @@ async function notifyAllOverdue(req, res) {
       sent,
       failed,
       overdueLoans: overdueLoans.length,
-      customers: loansByEmail.size
+      customers: loansByEmail.size,
+      failureReasons: [...new Set(failureReasons)]
     });
   } catch (err) {
     logBreakage('loanController.js', 'notifyAllOverdue', err, 'BULK OVERDUE NOTIFICATION FAILED');
