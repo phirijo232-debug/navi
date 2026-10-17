@@ -840,6 +840,7 @@ function findStoreAuthority(storeId) {
 }
 
 function publicEmployee(user) {
+  const trustedDevices = Array.isArray(user.trustedDevices) ? user.trustedDevices : [];
   return {
     id: user.id,
     username: user.username,
@@ -849,7 +850,9 @@ function publicEmployee(user) {
     role: user.role,
     storeId: getRecordStoreId(user),
     restrictions: Array.isArray(user.restrictions) ? user.restrictions : [],
-    createdAt: user.createdAt
+    createdAt: user.createdAt,
+    trustedDeviceCount: trustedDevices.length,
+    trustedDeviceLastSeen: trustedDevices.map(device => device?.lastSeen || device?.createdAt).filter(Boolean).sort().pop() || null
   };
 }
 

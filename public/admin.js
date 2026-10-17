@@ -40,6 +40,10 @@ let pendingEmail = '';
 let pendingResetEmail = '';
 let adminToastTimer;
 let portfolioRefreshTimer = null;
+let adminNotifications = [];
+let usersLoaded = false;
+let usersLoading = false;
+let usersRequestController = null;
 
 function showAdminSuccess(message) {
   const toast = document.getElementById('bmfToast');
@@ -52,10 +56,11 @@ function showAdminSuccess(message) {
 }
 
 function applyTheme(theme) {
+  const activeTheme = theme === 'light' ? 'light' : 'dark';
   document.documentElement.classList.remove('dark', 'light');
   document.body.classList.remove('dark', 'light');
-  document.documentElement.classList.add(theme);
-  document.body.classList.add(theme);
+  document.documentElement.classList.add(activeTheme);
+  document.body.classList.add(activeTheme);
 }
 
 function toggleTheme() {
@@ -65,26 +70,35 @@ function toggleTheme() {
 }
 
 function showAuthScreen() {
-  document.getElementById('storeSelect').classList.add('hidden');
-  document.getElementById('adminAuth').classList.remove('hidden');
+  setViewVisibility('storeSelect', false);
+  setViewVisibility('adminAuth', true);
   hideAdminViews();
   showAdminLogin();
 }
 
+function setViewVisibility(id, visible) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.hidden = !visible;
+  el.classList.toggle('hidden', !visible);
+  el.style.display = visible ? 'block' : 'none';
+}
+
 function hideAdminViews() {
-  ['adminDashboard', 'customersView', 'hrView'].forEach(id => {
-    document.getElementById(id)?.classList.add('hidden');
-  });
+  ['adminDashboard', 'customersView', 'hrView'].forEach(id => setViewVisibility(id, false));
 }
 
 // ─── Logged-in admin header (topbar) ─────────────────────────────────────────
 function renderLoggedInAdmin() {
   const el = document.getElementById('loggedInAdmin');
-  if (!el) return;
   const name = localStorage.getItem('username') || localStorage.getItem('userEmail') || 'Unknown';
   const email = localStorage.getItem('userEmail') || '';
   const role = formatStatus(localStorage.getItem('userRole') || 'user');
-  el.textContent = `Logged in: ${name}${email && email !== name ? ` (${email})` : ''} · ${role}`;
+  if (el) el.textContent = `Logged in: ${name}${email && email !== name ? ` (${email})` : ''} · ${role}`;
+  const displayName = document.getElementById('adminDisplayName');
+  const avatar = document.getElementById('adminAvatar');
+  if (displayName) displayName.textContent = name.split('@')[0];
+  if (avatar) avatar.textContent = name.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'BM';
 }
 
 // ─── Public/private server-mode toggle (franchise manager only) ──────────────
@@ -144,37 +158,53 @@ function initServerMode() {
 }
 
 function showDashboard() {
-  document.getElementById('storeSelect').classList.add('hidden');
-  document.getElementById('adminAuth').classList.add('hidden');
+  if (!ensureAdminAccess()) return;
+  setViewVisibility('storeSelect', false);
+  setViewVisibility('adminAuth', false);
   hideAdminViews();
-  document.getElementById('adminDashboard').classList.remove('hidden');
+  setViewVisibility('adminDashboard', true);
+  setActiveAdminMenu('adminMenuDashboard');
   renderLoggedInAdmin();
   initServerMode();
   if (portfolioRefreshTimer) clearInterval(portfolioRefreshTimer);
   portfolioRefreshTimer = setInterval(() => {
     if (!document.getElementById('adminDashboard').classList.contains('hidden')) fetchNewRequests();
-  }, 60000);
+  }, 30000);
 }
 
 function showCustomersView() {
-  document.getElementById('storeSelect').classList.add('hidden');
-  document.getElementById('adminAuth').classList.add('hidden');
+  if (!ensureAdminAccess()) return;
+  setViewVisibility('storeSelect', false);
+  setViewVisibility('adminAuth', false);
   hideAdminViews();
-  document.getElementById('customersView').classList.remove('hidden');
-  applyUserFilterAndSort();
+  setViewVisibility('customersView', true);
+  setActiveAdminMenu('adminMenuCustomers');
+  if (allUsers.length) applyUserFilterAndSort();
+  else {
+    const list = document.getElementById('userList');
+    if (list) list.innerHTML = '<div class="directory-empty" role="status">Loading customer accounts…</div>';
+  }
+  fetchUsers();
 }
 
 function showHrView() {
-  document.getElementById('storeSelect').classList.add('hidden');
-  document.getElementById('adminAuth').classList.add('hidden');
+  if (!ensureAdminAccess()) return;
+  setViewVisibility('storeSelect', false);
+  setViewVisibility('adminAuth', false);
   hideAdminViews();
-  document.getElementById('hrView').classList.remove('hidden');
+  setViewVisibility('hrView', true);
+  setActiveAdminMenu('adminMenuHr');
+  const role = localStorage.getItem('userRole');
+  if (!['admin', 'franchise_admin'].includes(role)) {
+    document.getElementById('hrEmployeeList').innerHTML = '<div class="directory-empty">Employee management is available to the main admin and Franchise Employee Admin only.</div>';
+    return;
+  }
   fetchHrEmployees();
 }
 
 function showStoreSelection() {
-  document.getElementById('storeSelect').classList.remove('hidden');
-  document.getElementById('adminAuth').classList.add('hidden');
+  setViewVisibility('storeSelect', true);
+  setViewVisibility('adminAuth', false);
   hideAdminViews();
   document.getElementById('storeContext').textContent = '';
 }
@@ -195,6 +225,8 @@ function isKnownStore(storeId) {
 
 function enterStore(storeId) {
   if (!isKnownStore(storeId)) return;
+  allUsers = [];
+  usersLoaded = false;
   localStorage.setItem('adminStore', storeId);
   document.getElementById('storeContext').textContent = getStoreName(storeId);
 
@@ -211,13 +243,13 @@ function enterStore(storeId) {
 function setAuthMessage(text, isError = false) {
   const el = document.getElementById('authMessage');
   el.textContent = text;
-  el.style.color = isError ? '#ff9ca9' : '#CCD0CF';
+  el.style.color = isError ? 'var(--danger)' : 'var(--text)';
 }
 
 function setCreateUserMessage(text, isError = false) {
   const el = document.getElementById('createUserMessage');
   el.textContent = text;
-  el.style.color = isError ? '#ff9ca9' : '#CCD0CF';
+  el.style.color = isError ? 'var(--danger)' : 'var(--text)';
 }
 
 function setLoader(active) {
@@ -293,6 +325,8 @@ function applyRolePermissions() {
   // HR (employee management) is only for the main admin and Franchise Employee Admin.
   const hrMenu = document.getElementById('adminMenuHr');
   if (hrMenu) hrMenu.hidden = !isFranchiseLevel;
+  const switchStoreButton = document.getElementById('backToStoresDashboard');
+  if (switchStoreButton) switchStoreButton.hidden = BMF_STORES.length < 2;
   // Only franchise-level roles may create store admins; only the main admin may
   // create Franchise Employee Admins.
   document.querySelector('#newUserRole option[value="store_admin"]').hidden = !isFranchiseLevel;
@@ -301,28 +335,69 @@ function applyRolePermissions() {
 
 async function fetchUsers() {
   if (!ensureAdminAccess()) return;
+  if (usersRequestController) usersRequestController.abort();
+  const controller = new AbortController();
+  usersRequestController = controller;
+  usersLoading = true;
+  const directoryStatus = document.getElementById('customerDirectoryStatus');
+  const userList = document.getElementById('userList');
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  if (directoryStatus) directoryStatus.textContent = 'Loading customers…';
 
   try {
     const response = await fetch('/users', {
-      headers: getStoreHeaders()
+      headers: getStoreHeaders(),
+      signal: controller.signal
     });
+    if (controller.signal.aborted) return;
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      throw new Error(data.error || 'Failed to fetch users');
+      const error = new Error(data.error || 'Failed to fetch customers.');
+      error.status = response.status;
+      throw error;
     }
 
-    allUsers = await response.json();
+    const payload = await response.json();
+    if (controller.signal.aborted) return;
+    const users = Array.isArray(payload) ? payload : Array.isArray(payload?.users) ? payload.users : null;
+    if (!users) throw new Error('The customer service returned data in an unexpected format.');
+    allUsers = users.filter(user => !user.role || user.role === 'user');
+    usersLoaded = true;
+    const [, , loanDetailsLoaded] = await Promise.all([fetchReportData(), fetchStoreFeedback(), fetchNewRequests()]);
+    if (directoryStatus) {
+      directoryStatus.textContent = allUsers.length
+        ? `${allUsers.length} customer accounts in this store${loanDetailsLoaded ? ' · loan details loaded from Loan Management.' : ' · loan details are temporarily unavailable.'}`
+        : 'No customer accounts have been added to this store yet.';
+    }
     applyUserFilterAndSort();
-    await Promise.all([fetchReportData(), fetchStoreFeedback(), fetchNewRequests()]);
   } catch (err) {
+    if (controller.signal.aborted && usersRequestController !== controller) return;
     console.error(err);
-    setAuthMessage('Access denied or session expired. Please login again.', true);
-    localStorage.removeItem('deviceToken');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('userEmail');
-    localStorage.removeItem('username');
-    showAuthScreen();
+    usersLoaded = false;
+    const message = controller.signal.aborted
+      ? 'Customer records took too long to load. Please retry.'
+      : err.status === 401
+      ? 'Your admin session expired. Please sign in again.'
+      : err.status === 403
+        ? 'Your account is not allowed to view this customer directory.'
+        : err.message || 'Unable to load customers. Your admin session is still active.';
+    if (directoryStatus) directoryStatus.textContent = message;
+    if (userList) userList.innerHTML = `<div class="directory-empty">${escapeHtml(message)}</div>`;
+    if (err.status === 401) {
+      localStorage.removeItem('deviceToken');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('username');
+      showAuthScreen();
+      setAuthMessage(message, true);
+    }
+  } finally {
+    clearTimeout(timeoutId);
+    if (usersRequestController === controller) {
+      usersRequestController = null;
+      usersLoading = false;
+    }
   }
 }
 
@@ -353,10 +428,13 @@ async function fetchNewRequests() {
       .filter(submission => submission.status === 'pending').map(submission => ({ loan, submission })));
     renderNewRequests();
     renderPortfolioOverview();
+    renderAdminFeedbackPreview();
+    await fetchAdminNotifications();
     // Loan data drives the "loyal vs all" customer view, so refresh it now that
     // portfolioLoans is populated.
     applyUserFilterAndSort();
     if (note) note.textContent = '';
+    return true;
   } catch (err) {
     pendingRequests = [];
     portfolioLoans = [];
@@ -364,6 +442,7 @@ async function fetchNewRequests() {
     if (badge) badge.textContent = '0';
     renderPortfolioOverview();
     if (list) list.innerHTML = `<p>${escapeHtml(err.message || 'Unable to load requests.')}</p>`;
+    return false;
   }
 }
 
@@ -419,62 +498,177 @@ function renderPortfolioOverview() {
   const activeStatuses = ['active', 'grace', 'defaulted', 'liquidated'];
   const active = portfolioLoans.filter(loan => activeStatuses.includes(getLoanStatus(loan)));
   const overdue = portfolioLoans.filter(loan => ['grace', 'defaulted'].includes(getLoanStatus(loan)));
+  const defaulters = portfolioLoans.filter(loan => getLoanStatus(loan) === 'defaulted');
   const outstanding = active.reduce((sum, loan) => sum + Math.max(0, Number(loan.outstanding) || 0), 0);
-  const collected = portfolioLoans.reduce((sum, loan) => sum + (loan.payments || []).reduce((loanSum, payment) => loanSum + (Number(payment.amount) || 0), 0), 0);
-  const values = [
-    ['Cash collected', formatCurrency(collected)],
-    ['Active loans', String(active.length)],
-    ['Overdue accounts', String(overdue.length)],
-    ['Outstanding balance', formatCurrency(outstanding)],
-    ['Transfers awaiting review', String(pendingPaymentReviews.length)]
+  const overdueOutstanding = overdue.reduce((sum, loan) => sum + Math.max(0, Number(loan.outstanding) || 0), 0);
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const paymentDate = payment => {
+    const raw = payment.paymentDate || payment.date;
+    const date = raw ? new Date(raw) : null;
+    return date && !Number.isNaN(date.getTime()) ? date : null;
+  };
+  const monthPayments = portfolioLoans.flatMap(loan => Array.isArray(loan.payments) ? loan.payments : [])
+    .filter(payment => { const date = paymentDate(payment); return date && date >= monthStart && date < monthEnd; });
+  const collectedMonth = monthPayments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+  const monthLabel = document.getElementById('collectionMonthLabel');
+  if (monthLabel) monthLabel.textContent = now.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+  const kpiData = [
+    ['Cash Collected', formatCurrency(collectedMonth), `${monthPayments.length} payments this month`, 'blue'],
+    ['Active Loans', String(active.length), `${pendingRequests.length} awaiting approval`, 'green'],
+    ['Overdue', String(overdue.length), `${formatCurrency(overdueOutstanding)} outstanding`, 'amber'],
+    ['Defaulters', String(defaulters.length), 'Past due with balance remaining', 'red']
   ];
-  kpis.innerHTML = values.map(([label, value]) => `<div class="report-metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
+  kpis.innerHTML = kpiData.map(([label, value, note, color]) => `<article class="admin-kpi-card accent-${color}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></article>`).join('');
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const days = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (6 - index));
-    const key = date.toISOString().slice(0, 10);
-    const amount = portfolioLoans.reduce((sum, loan) => sum + (Array.isArray(loan.payments) ? loan.payments : []).reduce((loanSum, payment) => {
-      const stamp = payment.paymentDate || payment.date;
-      const parsed = stamp ? new Date(stamp) : null;
-      return parsed && !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === key ? loanSum + (Number(payment.amount) || 0) : loanSum;
-    }, 0), 0);
-    return { date, key, amount };
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const monthlyDays = Array.from({ length: daysInMonth }, (_, index) => {
+    const dayDate = new Date(now.getFullYear(), now.getMonth(), index + 1);
+    const amount = monthPayments.reduce((sum, payment) => {
+      const date = paymentDate(payment);
+      return date && date.getDate() === index + 1 ? sum + (Number(payment.amount) || 0) : sum;
+    }, 0);
+    return { date: dayDate, amount };
   });
-  const max = Math.max(1, ...days.map(day => day.amount));
-  const barWidth = 46;
-  const gap = 24;
-  const svgBars = days.map((day, index) => {
-    const height = Math.max(3, (day.amount / max) * 112);
-    const x = 28 + index * (barWidth + gap);
-    const y = 130 - height;
-    const label = day.date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
-    return `<g><title>${escapeHtml(label)}: ${escapeHtml(formatCurrency(day.amount))}</title><rect x="${x}" y="${y}" width="${barWidth}" height="${height}" rx="6" fill="#2f81f7"/><text x="${x + barWidth / 2}" y="151" text-anchor="middle">${escapeHtml(label)}</text></g>`;
+  const max = Math.max(100, ...monthlyDays.map(day => day.amount));
+  const width = 1000; const height = 250; const left = 48; const top = 14; const bottom = 34;
+  const plotW = width - left - 12; const plotH = height - top - bottom;
+  const yTicks = 4;
+  const grid = Array.from({ length: yTicks + 1 }, (_, i) => {
+    const y = top + (plotH / yTicks) * i;
+    const value = max * (1 - i / yTicks);
+    return `<g><line x1="${left}" y1="${y}" x2="${width - 8}" y2="${y}"/><text x="${left - 8}" y="${y + 4}" text-anchor="end">K${Math.round(value)}</text></g>`;
   }).join('');
-  chart.innerHTML = `<svg class="collections-svg" viewBox="0 0 500 172" role="img" aria-label="Daily collections over the last seven days"><line x1="16" y1="130" x2="490" y2="130" stroke="currentColor" opacity=".24"/>${svgBars}</svg><p>Collected: <strong>${formatCurrency(days.reduce((sum, day) => sum + day.amount, 0))}</strong></p>`;
+  const bars = monthlyDays.map((day, index) => {
+    const bw = Math.max(5, (plotW / daysInMonth) * .54);
+    const x = left + (index + .23) * (plotW / daysInMonth);
+    const barH = day.amount ? Math.max(2, (day.amount / max) * plotH) : 0;
+    const y = top + plotH - barH;
+    const title = `${day.date.toLocaleDateString('en-GB')}: ${formatCurrency(day.amount)}`;
+    return `<g><title>${escapeHtml(title)}</title>${day.amount ? `<rect x="${x}" y="${y}" width="${bw}" height="${barH}" rx="3"/>` : ''}${(index === 0 || (index + 1) % 5 === 0 || index === daysInMonth - 1) ? `<text x="${x + bw / 2}" y="${height - 8}" text-anchor="middle">${index + 1}</text>` : ''}</g>`;
+  }).join('');
+  chart.innerHTML = `<svg class="collections-svg admin-month-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Daily collections for ${escapeHtml(monthLabel?.textContent || 'this month')}">${grid}${bars}</svg><p>Collected this month: <strong>${formatCurrency(collectedMonth)}</strong></p>`;
 
-  const activities = portfolioLoans.flatMap(loan => {
-    const latestHistory = Array.isArray(loan.statusHistory) ? loan.statusHistory.at(-1) : null;
+  const activity = portfolioLoans.flatMap(loan => {
+    const customer = findCustomerForLoan(loan) || {};
+    const name = customer.username || customer.name || 'Customer';
+    const loanId = loan.receiptNumber || `BMF-${loan.id}`;
     const events = [];
-    if (latestHistory) events.push({ at: latestHistory.updatedAt || loan.updatedAt, text: `${loan.receiptNumber || `Loan #${loan.id}`} · ${formatStatus(latestHistory.status)} · ${latestHistory.reason || 'Status updated'}` });
-    (Array.isArray(loan.payments) ? loan.payments : []).forEach(payment => events.push({ at: payment.paymentDate || payment.date, text: `${loan.receiptNumber || `Loan #${loan.id}`} · payment received ${formatCurrency(payment.amount)}` }));
+    const history = Array.isArray(loan.statusHistory) ? loan.statusHistory : [];
+    const latestHistory = history.at(-1);
+    if (latestHistory?.updatedAt || loan.updatedAt) {
+      const status = String(latestHistory?.status || loan.status || '').toLowerCase();
+      const kind = status === 'pending' ? 'amber' : ['declined', 'defaulted'].includes(status) ? 'red' : 'blue';
+      const text = status === 'pending' ? `New loan request — ${name} ${formatCurrency(loan.amount)}` : `Loan ${loanId} ${formatStatus(status).toLowerCase()} — ${name}`;
+      events.push({ at: latestHistory?.updatedAt || loan.updatedAt, text, kind });
+    }
+    (Array.isArray(loan.payments) ? loan.payments : []).forEach(payment => events.push({ at: payment.paymentDate || payment.date, text: `Payment ${formatCurrency(payment.amount)} received — ${name}`, kind: 'green' }));
     return events;
-  }).filter(item => item.at).sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 6);
-  activityList.innerHTML = activities.length ? activities.map(item => `<li><span>${escapeHtml(item.text)}</span><small>${escapeHtml(formatDate(item.at))}</small></li>`).join('') : '<li>No recent loan activity.</li>';
+  }).filter(item => item.at).sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 5);
+  activityList.innerHTML = activity.length ? activity.map(item => `<li class="activity-${item.kind}"><span>${escapeHtml(item.text)}</span><small>${escapeHtml(formatRelativeTime(item.at))}</small></li>`).join('') : '<li class="activity-empty">No recent loan activity.</li>';
 
-  const customers = new Map();
+  const search = String(document.getElementById('adminDashboardSearch')?.value || '').trim().toLowerCase();
+  const visibleLoans = portfolioLoans.filter(loan => {
+    if (!search) return true;
+    const customer = findCustomerForLoan(loan) || {};
+    return [loan.receiptNumber, loan.id, loan.email, loan.product, customer.username, customer.phone]
+      .some(value => String(value || '').toLowerCase().includes(search));
+  }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 12);
+  const loanTable = document.getElementById('adminLoanTable');
+  if (loanTable) loanTable.innerHTML = visibleLoans.length ? `<table class="admin-table"><thead><tr><th>Loan ID</th><th>Borrower</th><th>Amount</th><th>Interest</th><th>Total</th><th>Due Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>${visibleLoans.map(loan => {
+    const customer = findCustomerForLoan(loan) || {};
+    const status = getLoanStatus(loan);
+    const customerId = customer.id;
+    const canRecord = ['active', 'grace', 'defaulted'].includes(status) && Number(loan.outstanding) > 0;
+    const actionLabel = status === 'pending' ? 'Review' : ['grace', 'defaulted'].includes(status) ? 'Notify' : status === 'paid' ? 'Receipt' : canRecord ? 'Pay' : 'View';
+    const actionClass = ['grace', 'defaulted'].includes(status) ? 'quick-red-small' : 'quick-blue-small';
+    const quickAction = ['grace', 'defaulted'].includes(status)
+      ? `<button type="button" class="${actionClass}" data-notify-loan="${escapeHtml(loan.id)}">Notify</button>`
+      : customerId != null ? `<button type="button" class="${actionClass}" data-user-id="${escapeHtml(customerId)}">${actionLabel}</button>` : '<span>—</span>';
+    return `<tr data-loan-row><td class="loan-id-cell">${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</td><td>${escapeHtml(customer.username || loan.email || 'Customer')}</td><td>${formatCurrency(loan.amount)}</td><td>${formatCurrency(loan.interestAmount || 0)}</td><td>${formatCurrency(loan.totalRepayment || loan.amount || 0)}</td><td>${escapeHtml(formatDate(loan.dueDate))}</td><td><span class="admin-status status-${escapeHtml(status)}">${escapeHtml(formatStatus(status))}</span></td><td class="admin-row-actions">${quickAction}<button type="button" class="row-view" data-user-id="${escapeHtml(customerId ?? '')}" ${customerId == null ? 'disabled' : ''}>View</button></td></tr>`;
+  }).join('')}</tbody></table>` : '<p class="table-empty">No loans match this search.</p>';
+
+  const customerMap = new Map();
   portfolioLoans.forEach(loan => {
-    const key = String(loan.email || '').toLowerCase();
+    const key = String(loan.email || '').trim().toLowerCase();
     if (!key) return;
-    const entry = customers.get(key) || { email: loan.email, count: 0, paid: 0 };
-    entry.count += 1;
-    entry.paid += Number(loan.paidTotal) || (Array.isArray(loan.payments) ? loan.payments : []).reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
-    customers.set(key, entry);
+    const item = customerMap.get(key) || { email: loan.email, count: 0, paid: 0, lastPayment: null };
+    item.count += 1;
+    (Array.isArray(loan.payments) ? loan.payments : []).forEach(payment => {
+      item.paid += Number(payment.amount) || 0;
+      const date = paymentDate(payment);
+      if (date && (!item.lastPayment || date > item.lastPayment)) item.lastPayment = date;
+    });
+    customerMap.set(key, item);
   });
-  const loyal = [...customers.values()].filter(customer => customer.count > 1).sort((a, b) => b.count - a.count || b.paid - a.paid).slice(0, 4);
-  loyalList.innerHTML = loyal.length ? loyal.map(customer => `<div class="report-metric"><span>${escapeHtml(customer.email)}</span><strong>${customer.count} loans · ${formatCurrency(customer.paid)} repaid</strong></div>`).join('') : '<p>No returning borrowers yet.</p>';
+  const loyal = [...customerMap.values()].filter(customer => customer.count > 1)
+    .sort((a, b) => b.count - a.count || b.paid - a.paid).slice(0, 5);
+  loyalList.innerHTML = loyal.length ? `<table class="admin-table loyal-table"><thead><tr><th>#</th><th>Borrower</th><th>Phone</th><th>Total Loans</th><th>Total Repaid</th><th>Last Payment</th><th>Standing</th></tr></thead><tbody>${loyal.map((customer, index) => {
+    const user = findCustomerForLoan({ email: customer.email }) || {};
+    const stats = getCustomerLoanStats(customer.email);
+    const standing = formatStatus(stats.status);
+    return `<tr><td>${index + 1}</td><td>${escapeHtml(user.username || customer.email)}</td><td>${escapeHtml(user.phone || '—')}</td><td>${customer.count}</td><td class="paid-cell">${formatCurrency(customer.paid)}</td><td>${customer.lastPayment ? escapeHtml(formatDate(customer.lastPayment)) : '—'}</td><td><span class="admin-status status-${escapeHtml(String(stats.status).toLowerCase())}">${escapeHtml(standing)}</span></td></tr>`;
+  }).join('')}</tbody></table>` : '<p class="table-empty">Returning borrowers will appear here after their second loan.</p>';
+}
+
+function formatRelativeTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return formatDate(value);
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return 'Just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hr ago`;
+  if (seconds < 172800) return 'Yesterday';
+  return formatDate(date);
+}
+
+function renderAdminFeedbackPreview() {
+  const preview = document.getElementById('adminFeedbackPreview');
+  if (!preview) return;
+  const recent = storeFeedback.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 3);
+  preview.innerHTML = recent.length ? recent.map(item => {
+    const user = allUsers.find(entry => String(entry.email || '').toLowerCase() === String(item.email || '').toLowerCase());
+    return `<article class="feedback-preview-item"><strong>${escapeHtml(user?.username || item.email || 'Customer')}</strong><p>${escapeHtml(item.message || '')}</p><small>${escapeHtml(formatDate(item.createdAt))}</small></article>`;
+  }).join('') : '<p class="table-empty">No customer feedback yet.</p>';
+}
+
+async function fetchAdminNotifications() {
+  try {
+    const response = await fetch('/notifications', { headers: getStoreHeaders() });
+    if (!response.ok) return;
+    const data = await response.json();
+    adminNotifications = Array.isArray(data) ? data : Array.isArray(data.notifications) ? data.notifications : [];
+    renderAdminNotifications();
+  } catch { /* notification refresh is best effort; core dashboard remains available */ }
+}
+
+function renderAdminNotifications() {
+  const list = document.getElementById('adminNotificationList');
+  const badge = document.getElementById('adminNotificationCount');
+  if (!list || !badge) return;
+  const unread = adminNotifications.filter(item => !item.readAt).length;
+  badge.textContent = String(unread);
+  badge.classList.toggle('hidden', unread === 0);
+  const recent = adminNotifications.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 6);
+  list.innerHTML = recent.length ? recent.map(item => {
+    const reviewLabel = item.type === 'loan-request' ? 'Review request' : item.type === 'payment-review' ? 'Review payment' : '';
+    const action = reviewLabel
+      ? `<button type="button" data-notification-open-loan="${escapeHtml(item.loanId)}" data-notification-id="${escapeHtml(item.id)}">${reviewLabel}</button>`
+      : '';
+    return `<article class="notification-item ${item.readAt ? '' : 'unread'}"><strong>${escapeHtml(formatStatus(item.type || 'Update'))}</strong><p>${escapeHtml(item.message || 'There is an update to review.')}</p><small>${escapeHtml(formatRelativeTime(item.createdAt))}</small>${action}</article>`;
+  }).join('') : '<p class="table-empty">You are all caught up.</p>';
+}
+
+async function markAdminNotificationRead(id) {
+  const item = adminNotifications.find(notification => notification.id === id);
+  if (!item || item.readAt) return;
+  try {
+    const response = await fetch(`/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH', headers: getStoreHeaders() });
+    if (!response.ok) return;
+    item.readAt = new Date().toISOString();
+    renderAdminNotifications();
+  } catch { /* keep the notification unread if the write failed */ }
 }
 
 async function notifySelectedUser() {
@@ -580,6 +774,7 @@ async function fetchStoreFeedback() {
     if (!response.ok) throw new Error(data.error || 'Unable to load BMF feedback.');
     storeFeedback = Array.isArray(data.feedback) ? data.feedback : [];
     renderStoreFeedback();
+    renderAdminFeedbackPreview();
   } catch (err) {
     list.innerHTML = `<p>${escapeHtml(err.message || 'Unable to load BMF feedback.')}</p>`;
   }
@@ -678,8 +873,12 @@ function getCustomerLoanStats(email) {
 
 function renderUsers(users) {
   const list = document.getElementById('userList');
+  if (!list) return;
   if (!users.length) {
-    list.innerHTML = '<div class="panel" style="padding: 22px;">No users found.</div>';
+    const message = allUsers.length
+      ? 'No customers match this search.'
+      : 'No customer accounts have been added to this store yet.';
+    list.innerHTML = `<div class="directory-empty">${message}</div>`;
     return;
   }
 
@@ -726,6 +925,12 @@ function formatDate(dateValue) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = date.getFullYear();
   return `${day}/${month}/${year}`;
+}
+
+function formatDateTime(dateValue) {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return 'Not available';
+  return `${formatDate(date.toISOString())} ${date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 // ─── CSV export (rule 10) ─────────────────────────────────────────────────────
@@ -1324,7 +1529,7 @@ async function handleAdminOtp(event) {
 
     if (data.message === 'Login successful.') {
       showAdminSuccess('Admin login verified. Dashboard ready.');
-      if (!['admin', 'store_admin'].includes(data.role)) {
+      if (!['admin', 'store_admin', 'franchise_admin'].includes(data.role)) {
         setAuthMessage('This account is not an admin account.', true);
         document.getElementById('adminOtpForm').classList.add('hidden');
         document.getElementById('adminLoginForm').classList.remove('hidden');
@@ -1352,6 +1557,7 @@ async function handleAdminOtp(event) {
 }
 
 function logoutAdmin() {
+  if (!window.confirm('Log out of BMF Admin?')) return;
   localStorage.removeItem('deviceToken');
   localStorage.removeItem('userRole');
   localStorage.removeItem('userStoreId');
@@ -1359,6 +1565,8 @@ function logoutAdmin() {
   localStorage.removeItem('username');
   localStorage.removeItem('lastAppPage');
   localStorage.removeItem('adminStore');
+  usersLoaded = false;
+  allUsers = [];
   pendingEmail = '';
   document.getElementById('adminLoginForm').reset();
   document.getElementById('adminOtpForm').reset();
@@ -1502,6 +1710,20 @@ function setupAdminMenu() {
   });
   document.getElementById('customersBackBtn')?.addEventListener('click', showDashboard);
   document.getElementById('hrBackBtn')?.addEventListener('click', showDashboard);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') dropdown?.classList.remove('active');
+  });
+}
+
+function setActiveAdminMenu(activeId) {
+  ['adminMenuDashboard', 'adminMenuCustomers', 'adminMenuHr'].forEach(id => {
+    const button = document.getElementById(id);
+    if (!button) return;
+    const active = id === activeId;
+    button.classList.toggle('is-active', active);
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
 }
 
 // ─── HR / Employee Securities ───────────────────────────────────────────────
@@ -1511,20 +1733,45 @@ function setHrMessage(text, isError = false) {
   const el = document.getElementById('hrMessage');
   if (!el) return;
   el.textContent = text;
-  el.style.color = isError ? '#ff9ca9' : '#CCD0CF';
+  el.style.color = isError ? 'var(--danger)' : 'var(--text)';
 }
 
 async function fetchHrEmployees() {
   const list = document.getElementById('hrEmployeeList');
+  if (!list) return;
+  const summary = document.getElementById('hrEmployeeCount');
+  if (summary) summary.textContent = 'Loading staff and security details…';
+  list.innerHTML = '<div class="directory-empty">Loading employee records…</div>';
+  setHrMessage('');
   try {
     const response = await fetch('/hr/employees', { headers: getStoreHeaders() });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Unable to load employees.');
-    hrEmployees = data.employees || [];
+    if (!response.ok) {
+      const error = new Error(data.error || 'Unable to load employee records.');
+      error.status = response.status;
+      throw error;
+    }
+    if (!Array.isArray(data.employees)) throw new Error('The employee service returned data in an unexpected format.');
+    hrEmployees = data.employees;
     renderHrEmployees();
     setHrMessage('');
   } catch (err) {
-    list.innerHTML = `<p>${escapeHtml(err.message || 'Unable to load employees.')}</p>`;
+    const message = err.status === 403
+      ? 'Your role does not have permission to view employee records.'
+      : err.status === 401
+        ? 'Your admin session expired. Please sign in again.'
+        : err.message || 'Unable to load employee records.';
+    list.innerHTML = `<div class="directory-empty" role="status">${escapeHtml(message)}</div>`;
+    if (summary) summary.textContent = err.status === 403 ? 'Employee security details are restricted to authorized HR roles.' : 'Employee details could not be loaded.';
+    setHrMessage(err.status === 401 ? message : '', err.status !== 401);
+    if (err.status === 401) {
+      localStorage.removeItem('deviceToken');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('username');
+      showAuthScreen();
+      setAuthMessage(message, true);
+    }
   }
 }
 
@@ -1532,24 +1779,43 @@ const HR_ROLE_LABELS = { admin: 'Main admin', franchise_admin: 'Franchise Employ
 
 function renderHrEmployees() {
   const list = document.getElementById('hrEmployeeList');
+  const summary = document.getElementById('hrEmployeeCount');
   if (!hrEmployees.length) {
-    list.innerHTML = '<p>No employees found.</p>';
+    if (summary) summary.textContent = '0 staff accounts';
+    list.innerHTML = '<div class="directory-empty">No employee accounts are configured for this store.</div>';
     return;
   }
+  if (summary) summary.textContent = `${hrEmployees.length} staff accounts`;
   list.innerHTML = hrEmployees.map(emp => {
-    const restrictedNotify = emp.restrictions.includes('notifyAll');
+    const restrictedNotify = Array.isArray(emp.restrictions) && emp.restrictions.includes('notifyAll');
+    const roleLabel = HR_ROLE_LABELS[emp.role] || formatStatus(emp.role);
+    const deviceCount = Number(emp.trustedDeviceCount || 0);
+    const lastSeen = emp.trustedDeviceLastSeen ? formatDateTime(emp.trustedDeviceLastSeen) : 'No trusted device activity';
+    const restrictions = Array.isArray(emp.restrictions) && emp.restrictions.length
+      ? emp.restrictions.map(formatStatus).join(', ')
+      : 'No additional restrictions';
     return `
-    <div class="panel" style="padding:14px; margin-bottom:10px;">
+    <article class="panel hr-employee-card">
       <h3>${escapeHtml(emp.username || 'Unknown')}</h3>
       <p class="user-meta">${escapeHtml(emp.email || '')} · ${escapeHtml(emp.phone || 'N/A')}</p>
-      <p class="user-meta">NRC: ${escapeHtml(emp.nrc || 'N/A')} · Role: <strong>${escapeHtml(HR_ROLE_LABELS[emp.role] || emp.role)}</strong></p>
+      <p class="user-meta">NRC: ${escapeHtml(emp.nrc || 'N/A')} · Role: <strong>${escapeHtml(roleLabel)}</strong></p>
+      <details class="hr-security-details">
+        <summary>Security &amp; permissions</summary>
+        <dl>
+          <div><dt>Store</dt><dd>${escapeHtml(getStoreName(emp.storeId) || formatStatus(emp.storeId || 'buraza'))}</dd></div>
+          <div><dt>Account created</dt><dd>${escapeHtml(formatDate(emp.createdAt))}</dd></div>
+          <div><dt>Trusted devices</dt><dd>${deviceCount} registered · ${escapeHtml(lastSeen)}</dd></div>
+          <div><dt>Bulk overdue notifications</dt><dd>${restrictedNotify ? 'Restricted' : 'Allowed'}</dd></div>
+          <div><dt>Other restrictions</dt><dd>${escapeHtml(restrictions)}</dd></div>
+        </dl>
+      </details>
       <div class="button-row" style="margin-top:10px;">
         <button type="button" class="toggle-mode" data-hr-edit="${escapeHtml(emp.id)}">Edit</button>
         <button type="button" class="toggle-mode" data-hr-restrict="${escapeHtml(emp.id)}" data-restricted="${restrictedNotify ? '1' : '0'}">
           ${restrictedNotify ? 'Allow notifications' : 'Restrict notifications'}
         </button>
       </div>
-    </div>`;
+    </article>`;
   }).join('');
 }
 
@@ -1590,12 +1856,12 @@ async function submitEditEmployee(event) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Unable to update employee.');
     msg.textContent = data.message || 'Employee updated.';
-    msg.style.color = '#a8f0c6';
+    msg.style.color = 'var(--success)';
     await fetchHrEmployees();
     setTimeout(closeEditEmployeeModal, 800);
   } catch (err) {
     msg.textContent = err.message || 'Update failed.';
-    msg.style.color = '#ff9ca9';
+    msg.style.color = 'var(--danger)';
   }
 }
 
@@ -1783,6 +2049,7 @@ document.getElementById('backToStores').addEventListener('click', () => {
 });
 document.getElementById('logoutBtn').addEventListener('click', logoutAdmin);
 document.getElementById('backToStoresDashboard').addEventListener('click', () => {
+  if (BMF_STORES.length < 2) return;
   localStorage.removeItem('adminStore');
   showStoreSelection();
 });
@@ -1993,13 +2260,57 @@ function applyUserFilterAndSort() {
 }
 document.getElementById('userSearch').addEventListener('input', applyUserFilterAndSort);
 document.getElementById('userSort')?.addEventListener('change', applyUserFilterAndSort);
+document.getElementById('refreshCustomerDirectory')?.addEventListener('click', fetchUsers);
 document.getElementById('refreshRequestsBtn').addEventListener('click', fetchNewRequests);
 document.getElementById('refreshPortfolioBtn')?.addEventListener('click', fetchNewRequests);
-document.querySelector('.section-jump-nav')?.addEventListener('click', event => {
+document.getElementById('adminDashboard')?.addEventListener('click', event => {
   const button = event.target.closest('[data-admin-jump]');
   if (button) document.getElementById(button.dataset.adminJump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 document.getElementById('jumpCustomersBtn')?.addEventListener('click', showCustomersView);
+document.getElementById('adminDashboardSearch')?.addEventListener('input', renderPortfolioOverview);
+document.getElementById('dailyReportQuickBtn')?.addEventListener('click', () => {
+  reportType = 'daily';
+  downloadReport('xlsx');
+});
+document.getElementById('adminLoanTable')?.addEventListener('click', event => {
+  const notifyButton = event.target.closest('[data-notify-loan]');
+  if (notifyButton) {
+    sendOverdueNotice(notifyButton.dataset.notifyLoan);
+    return;
+  }
+  const userButton = event.target.closest('[data-user-id]');
+  if (userButton?.dataset.userId) viewUserDetails(userButton.dataset.userId);
+});
+document.getElementById('adminNotificationBtn')?.addEventListener('click', async event => {
+  event.stopPropagation();
+  const menu = document.getElementById('adminNotificationMenu');
+  const open = menu.classList.toggle('hidden') === false;
+  event.currentTarget.setAttribute('aria-expanded', String(open));
+  if (open) await fetchAdminNotifications();
+});
+document.addEventListener('click', event => {
+  const menu = document.getElementById('adminNotificationMenu');
+  const anchor = document.querySelector('.notification-anchor');
+  if (menu && anchor && !anchor.contains(event.target)) {
+    menu.classList.add('hidden');
+    document.getElementById('adminNotificationBtn')?.setAttribute('aria-expanded', 'false');
+  }
+});
+document.getElementById('adminNotificationList')?.addEventListener('click', event => {
+  const review = event.target.closest('[data-notification-open-loan]');
+  if (!review) return;
+  const loan = portfolioLoans.find(item => String(item.id) === String(review.dataset.notificationOpenLoan));
+  const customer = loan ? findCustomerForLoan(loan) : null;
+  markAdminNotificationRead(review.dataset.notificationId);
+  if (customer) viewUserDetails(customer.id);
+  else document.getElementById('requestQueue')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('adminNotificationMenu')?.classList.add('hidden');
+});
+document.getElementById('markAllNotificationsRead')?.addEventListener('click', async () => {
+  const unread = adminNotifications.filter(item => !item.readAt);
+  for (const item of unread) await markAdminNotificationRead(item.id);
+});
 document.getElementById('newRequestsList').addEventListener('click', event => {
   const requestButton = event.target.closest('[data-request-user]');
   if (requestButton && requestButton.dataset.requestUser) {
@@ -2097,10 +2408,14 @@ async function restoreSession() {
 }
 
 window.onload = () => {
-  const savedMode = localStorage.getItem('mode') || 'dark';
+  const savedMode = localStorage.getItem('mode') === 'light' ? 'light' : 'dark';
   applyTheme(savedMode);
   restoreSession();
 };
+
+window.addEventListener('storage', event => {
+  if (event.key === 'mode') applyTheme(event.newValue === 'light' ? 'light' : 'dark');
+});
 
 window.closeModal = closeModal;
 window.closeCreateUserModal = closeCreateUserModal;

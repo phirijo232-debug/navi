@@ -1196,7 +1196,7 @@ function getTrackingSheet(req, res) {
   }
 }
 
-// â”€â”€â”€ BMF typed-report handlers (GET /reports/:type) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// BMF typed-report handlers (GET /reports/:type)
 function getTypedReport(req, res) {
   try {
     const type = req.params.type;
@@ -1272,7 +1272,7 @@ function getTypedReport(req, res) {
   }
 }
 
-// Typed-report Excel export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Typed-report Excel export
 async function getTypedReportExcel(req, res) {
   try {
     const type = req.params.type;
@@ -1385,7 +1385,7 @@ async function getTypedReportExcel(req, res) {
   }
 }
 
-// â”€â”€â”€ Typed-report PDF export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Typed-report PDF export
 async function getTypedReportPdf(req, res) {
   try {
     const type = req.params.type;

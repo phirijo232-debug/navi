@@ -5,12 +5,25 @@
   font-family: 'Segoe UI', sans-serif;
 }
 
+:root {
+  color-scheme: dark;
+  --app-bg: #0B0F17;
+  --panel-bg: #161B22;
+  --border: #21262D;
+  --accent: #2F81F7;
+  --success: #2EA043;
+  --warning: #D29922;
+  --danger: #DA3633;
+  --text: #F0F6FC;
+  --muted: #8B949E;
+}
+
 html, body {
   width: 100%;
   min-height: 100vh;
   overflow-x: hidden;
-  background: #06141B;
-  color: #CCD0CF;
+  background: var(--app-bg);
+  color: var(--text);
   font-family: 'Segoe UI', sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -18,11 +31,13 @@ html, body {
 }
 
 html.dark, body.dark {
-  background: #06141B;
-  color: #CCD0CF;
+  color-scheme: dark;
+  background: var(--app-bg);
+  color: var(--text);
 }
 
 html.light, body.light {
+  color-scheme: light;
   background: #DDE1E0;
   color: #06141B;
 }
@@ -742,6 +757,10 @@ body.light .panel {
   display: none !important;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .loan-tabs {
   display: flex;
   gap: 10px;
@@ -1399,3 +1418,595 @@ body.light .admin-decision-box textarea { background: #DDE1E0; border-color:rgba
 .customer-payment-table th, .customer-payment-table td { padding: 11px 12px; text-align: left; border-bottom: 1px solid rgba(127,127,127,.2); }
 .customer-payment-table th { font-size: .82rem; opacity: .76; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+
+/* Screenshot-matched BMF admin dashboard */
+body:has(#adminDashboard:not(.hidden)) { background:#0d1117 !important; color:#e6edf3 !important; }
+body:has(#adminDashboard:not(.hidden)) .admin-shell { max-width:none; margin:0; padding:56px 12px 48px; }
+body:has(#adminDashboard:not(.hidden)) .brand-header { display:none; }
+body:has(#adminDashboard:not(.hidden)) .panel,
+body:has(#adminDashboard:not(.hidden)) .admin-data-section { background:#161b22; border:1px solid #30363d; border-radius:8px; box-shadow:none; backdrop-filter:none; color:#e6edf3; }
+body:has(#adminDashboard:not(.hidden)) .menu-toggle { top:8px; left:8px; width:34px; height:34px; z-index:310; border-radius:6px; background:transparent; box-shadow:none; color:#8b949e; }
+body:has(#adminDashboard:not(.hidden)) .menu-toggle:hover { color:#e6edf3; background:#21262d; }
+body:has(#adminDashboard:not(.hidden)) .dropdown-menu { position:fixed; top:46px; left:4px; z-index:320; width:210px; min-width:210px; gap:2px; padding:6px 0; background:#1c2128; border:1px solid #30363d; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.5); }
+body:has(#adminDashboard:not(.hidden)) .dropdown-menu button { width:auto; border:0; background:transparent; border-radius:4px; padding:9px 14px; color:#cdd9e5; font-size:13px; }
+body:has(#adminDashboard:not(.hidden)) .dropdown-menu button:hover { background:#21262d; color:#e6edf3; }
+.admin-menu-heading { padding:8px 14px 9px; margin-bottom:3px; border-bottom:1px solid #30363d; color:#8b949e; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.admin-appbar { position:fixed; top:0; left:0; right:0; z-index:250; min-height:48px; display:flex; align-items:center; gap:18px; padding:5px 16px 5px 48px; background:#161b22; border-bottom:1px solid #30363d; }
+.admin-brand { min-width:130px; display:grid; grid-template-columns:auto auto; align-items:baseline; column-gap:5px; line-height:1.05; }
+.admin-brand strong { color:#2f81f7; font-size:16px; }
+.admin-brand span { color:#8b949e; font-size:14px; }
+.admin-brand small { grid-column:1 / -1; color:#8b949e; font-size:10px; }
+.admin-search-wrap { flex:1; min-width:100px; max-width:500px; height:34px; display:flex; align-items:center; gap:8px; padding:0 10px; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#8b949e; }
+.admin-search-wrap input { min-width:0; width:100%; border:0; outline:0; background:transparent; color:#e6edf3; font-size:13px; }
+.admin-search-wrap input::placeholder { color:#8b949e; }
+.admin-user-controls { display:flex; align-items:center; gap:10px; margin-left:auto; white-space:nowrap; }
+.admin-user-controls .admin-mode-btn { width:auto; max-width:none; padding:7px 10px; border-radius:6px; font-size:12px; letter-spacing:0; }
+.admin-mode-btn { display:inline-block; }
+.admin-avatar { width:30px; height:30px; display:grid; place-items:center; flex:none; border-radius:50%; background:#2f81f7; color:white; font-size:11px; font-weight:700; }
+.admin-display-name { font-size:13px; }
+.notification-anchor { position:relative; }
+#adminNotificationBtn { position:relative; width:34px; height:34px; border:0; border-radius:6px; background:transparent; color:#cdd9e5; font-size:19px; cursor:pointer; }
+#adminNotificationBtn:hover { background:#21262d; }
+.notification-count { position:absolute; top:-2px; right:-3px; min-width:16px; height:16px; padding:0 4px; border-radius:10px; background:#f85149; color:#fff; font-size:10px; line-height:16px; font-weight:700; }
+.notification-menu { position:absolute; top:42px; right:-80px; z-index:280; width:min(360px, calc(100vw - 24px)); max-height:min(70vh,500px); overflow:auto; border:1px solid #30363d; border-radius:8px; background:#1c2128; box-shadow:0 14px 34px rgba(0,0,0,.55); }
+.notification-menu > header { position:sticky; top:0; display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:#1c2128; border-bottom:1px solid #30363d; }
+.notification-menu > header button { width:auto; max-width:none; padding:4px; border:0; background:transparent; color:#2f81f7; cursor:pointer; font-size:11px; }
+.notification-item { padding:12px 14px; border-left:3px solid #30363d; border-bottom:1px solid #30363d; }
+.notification-item.unread { background:#202a35; border-left-color:#2f81f7; }
+.notification-item p { margin:5px 0; color:#cdd9e5; font-size:12px; line-height:1.5; }
+.notification-item small { color:#8b949e; font-size:11px; }
+.notification-item > button { display:block; width:auto; max-width:none; margin-top:8px; padding:6px 9px; border:0; border-radius:5px; background:#2f81f7; color:white; font-size:11px; cursor:pointer; }
+.server-mode-confirm { position:absolute; top:48px; right:12px; z-index:260; display:flex; align-items:center; gap:8px; padding:8px; background:#1c2128; border:1px solid #30363d; border-radius:6px; }
+.server-mode-confirm[hidden] { display:none; }
+.server-mode-confirm > button { width:auto; max-width:none; padding:5px 9px; }
+.dashboard-screen { display:grid; gap:18px; max-width:1500px; margin:0 auto; }
+.admin-kpi-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+.admin-kpi-card { min-height:108px; padding:16px 19px; background:#161b22; border:1px solid #30363d; border-top:3px solid #2f81f7; border-radius:8px; display:flex; flex-direction:column; justify-content:center; gap:6px; }
+.admin-kpi-card.accent-blue { border-top-color:#2f81f7; }
+.admin-kpi-card.accent-green { border-top-color:#3fb950; }
+.admin-kpi-card.accent-amber { border-top-color:#d29922; }
+.admin-kpi-card.accent-red { border-top-color:#f85149; }
+.admin-kpi-card > span { color:#8b949e; font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; }
+.admin-kpi-card > strong { color:#e6edf3; font-size:30px; line-height:1.05; font-weight:700; }
+.admin-kpi-card > small { color:#8b949e; font-size:11px; }
+.admin-chart-panel { padding:16px 18px 10px; }
+.admin-chart-panel > header, .admin-data-section > header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.admin-chart-panel > header strong { font-size:14px; }
+.admin-chart-panel > header span { margin-right:auto; color:#8b949e; font-size:12px; }
+.admin-chart-panel > header button { width:auto; max-width:none; padding:6px 9px; font-size:11px; }
+.admin-chart-panel #collectionsChart > p { margin:2px 0 0; color:#8b949e; font-size:12px; }
+.admin-chart-panel #collectionsChart > p strong { color:#e6edf3; }
+.collections-svg.admin-month-chart { width:100%; height:auto; min-height:220px; color:#8b949e; }
+.collections-svg.admin-month-chart line { stroke:#30363d; stroke-width:1; }
+.collections-svg.admin-month-chart text { fill:#8b949e; font-size:12px; }
+.collections-svg.admin-month-chart rect { fill:rgba(47,129,247,.28); stroke:#2f81f7; stroke-width:1.5; }
+.admin-activity-panel { padding:17px 19px; }
+.admin-activity-panel h2, .admin-data-section h2, .admin-feedback-panel h2, .admin-quick-actions h2 { margin:0; font-size:15px; }
+.admin-activity-panel .activity-list { margin:9px 0 0; padding:0; }
+.admin-activity-panel .activity-list li { position:relative; min-height:46px; display:block; padding:9px 8px 9px 19px; border-bottom:1px solid #30363d; }
+.admin-activity-panel .activity-list li:last-child { border-bottom:0; }
+.admin-activity-panel .activity-list li::before { content:""; position:absolute; top:15px; left:0; width:8px; height:8px; border-radius:50%; background:#2f81f7; }
+.admin-activity-panel .activity-list li.activity-green::before { background:#3fb950; }
+.admin-activity-panel .activity-list li.activity-amber::before { background:#d29922; }
+.admin-activity-panel .activity-list li.activity-red::before { background:#f85149; }
+.admin-activity-panel .activity-list li span { display:block; font-size:12px; }
+.admin-activity-panel .activity-list li small { display:block; margin-top:3px; color:#8b949e; font-size:11px; }
+.admin-data-section { padding:13px 0 0; overflow:hidden; }
+.admin-data-section > header { padding:0 12px; }
+.admin-data-section > header h2 { font-weight:700; }
+.admin-data-section .enter-btn { width:auto; max-width:none; padding:6px 10px; border:0; border-radius:5px; background:#2f81f7; font-size:11px; letter-spacing:0; text-transform:none; box-shadow:none; }
+.admin-data-section .link-button { width:auto; max-width:none; padding:5px; border:0; background:transparent; color:#2f81f7; cursor:pointer; }
+.admin-table-wrap { width:100%; overflow-x:auto; border:1px solid #30363d; border-radius:8px; }
+.admin-table { width:100%; border-collapse:collapse; min-width:840px; color:#cdd9e5; background:#161b22; font-size:12px; }
+.admin-table th, .admin-table td { padding:10px 12px; text-align:left; border-bottom:1px solid #30363d; vertical-align:middle; }
+.admin-table th { background:#1c2128; color:#8b949e; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
+.admin-table tbody tr:last-child td { border-bottom:0; }
+.admin-table tbody tr:hover { background:rgba(47,129,247,.05); }
+.admin-table .loan-id-cell { max-width:96px; color:#8b949e; font:11px ui-monospace,Consolas,monospace; overflow-wrap:anywhere; }
+.admin-row-actions { white-space:nowrap; }
+.admin-row-actions button { width:auto; max-width:none; margin-right:4px; padding:5px 9px; border:1px solid #30363d; border-radius:5px; background:#21262d; color:#cdd9e5; cursor:pointer; font-size:11px; }
+.admin-row-actions .quick-blue-small { border-color:#2f81f7; background:#2f81f7; color:white; }
+.admin-row-actions .quick-red-small { border-color:#f85149; background:#f85149; color:white; }
+.admin-row-actions button:disabled { opacity:.45; cursor:not-allowed; }
+.admin-status { display:inline-block; padding:4px 8px; border:1px solid #484f58; border-radius:4px; background:#21262d; color:#cdd9e5; font-size:10px; font-weight:700; white-space:nowrap; }
+.admin-status.status-active, .admin-status.status-paid { border-color:rgba(63,185,80,.4); background:rgba(63,185,80,.15); color:#3fb950; }
+.admin-status.status-pending, .admin-status.status-grace { border-color:rgba(210,153,34,.4); background:rgba(210,153,34,.15); color:#d29922; }
+.admin-status.status-defaulted, .admin-status.status-declined { border-color:rgba(248,81,73,.4); background:rgba(248,81,73,.15); color:#f85149; }
+.admin-status.status-liquidated { border-color:rgba(163,113,247,.4); background:rgba(163,113,247,.15); color:#a371f7; }
+.admin-table .paid-cell { color:#3fb950; font-weight:700; }
+.admin-feedback-panel { padding:16px 19px; }
+.feedback-preview-item { padding:12px 0; border-bottom:1px solid #30363d; }
+.feedback-preview-item:last-of-type { border-bottom:0; }
+.feedback-preview-item strong { color:#e6edf3; font-size:12px; }
+.feedback-preview-item p { margin:5px 0 3px; color:#cdd9e5; font-size:12px; }
+.feedback-preview-item small { color:#8b949e; font-size:10px; }
+.admin-feedback-panel .link-button { width:auto; max-width:none; margin-top:8px; padding:0; border:0; background:transparent; color:#2f81f7; cursor:pointer; font-size:12px; }
+.admin-quick-actions { padding:15px; }
+.admin-quick-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:12px; }
+.admin-quick-grid button { width:100%; max-width:none; min-height:38px; padding:9px 12px; border:1px solid #484f58; border-radius:6px; background:#21262d; color:#cdd9e5; text-align:left; cursor:pointer; font-size:12px; }
+.admin-quick-grid button:hover { filter:brightness(1.12); }
+.admin-quick-grid .quick-blue { border-color:#2f81f7; background:#2f81f7; color:white; }
+.admin-quick-grid .quick-gold { border-color:#d29922; background:#d29922; color:#0d1117; font-weight:700; }
+.admin-quick-grid .quick-red { border-color:#f85149; background:#f85149; color:white; grid-column:1 / -1; }
+.admin-utility-section { padding:16px; margin-top:2px; }
+.admin-utility-section .admin-topbar { margin:0 0 14px; }
+.admin-utility-section .admin-topbar h2 { margin:0; font-size:16px; }
+.admin-utility-section .admin-topbar p { color:#8b949e; font-size:12px; }
+.admin-utility-section .button-row { align-items:center; }
+.admin-utility-section .button-row button, .admin-utility-section .button-row select, .admin-utility-section .button-row input { width:auto; max-width:100%; padding:7px 9px; font-size:11px; }
+.visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.table-empty { padding:13px; color:#8b949e; font-size:12px; }
+@media (max-width:900px) { .admin-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .admin-appbar { gap:10px; } .admin-display-name { display:none; } }
+@media (max-width:600px) {
+  body:has(#adminDashboard:not(.hidden)) .admin-shell { padding:52px 8px 30px; }
+  .admin-appbar { min-height:48px; gap:7px; padding:5px 7px 5px 45px; }
+  .admin-brand { min-width:70px; }
+  .admin-brand small { display:none; }
+  .admin-search-wrap { max-width:none; height:32px; }
+  .admin-search-wrap input { font-size:11px; }
+  .admin-user-controls { gap:5px; }
+  .admin-avatar { width:27px; height:27px; }
+  .admin-user-controls .admin-mode-btn { padding:6px; font-size:10px; }
+  .admin-kpi-grid { gap:8px; }
+  .admin-kpi-card { min-height:96px; padding:12px; }
+  .admin-kpi-card > strong { font-size:24px; }
+  .dashboard-screen { gap:12px; }
+  .admin-chart-panel { padding:12px 10px; }
+  .collections-svg.admin-month-chart { min-height:150px; }
+  .admin-quick-grid { grid-template-columns:1fr; }
+  .admin-quick-grid .quick-red { grid-column:auto; }
+  .notification-menu { right:-54px; }
+}
+.admin-menu-divider { height:1px; margin:5px 10px; background:#30363d; }
+.admin-quick-grid { grid-template-columns:1fr; }
+.admin-quick-grid .quick-red { grid-column:auto; }
+/* Shared front-end theme state for all admin views */
+body.dark:has(#adminDashboard:not(.hidden)) { background:#0d1117 !important; color:#e6edf3 !important; }
+body.light:has(#adminDashboard:not(.hidden)) { background:#DDE1E0 !important; color:#06141B !important; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-appbar,
+body.light:has(#adminDashboard:not(.hidden)) .admin-kpi-card,
+body.light:has(#adminDashboard:not(.hidden)) .admin-chart-panel,
+body.light:has(#adminDashboard:not(.hidden)) .admin-activity-panel,
+body.light:has(#adminDashboard:not(.hidden)) .admin-data-section,
+body.light:has(#adminDashboard:not(.hidden)) .admin-feedback-panel,
+body.light:has(#adminDashboard:not(.hidden)) .admin-quick-actions,
+body.light:has(#adminDashboard:not(.hidden)) .admin-table,
+body.light:has(#adminDashboard:not(.hidden)) .notification-menu,
+body.light:has(#adminDashboard:not(.hidden)) .server-mode-confirm,
+body.light:has(#adminDashboard:not(.hidden)) .admin-utility-section { background:#fff; border-color:rgba(74,92,106,.25); color:#06141B; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-appbar { box-shadow:0 2px 10px rgba(6,20,27,.08); }
+body.light:has(#adminDashboard:not(.hidden)) .admin-search-wrap { background:#f5f7f8; border-color:rgba(74,92,106,.32); color:#4A5C6A; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-search-wrap input { color:#06141B; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-search-wrap input::placeholder,
+body.light:has(#adminDashboard:not(.hidden)) .admin-brand small,
+body.light:has(#adminDashboard:not(.hidden)) .admin-brand span,
+body.light:has(#adminDashboard:not(.hidden)) .admin-kpi-card > span,
+body.light:has(#adminDashboard:not(.hidden)) .admin-kpi-card > small,
+body.light:has(#adminDashboard:not(.hidden)) .admin-chart-panel > header span,
+body.light:has(#adminDashboard:not(.hidden)) .collections-svg.admin-month-chart text,
+body.light:has(#adminDashboard:not(.hidden)) .activity-list li small,
+body.light:has(#adminDashboard:not(.hidden)) .directory-status { color:#4A5C6A; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-brand strong,
+body.light:has(#adminDashboard:not(.hidden)) .admin-kpi-card > strong,
+body.light:has(#adminDashboard:not(.hidden)) .admin-activity-panel h2,
+body.light:has(#adminDashboard:not(.hidden)) .admin-data-section h2,
+body.light:has(#adminDashboard:not(.hidden)) .admin-feedback-panel h2,
+body.light:has(#adminDashboard:not(.hidden)) .admin-quick-actions h2,
+body.light:has(#adminDashboard:not(.hidden)) .feedback-preview-item strong { color:#06141B; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-table th,
+body.light:has(#adminDashboard:not(.hidden)) .notification-menu > header { background:#eef1f2; color:#4A5C6A; border-color:rgba(74,92,106,.2); }
+body.light:has(#adminDashboard:not(.hidden)) .admin-table td,
+body.light:has(#adminDashboard:not(.hidden)) .feedback-preview-item,
+body.light:has(#adminDashboard:not(.hidden)) .activity-list li,
+body.light:has(#adminDashboard:not(.hidden)) .notification-item,
+body.light:has(#adminDashboard:not(.hidden)) .notification-menu > header { border-color:rgba(74,92,106,.2); }
+body.light:has(#adminDashboard:not(.hidden)) .admin-table { color:#06141B; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-table .loan-id-cell,
+body.light:has(#adminDashboard:not(.hidden)) .notification-item small,
+body.light:has(#adminDashboard:not(.hidden)) .feedback-preview-item small { color:#4A5C6A; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-table tbody tr:hover { background:rgba(47,129,247,.07); }
+body.light:has(#adminDashboard:not(.hidden)) .notification-item.unread { background:#eaf2ff; }
+body.light:has(#adminDashboard:not(.hidden)) .notification-item p,
+body.light:has(#adminDashboard:not(.hidden)) .feedback-preview-item p { color:#1B2F3D; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-user-controls .admin-mode-btn,
+body.light:has(#adminDashboard:not(.hidden)) .admin-chart-panel > header button { color:#06141B; border-color:rgba(74,92,106,.32); background:#f5f7f8; }
+body.light:has(#adminDashboard:not(.hidden)) .dropdown-menu { background:#fff; border-color:rgba(74,92,106,.28); box-shadow:0 8px 24px rgba(6,20,27,.16); }
+body.light:has(#adminDashboard:not(.hidden)) .dropdown-menu button { color:#1B2F3D; }
+body.light:has(#adminDashboard:not(.hidden)) .dropdown-menu button:hover { background:#eef1f2; color:#06141B; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-menu-heading { color:#4A5C6A; border-color:rgba(74,92,106,.2); }
+body.light:has(#adminDashboard:not(.hidden)) .collections-svg.admin-month-chart line { stroke:rgba(74,92,106,.22); }
+.menu-icon { width:16px; height:16px; flex:none; fill:currentColor; }
+.icon-dashboard { color:#2f81f7; }
+.icon-customers { color:#a371f7; }
+.icon-hr { color:#a371f7; }
+.icon-store { color:#3fb950; }
+.icon-logout { color:#f85149; }
+.business-menu-icon { width:18px; height:18px; fill:currentColor; }
+.dropdown-menu button.menu-action { display:flex; align-items:center; gap:11px; }
+.dropdown-menu button.menu-action.is-active { background:rgba(47,129,247,.16); color:#2f81f7; font-weight:700; }
+.dropdown-menu button.menu-action.is-active .menu-icon { color:#2f81f7; }
+.directory-status { min-height:18px; margin:8px 0 10px; color:#8b949e; font-size:12px; }
+.directory-empty { width:100%; padding:18px; border:1px dashed rgba(127,127,127,.35); border-radius:8px; color:#8b949e; background:rgba(127,127,127,.05); font-size:13px; }
+.hr-employee-card { padding:16px; margin-bottom:10px; }
+.hr-employee-card h3 { margin-bottom:7px; }
+.hr-employee-card .user-meta { margin:5px 0; }
+body.light .directory-status { color:#4A5C6A; }
+body.light .directory-empty { color:#4A5C6A; border-color:rgba(74,92,106,.32); background:rgba(255,255,255,.62); }
+body.light .dropdown-menu button.menu-action.is-active { background:rgba(47,129,247,.1); color:#1769c2; }
+body.light .dropdown-menu button.menu-action.is-active .menu-icon { color:#1769c2; }
+
+/* Shared BMF developer dark theme. Keep semantic statuses distinct while all
+   customer and admin surfaces use the same base palette. */
+body.dark { background:var(--app-bg); color:var(--text); }
+body.dark .panel,
+body.dark .board-card,
+body.dark .loan-summary-card,
+body.dark .loan-card,
+body.dark .summary-inline-card,
+body.dark .dropdown-menu,
+body.dark .notification-panel,
+body.dark .admin-appbar,
+body.dark .admin-kpi-card,
+body.dark .admin-chart-panel,
+body.dark .admin-activity-panel,
+body.dark .admin-data-section,
+body.dark .admin-feedback-panel,
+body.dark .admin-quick-actions,
+body.dark .admin-utility-section,
+body.dark .notification-menu,
+body.dark .server-mode-confirm {
+  background:var(--panel-bg);
+  border-color:var(--border);
+  color:var(--text);
+}
+body.dark .menu-toggle { background:var(--panel-bg); border:1px solid var(--border); color:var(--text); }
+body.dark .admin-search-wrap,
+body.dark .auth-input,
+body.dark .search-box,
+body.dark .modal-input,
+body.dark textarea,
+body.dark select {
+  background:var(--app-bg);
+  border-color:var(--border);
+  color:var(--text);
+}
+body.dark select option { background:var(--panel-bg); color:var(--text); }
+body.dark .toggle-mode,
+body.dark .loan-tab,
+body.dark .loan-filter,
+body.dark .history-filter,
+body.dark .admin-row-actions button {
+  background:var(--panel-bg);
+  border-color:var(--border);
+  color:var(--text);
+}
+body.dark .enter-btn,
+body.dark .loan-tab.active,
+body.dark .loan-filter.active,
+body.dark .history-filter.active,
+body.dark .dropdown-menu button.menu-action.is-active {
+  background:var(--accent);
+  border-color:var(--accent);
+  color:#fff;
+}
+body.dark .brand,
+body.dark .dash-header h1,
+body.dark .admin-brand strong,
+body.dark .admin-data-section .link-button,
+body.dark .admin-feedback-panel .link-button,
+body.dark .notification-menu > header button { color:var(--accent); }
+body.dark .brand,
+body.dark .dash-header h1 { background:none; -webkit-text-fill-color:var(--accent); }
+body.dark .admin-kpi-card,
+body.dark .admin-kpi-card.accent-blue { border-top-color:var(--accent); }
+body.dark .admin-kpi-card.accent-green { border-top-color:var(--success); }
+body.dark .admin-kpi-card.accent-amber { border-top-color:var(--warning); }
+body.dark .admin-kpi-card.accent-red { border-top-color:var(--danger); }
+body.dark .admin-kpi-card > strong,
+body.dark .admin-activity-panel h2,
+body.dark .admin-data-section h2,
+body.dark .admin-feedback-panel h2,
+body.dark .admin-quick-actions h2,
+body.dark .feedback-preview-item strong,
+body.dark .admin-table { color:var(--text); }
+body.dark .admin-kpi-card > span,
+body.dark .admin-kpi-card > small,
+body.dark .admin-brand small,
+body.dark .admin-brand span,
+body.dark .admin-chart-panel > header span,
+body.dark .activity-list li small,
+body.dark .directory-status,
+body.dark .admin-menu-heading,
+body.dark .notification-item small,
+body.dark .feedback-preview-item small,
+body.dark .table-empty { color:var(--muted); }
+body.dark .admin-table th,
+body.dark .notification-menu > header { background:var(--app-bg); color:var(--muted); }
+body.dark .admin-table th,
+body.dark .admin-table td,
+body.dark .admin-table-wrap,
+body.dark .notification-menu > header,
+body.dark .notification-item,
+body.dark .feedback-preview-item,
+body.dark .activity-list li,
+body.dark .collections-svg.admin-month-chart line { border-color:var(--border); stroke:var(--border); }
+body.dark .admin-activity-panel .activity-list li.activity-green::before,
+body.dark .admin-status.status-active,
+body.dark .admin-status.status-paid,
+body.dark .admin-table .paid-cell { color:var(--success); }
+body.dark .admin-activity-panel .activity-list li.activity-green::before { background:var(--success); }
+body.dark .admin-activity-panel .activity-list li.activity-amber::before { background:var(--warning); }
+body.dark .admin-activity-panel .activity-list li.activity-red::before { background:var(--danger); }
+body.dark .admin-status.status-defaulted,
+body.dark .admin-status.status-declined,
+body.dark .admin-row-actions .quick-red-small,
+body.dark .admin-quick-grid .quick-red { color:#fff; background:var(--danger); border-color:var(--danger); }
+body.dark .admin-row-actions .quick-blue-small,
+body.dark .admin-quick-grid .quick-blue { color:#fff; background:var(--accent); border-color:var(--accent); }
+body.dark .admin-quick-grid .quick-gold { color:var(--app-bg); background:var(--warning); border-color:var(--warning); }
+body.dark .notification-count { background:var(--danger); }
+body.dark .directory-empty { color:var(--muted); border-color:var(--border); background:rgba(22,27,34,.75); }
+body.dark .admin-appbar { background:var(--panel-bg); border-bottom-color:var(--border); }
+body.dark:has(#adminDashboard:not(.hidden)) { background:var(--app-bg) !important; color:var(--text) !important; }
+body.dark:has(#adminDashboard:not(.hidden)) .panel,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-data-section,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-appbar,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-kpi-card,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-table,
+body.dark:has(#adminDashboard:not(.hidden)) .notification-menu,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-utility-section,
+body.dark:has(#adminDashboard:not(.hidden)) .server-mode-confirm {
+  background-color:var(--panel-bg);
+  border-color:var(--border);
+  color:var(--text);
+}
+body.dark:has(#adminDashboard:not(.hidden)) .dropdown-menu { background:var(--panel-bg); border-color:var(--border); color:var(--text); }
+body.dark:has(#adminDashboard:not(.hidden)) .dropdown-menu button { color:var(--text); }
+body.dark:has(#adminDashboard:not(.hidden)) .dropdown-menu button:hover { background:var(--border); color:var(--text); }
+body.dark:has(#adminDashboard:not(.hidden)) .admin-menu-heading { color:var(--muted); border-color:var(--border); }
+body.dark:has(#adminDashboard:not(.hidden)) .admin-search-wrap,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-table th,
+body.dark:has(#adminDashboard:not(.hidden)) .notification-menu > header { background:var(--app-bg); }
+body.dark:has(#adminDashboard:not(.hidden)) .admin-table td,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-table th,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-table-wrap,
+body.dark:has(#adminDashboard:not(.hidden)) .notification-item,
+body.dark:has(#adminDashboard:not(.hidden)) .notification-menu > header,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-activity-panel .activity-list li,
+body.dark:has(#adminDashboard:not(.hidden)) .feedback-preview-item { border-color:var(--border); }
+body.dark:has(#adminDashboard:not(.hidden)) .admin-brand strong,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-kpi-card > strong,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-activity-panel h2,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-data-section h2,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-feedback-panel h2,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-quick-actions h2,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-table,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-search-wrap input { color:var(--text); }
+body.dark:has(#adminDashboard:not(.hidden)) .admin-menu-heading,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-kpi-card > span,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-kpi-card > small,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-brand small,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-brand span,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-chart-panel > header span,
+body.dark:has(#adminDashboard:not(.hidden)) .activity-list li small,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-table th,
+body.dark:has(#adminDashboard:not(.hidden)) .admin-table .loan-id-cell { color:var(--muted); }
+body.dark:has(#adminDashboard:not(.hidden)) .admin-quick-grid .quick-gold { color:var(--app-bg); }
+body.dark .user-card { background:var(--panel-bg); border-color:var(--border); color:var(--text); }
+body.dark .hr-security-details { margin:12px 0 4px; border:1px solid var(--border); border-radius:10px; background:var(--app-bg); color:var(--text); }
+body.dark .hr-security-details summary { padding:10px 12px; color:var(--accent); cursor:pointer; font-weight:700; }
+body.dark .hr-security-details dl { display:grid; gap:8px; margin:0; padding:0 12px 12px; }
+body.dark .hr-security-details dl > div { display:grid; grid-template-columns:minmax(120px, .7fr) 1.3fr; gap:10px; padding-top:8px; border-top:1px solid var(--border); }
+body.dark .hr-security-details dt { color:var(--muted); }
+body.dark .hr-security-details dd { margin:0; color:var(--text); overflow-wrap:anywhere; }
+body.light .hr-security-details { margin:12px 0 4px; border:1px solid rgba(6,20,27,.14); border-radius:10px; background:rgba(255,255,255,.65); }
+body.light .hr-security-details summary { padding:10px 12px; color:#1769c2; cursor:pointer; font-weight:700; }
+body.light .hr-security-details dl { display:grid; gap:8px; margin:0; padding:0 12px 12px; }
+body.light .hr-security-details dl > div { display:grid; grid-template-columns:minmax(120px, .7fr) 1.3fr; gap:10px; padding-top:8px; border-top:1px solid rgba(6,20,27,.12); }
+body.light .hr-security-details dt { color:#52606d; }
+body.light .hr-security-details dd { margin:0; color:#06141B; overflow-wrap:anywhere; }
+body.dark .decision-btn { background:var(--accent); color:#fff; }
+body.dark .decision-btn.decline { background:var(--danger); color:#fff; }
+body.dark .bmf-toast { background:var(--success); color:#fff; border-color:var(--success); }
+body.dark .bmf-toast[data-kind="error"] { background:var(--danger); border-color:var(--danger); }
+body.dark .section-jump-nav { background:rgba(22,27,34,.96); border-color:var(--border); }
+body.dark .section-jump-nav button { border-color:var(--border); }
+
+/* Shared BMF light theme. Use neutral surfaces and the same accent/status
+   colors as dark mode so changing themes does not restore the retired slate UI. */
+html.light,
+body.light {
+  --app-bg:#F6F8FA;
+  --panel-bg:#FFFFFF;
+  --border:#D0D7DE;
+  --accent:#2F81F7;
+  --success:#2EA043;
+  --warning:#D29922;
+  --danger:#DA3633;
+  --text:#1F2328;
+  --muted:#656D76;
+  color-scheme:light;
+  background:var(--app-bg) !important;
+  color:var(--text) !important;
+}
+body.light .panel,
+body.light .board-card,
+body.light .loan-summary-card,
+body.light .loan-card,
+body.light .summary-inline-card,
+body.light .dropdown-menu,
+body.light .notification-panel,
+body.light .user-card,
+body.light .admin-appbar,
+body.light .admin-kpi-card,
+body.light .admin-chart-panel,
+body.light .admin-activity-panel,
+body.light .admin-data-section,
+body.light .admin-feedback-panel,
+body.light .admin-quick-actions,
+body.light .admin-utility-section,
+body.light .notification-menu,
+body.light .server-mode-confirm {
+  background:var(--panel-bg) !important;
+  border-color:var(--border) !important;
+  color:var(--text) !important;
+}
+body.light .auth-input,
+body.light .search-box,
+body.light .modal-input,
+body.light textarea,
+body.light select {
+  background:var(--panel-bg) !important;
+  border-color:var(--border) !important;
+  color:var(--text) !important;
+}
+body.light select option { background:var(--panel-bg); color:var(--text); }
+body.light .toggle-mode,
+body.light .loan-tab,
+body.light .loan-filter,
+body.light .history-filter,
+body.light .admin-row-actions button,
+body.light .section-jump-nav button {
+  background:var(--panel-bg);
+  border-color:var(--border);
+  color:var(--text);
+}
+body.light .enter-btn,
+body.light .loan-tab.active,
+body.light .loan-filter.active,
+body.light .history-filter.active,
+body.light .dropdown-menu button.menu-action.is-active {
+  background:var(--accent);
+  border-color:var(--accent);
+  color:#fff;
+}
+body.light .brand,
+body.light .dash-header h1,
+body.light .admin-brand strong,
+body.light .admin-data-section .link-button,
+body.light .admin-feedback-panel .link-button,
+body.light .notification-menu > header button { color:var(--accent); }
+body.light .brand,
+body.light .dash-header h1 { background:none; -webkit-text-fill-color:var(--accent); }
+body.light .admin-kpi-card,
+body.light .admin-kpi-card.accent-blue { border-top-color:var(--accent); }
+body.light .admin-kpi-card.accent-green { border-top-color:var(--success); }
+body.light .admin-kpi-card.accent-amber { border-top-color:var(--warning); }
+body.light .admin-kpi-card.accent-red { border-top-color:var(--danger); }
+body.light .admin-kpi-card > strong,
+body.light .admin-activity-panel h2,
+body.light .admin-data-section h2,
+body.light .admin-feedback-panel h2,
+body.light .admin-quick-actions h2,
+body.light .feedback-preview-item strong,
+body.light .admin-table { color:var(--text); }
+body.light .admin-kpi-card > span,
+body.light .admin-kpi-card > small,
+body.light .admin-brand small,
+body.light .admin-brand span,
+body.light .admin-chart-panel > header span,
+body.light .activity-list li small,
+body.light .directory-status,
+body.light .admin-menu-heading,
+body.light .notification-item small,
+body.light .feedback-preview-item small,
+body.light .table-empty { color:var(--muted); }
+body.light .admin-table th,
+body.light .notification-menu > header { background:var(--app-bg); color:var(--muted); }
+body.light .admin-table th,
+body.light .admin-table td,
+body.light .admin-table-wrap,
+body.light .notification-menu > header,
+body.light .notification-item,
+body.light .feedback-preview-item,
+body.light .activity-list li,
+body.light .collections-svg.admin-month-chart line { border-color:var(--border); stroke:var(--border); }
+body.light .admin-activity-panel .activity-list li.activity-green::before,
+body.light .admin-status.status-active,
+body.light .admin-status.status-paid,
+body.light .admin-table .paid-cell { color:var(--success); }
+body.light .admin-status.status-defaulted,
+body.light .admin-status.status-declined,
+body.light .admin-row-actions .quick-red-small,
+body.light .admin-quick-grid .quick-red { color:#fff; background:var(--danger); border-color:var(--danger); }
+body.light .admin-row-actions .quick-blue-small,
+body.light .admin-quick-grid .quick-blue { color:#fff; background:var(--accent); border-color:var(--accent); }
+body.light .admin-quick-grid .quick-gold { color:#1F2328; background:var(--warning); border-color:var(--warning); }
+body.light .notification-count { background:var(--danger); }
+body.light .notification-menu > header,
+body.light .admin-table th { background:var(--app-bg); }
+body.light .status-pending,
+body.light .loan-badge.pending,
+body.light .admin-status.status-grace { color:#8A5A00; border-color:rgba(210,153,34,.5); }
+body.light .status-pending,
+body.light .loan-badge.pending { background:rgba(210,153,34,.14); }
+body.light .status-approved,
+body.light .status-active,
+body.light .loan-badge.approved,
+body.light .loan-badge.active,
+body.light .loan-badge.paid,
+body.light .admin-status.status-active,
+body.light .admin-status.status-paid { background:rgba(46,160,67,.12); color:#1A7F37; border-color:rgba(46,160,67,.4); }
+body.light .status-declined,
+body.light .status-overdue,
+body.light .status-defaulted,
+body.light .loan-badge.defaulted,
+body.light .loan-badge.declined,
+body.light .loan-badge.closed,
+body.light .admin-status.status-defaulted,
+body.light .admin-status.status-declined { background:rgba(218,54,51,.1); color:#CF222E; border-color:rgba(218,54,51,.4); }
+body.light .status-in_progress,
+body.light .loan-badge.in_progress,
+body.light .loan-badge.running { background:rgba(47,129,247,.1); color:#0969DA; border-color:rgba(47,129,247,.38); }
+body.light .status-paid { background:rgba(46,160,67,.12); color:#1A7F37; }
+body.light .status-grace,
+body.light .loan-badge.grace { background:rgba(210,153,34,.14); color:#8A5A00; }
+body.light .admin-status.status-liquidated,
+body.light .loan-badge.liquidated { background:rgba(101,109,118,.1); color:var(--muted); border-color:var(--border); }
+body.light:has(#adminDashboard:not(.hidden)) { background:var(--app-bg) !important; color:var(--text) !important; }
+body.light:has(#adminDashboard:not(.hidden)) .panel,
+body.light:has(#adminDashboard:not(.hidden)) .admin-data-section,
+body.light:has(#adminDashboard:not(.hidden)) .admin-appbar,
+body.light:has(#adminDashboard:not(.hidden)) .admin-kpi-card,
+body.light:has(#adminDashboard:not(.hidden)) .admin-table,
+body.light:has(#adminDashboard:not(.hidden)) .notification-menu,
+body.light:has(#adminDashboard:not(.hidden)) .admin-utility-section,
+body.light:has(#adminDashboard:not(.hidden)) .server-mode-confirm { background:var(--panel-bg) !important; border-color:var(--border) !important; color:var(--text) !important; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-table th,
+body.light:has(#adminDashboard:not(.hidden)) .notification-menu > header { background:var(--app-bg) !important; color:var(--muted) !important; }
+body.light .section-jump-nav { background:rgba(255,255,255,.96); border-color:var(--border); }
+body.light .admin-search-wrap { background:var(--app-bg) !important; border-color:var(--border) !important; color:var(--muted) !important; }
+body.light .admin-search-wrap input { color:var(--text) !important; }
+body.light .admin-search-wrap input::placeholder { color:var(--muted) !important; }
+body.light .decision-btn { background:var(--accent); color:#fff; }
+body.light .decision-btn.decline { background:var(--danger); color:#fff; }
+body.light .bmf-toast { background:var(--success); color:#fff; border-color:var(--success); }
+body.light .bmf-toast[data-kind="error"] { background:var(--danger); border-color:var(--danger); }
+body.dark .status-pending,
+body.dark .loan-badge.pending,
+body.dark .admin-status.status-grace { color:var(--warning); border-color:rgba(210,153,34,.45); }
+body.dark .status-pending,
+body.dark .loan-badge.pending { background:rgba(210,153,34,.14); }
+body.dark .status-approved,
+body.dark .status-active,
+body.dark .loan-badge.approved,
+body.dark .loan-badge.active,
+body.dark .loan-badge.paid,
+body.dark .admin-status.status-active,
+body.dark .admin-status.status-paid { background:rgba(46,160,67,.14); color:var(--success); border-color:rgba(46,160,67,.45); }
+body.dark .status-declined,
+body.dark .status-overdue,
+body.dark .status-defaulted,
+body.dark .loan-badge.defaulted,
+body.dark .loan-badge.declined,
+body.dark .loan-badge.closed,
+body.dark .admin-status.status-defaulted,
+body.dark .admin-status.status-declined { background:rgba(218,54,51,.14); color:var(--danger); border-color:rgba(218,54,51,.5); }
+body.dark .status-in_progress,
+body.dark .loan-badge.in_progress,
+body.dark .loan-badge.running { background:rgba(47,129,247,.14); color:#79C0FF; border-color:rgba(47,129,247,.45); }
+body.dark .status-paid { background:rgba(46,160,67,.14); color:var(--success); }
+body.dark .status-grace,
+body.dark .loan-badge.grace { background:rgba(210,153,34,.14); color:var(--warning); }
+body.dark .admin-status.status-liquidated,
+body.dark .loan-badge.liquidated { background:rgba(139,148,158,.14); color:var(--muted); border-color:var(--border); }

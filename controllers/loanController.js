@@ -22,6 +22,14 @@ function addInAppNotification(recipientEmail, type, message, loanId, extra = {})
   dataStore.writeJson(NOTIFICATIONS_FILE, records);
 }
 
+function addAdminInAppNotification(type, message, loanId, extra = {}) {
+  const records = dataStore.readJson(NOTIFICATIONS_FILE, [], Array.isArray);
+  records.push({ id: crypto.randomUUID(), kind: 'in-app', recipientEmail: '', type,
+    message: String(message).slice(0, 500), loanId: Number(loanId), createdAt: new Date().toISOString(),
+    readAt: null, ...extra });
+  dataStore.writeJson(NOTIFICATIONS_FILE, records);
+}
+
 function getNotifications(req, res) {
   try {
     const user = req.authUser;
@@ -33,7 +41,8 @@ function getNotifications(req, res) {
       ? canAccessRecord({ authUser: user, headers: {} }, loan)
       : String(loan.email || '').toLowerCase() === email).map(loan => Number(loan.id)));
     return res.json(records.filter(n => n.kind === 'in-app' &&
-      ((n.recipientEmail === email) || (isAdminRole(user.role) && n.type === 'payment-review' && allowedLoanIds.has(Number(n.loanId))))));
+      ((String(n.recipientEmail || '').toLowerCase() === email) ||
+        (isAdminRole(user.role) && !n.recipientEmail && ['loan-request', 'payment-review'].includes(n.type) && allowedLoanIds.has(Number(n.loanId))))));
   } catch (err) {
     logError(`GET_NOTIFICATIONS FAILED: ${err.message}`);
     return res.status(503).json({ error: 'Notifications are temporarily unavailable.' });
@@ -49,7 +58,8 @@ function markNotificationRead(req, res) {
     if (!item) return res.status(404).json({ error: 'Notification not found.' });
     const own = item.recipientEmail === String(user.email).toLowerCase();
     const loan = getLoansData().find(l => Number(l.id) === Number(item.loanId));
-    const scoped = isAdminRole(user.role) && item.type === 'payment-review' && loan && canAccessRecord({ authUser: user, headers: {} }, loan);
+    const scoped = isAdminRole(user.role) && !item.recipientEmail && ['loan-request', 'payment-review'].includes(item.type) && loan &&
+      canAccessRecord({ authUser: user, headers: {} }, loan);
     if (!own && !scoped) return res.status(404).json({ error: 'Notification not found.' });
     item.readAt = item.readAt || new Date().toISOString();
     dataStore.writeJson(NOTIFICATIONS_FILE, records);
@@ -780,6 +790,7 @@ async function requestLoan(req, res) {
     loans.push(newLoan);
     saveLoansData(loans);
     addInAppNotification(email, 'loan-request', 'Your loan request was received and is awaiting review.', newLoan.id);
+    addAdminInAppNotification('loan-request', `New loan request from ${String(email).trim()}: ${product} for ${formatCurrency(newLoan.amount)}.`, newLoan.id);
 
     try {
       const requestEmail = emailService.buildRequestReceivedMessage(product, normalizedUrgency, email, newLoan);

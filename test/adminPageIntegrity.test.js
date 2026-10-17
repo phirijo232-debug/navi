@@ -19,7 +19,7 @@ test('admin.html is structurally intact (not corrupted or truncated)', () => {
   assert.ok(html.length > 15000, `admin.html is suspiciously small (${html.length} chars)`);
   assert.match(html.slice(0, 64), /^\s*<!DOCTYPE html>/i, 'admin.html must start with <!DOCTYPE html>');
   assert.equal((html.match(/<!DOCTYPE/gi) || []).length, 1, 'admin.html must contain exactly one DOCTYPE');
-  assert.equal((html.match(/<script[^>]*src="admin\.js"/g) || []).length, 1, 'admin.html must load admin.js exactly once');
+  assert.equal((html.match(/<script[^>]*src="admin\.js(?:\?[^\"]*)?"/g) || []).length, 1, 'admin.html must load admin.js exactly once');
   assert.ok(!html.includes('@@APPEND@@'), 'leftover append marker found — rebuild was incomplete');
   assert.match(html, /<\/html>\s*$/, 'admin.html must end with </html>');
 });

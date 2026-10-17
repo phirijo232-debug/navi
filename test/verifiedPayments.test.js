@@ -2,11 +2,59 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const dataStore = require('../middleware/dataStore');
-const { submitPaymentProof, decidePaymentSubmission, getNotifications } = require('../controllers/loanController');
+const { submitPaymentProof, decidePaymentSubmission, getNotifications, markNotificationRead, requestLoan } = require('../controllers/loanController');
+const emailService = require('../middleware/email');
 
 function responseRecorder() {
   return { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
 }
+
+test('new loan requests create a scoped admin bell notification that can be reviewed and marked read', async t => {
+  const loanFile = dataStore.paths.loans;
+  const notificationFile = dataStore.paths.notifications;
+  const originals = [loanFile, notificationFile].map(file => {
+    try { return fs.readFileSync(file, 'utf8'); } catch { return null; }
+  });
+  fs.writeFileSync(loanFile, JSON.stringify([]));
+  fs.writeFileSync(notificationFile, JSON.stringify([]));
+  t.mock.method(emailService, 'sendCustomerEmail', async () => ({ ok: true, messageId: 'mock-loan-request' }));
+
+  try {
+    const response = responseRecorder();
+    await requestLoan({
+      body: { email: 'borrower@example.test', product: 'School fees', amount: '500', dueDate: '2026-11-01',
+        tenureWeeks: '1', urgency: 'standard', agreedToTerms: true },
+      files: { nrcFront: [{ filename: 'nrc-front.jpg' }], nrcBack: [{ filename: 'nrc-back.jpg' }] },
+      authUser: { email: 'borrower@example.test', role: 'user', storeId: 'buraza' }
+    }, response);
+    assert.equal(response.statusCode, 200);
+
+    const customerNotifications = responseRecorder();
+    getNotifications({ authUser: { email: 'borrower@example.test', role: 'user', storeId: 'buraza' } }, customerNotifications);
+    assert.ok(customerNotifications.body.some(item => item.type === 'loan-request'));
+
+    const staff = { role: 'store_admin', email: 'staff@example.test', storeId: 'buraza' };
+    const staffNotifications = responseRecorder();
+    getNotifications({ authUser: staff }, staffNotifications);
+    const alert = staffNotifications.body.find(item => item.type === 'loan-request');
+    assert.ok(alert, 'in-scope staff should receive the new request in the bell');
+    assert.match(alert.message, /School fees/);
+
+    const outsideStore = responseRecorder();
+    getNotifications({ authUser: { ...staff, storeId: 'other-store' } }, outsideStore);
+    assert.equal(outsideStore.body.some(item => item.id === alert.id), false);
+
+    const marked = responseRecorder();
+    markNotificationRead({ params: { id: alert.id }, authUser: staff }, marked);
+    assert.equal(marked.statusCode, 200);
+    const refreshed = responseRecorder();
+    getNotifications({ authUser: staff }, refreshed);
+    assert.ok(refreshed.body.find(item => item.id === alert.id).readAt);
+  } finally {
+    if (originals[0] === null) fs.rmSync(loanFile, { force: true }); else fs.writeFileSync(loanFile, originals[0]);
+    if (originals[1] === null) fs.rmSync(notificationFile, { force: true }); else fs.writeFileSync(notificationFile, originals[1]);
+  }
+});
 
 test('transfer proof stays pending until scoped staff approval posts a single ledger payment', () => {
   const loanFile = dataStore.paths.loans;
