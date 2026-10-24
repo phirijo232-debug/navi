@@ -49,6 +49,63 @@ const PENDING_AUTH_TTL_MS = 15 * 60 * 1000;
 const INVITES_FILE = path.join(dataStore.DATA_DIR, 'invites.json');
 const INVITE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
+// Shareable signup link builder. Prefers an explicit PUBLIC_URL/APP_URL override
+// (e.g. https://prymebfm.com), otherwise derives the origin from the incoming
+// request — so the link automatically matches the tunnel domain the admin is
+// actually using (ngrok free URLs rotate on every restart, so a hardcoded
+// domain would go stale). Appends the public ?key= share key when
+// SHARE_PUBLIC_KEY is set (first door on page load — never replaces login,
+// invite, OTP or device-token auth). Falls back to a relative path when no
+// request context exists (e.g. unit tests calling with a stub req).
+function buildSignupUrl(req, token) {
+  const { getPublicBaseUrl, appendShareKey } = require('../middleware/shareLinks');
+  let url = '';
+  const override = String(process.env.PUBLIC_URL || process.env.APP_URL || config.PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  if (override) {
+    url = `${override}/signup.html?invite=${token}`;
+  } else {
+    try {
+      const base = getPublicBaseUrl(req);
+      if (base) {
+        url = `${base}/signup.html?invite=${token}`;
+      }
+    } catch { /* fall through to relative */ }
+    if (!url) {
+      url = `/signup.html?invite=${token}`;
+    }
+  }
+  try {
+    return appendShareKey(url);
+  } catch {
+    return url;
+  }
+}
+
+// Public shareable link for any in-app page (admin, signin/login, signup).
+// Uses the same PUBLIC_URL base + ?key= first door as invite links.
+function buildPublicLink(req, pagePath) {
+  const { getPublicBaseUrl, appendShareKey } = require('../middleware/shareLinks');
+  const clean = String(pagePath || '/login.html').trim();
+  const pathPart = clean.startsWith('/') ? clean : `/${clean}`;
+  const override = String(process.env.PUBLIC_URL || process.env.APP_URL || config.PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  let url;
+  if (override) {
+    url = `${override}${pathPart}`;
+  } else {
+    try {
+      const base = getPublicBaseUrl(req);
+      url = base ? `${base}${pathPart}` : pathPart;
+    } catch {
+      url = pathPart;
+    }
+  }
+  try {
+    return appendShareKey(url);
+  } catch {
+    return url;
+  }
+}
+
 function loadInvites() {
   return dataStore.readJson(INVITES_FILE, {}, (v) => v && typeof v === 'object' && !Array.isArray(v));
 }
@@ -625,7 +682,7 @@ async function createInvite(req, res) {
     }
 
     const token = generateInviteToken(email);
-    return res.json({ message: 'Invite generated.', inviteToken: token, signupUrl: `/signup.html?invite=${token}` });
+    return res.json({ message: 'Invite generated.', inviteToken: token, signupUrl: buildSignupUrl(req, token) });
   } catch (err) {
     logBreakage('authController.js', 'createInvite', err, 'INVITE GENERATION FAILED');
     res.status(503).json({ error: 'Unable to generate invite token.' });
@@ -813,7 +870,7 @@ function listInvites(req, res) {
         createdAt: invite.createdAt,
         expiresAt: new Date(invite.expiresAt).toISOString(),
         used: Boolean(invite.used),
-        signupUrl: `/signup.html?invite=${token}`
+        signupUrl: buildSignupUrl(req, token)
       }))
       .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
@@ -1032,4 +1089,4 @@ function verifyStoreSwitch(req, res) {
   }
 }
 
-module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError, sweepExpiredAuth, cleanupExpiredInvites };
+module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError, sweepExpiredAuth, cleanupExpiredInvites, buildPublicLink };

@@ -272,6 +272,15 @@ function getDeviceToken() {
   return localStorage.getItem('deviceToken') || '';
 }
 
+// Helper: if no device token, show auth screen so the admin panel doesn't
+// render empty tables when the admin has a role but lacks a valid device token.
+function maybeRedirectToLoginIfNoToken() {
+  const token = getDeviceToken();
+  if (!token) {
+    showAuthScreen();
+  }
+}
+
 function getStoreHeaders(extraHeaders = {}) {
   return {
     'x-device-token': getDeviceToken(),
@@ -457,6 +466,7 @@ async function fetchNewRequests() {
   const badge = document.getElementById('newRequestsBadge');
   const note = document.getElementById('newRequestsNote');
   try {
+    maybeRedirectToLoginIfNoToken();
     const response = await fetch('/loans/all', { headers: getStoreHeaders() });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Unable to load requests.');
@@ -748,6 +758,7 @@ async function fetchReportData() {
   note.textContent = '';
 
   try {
+    maybeRedirectToLoginIfNoToken();
     const scope = reportScope;
     const endpoint = REPORT_ENDPOINT[reportType] || 'summary';
     const qs = new URLSearchParams();
@@ -874,6 +885,7 @@ async function updateStoreFeedback(id, status) {
 async function downloadReport(format) {
   const note = document.getElementById('storeReportNote');
   try {
+    maybeRedirectToLoginIfNoToken();
     const qs = new URLSearchParams({ format });
     if (reportFrom) qs.set('from', reportFrom);
     if (reportTo) qs.set('to', reportTo);

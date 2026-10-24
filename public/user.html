@@ -3,39 +3,47 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BMF — My Account</title>
+  <title>PrymeBMF — My Account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="style.css?v=20261017-shared-theme-refresh">
   <style>
-    body.customer-portal { background:#0d1117; color:#e8edf5; }
-    .customer-portal .dashboard { max-width:1120px; margin:0 auto; padding:18px; }
+    body.customer-portal { background:#0d1117; color:#e6edf3; }
+    .customer-portal .dashboard { width: 100%; max-width: 100vw; margin: 0; padding: 18px clamp(12px, 3vw, 24px); box-sizing: border-box; }
     .customer-portal .dash-header { display:flex; align-items:center; justify-content:space-between; min-height:44px; }
     .customer-portal .brand { margin:0; font-size:20px; }
-    .customer-portal .loan-tabs { display:flex; align-items:center; gap:8px; overflow-x:auto; padding:8px 0 14px; border-bottom:1px solid #29313b; }
-    .customer-portal .loan-tab { border:0; border-radius:7px; padding:10px 16px; white-space:nowrap; color:#9aa8b8; background:transparent; }
-    .customer-portal .loan-tab.active { color:white; background:#2f80ed; }
+    .customer-portal .loan-tabs { display:flex; align-items:center; gap:8px; overflow-x:auto; padding:8px 0 14px; border-bottom:1px solid #30363d; }
+    .customer-portal .loan-tab { border:0; border-radius:7px; padding:10px 16px; white-space:nowrap; color:#8b949e; background:transparent; }
+    .customer-portal .loan-tab.active { color:white; background:#2f81f7; }
     .customer-portal .screen-section { padding-top:16px; }
-    .customer-portal .welcome-card,.customer-portal .board-card,.customer-portal .loan-summary-card,.customer-portal .panel { background:#161b22; border:1px solid #29313b; border-radius:10px; box-shadow:none; }
-    .customer-portal .welcome-card { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 24px; margin-bottom:18px; border-left:4px solid #2f80ed; }
+    .customer-portal .welcome-card,.customer-portal .board-card,.customer-portal .loan-summary-card,.customer-portal .panel { background:#161b22; border:1px solid #30363d; border-radius:10px; box-shadow:none; }
+    .customer-portal .welcome-card { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 24px; margin-bottom:18px; border-left:4px solid #2f81f7; }
     .customer-portal .welcome-card h2 { margin:0 0 5px; font-size:20px; }
-    .customer-portal .welcome-card p { margin:0; color:#8b99aa; }
-    .customer-portal .standing-badge { color:#4ade80; border:1px solid #23633d; border-radius:20px; padding:8px 13px; white-space:nowrap; }
+    .customer-portal .welcome-card p { margin:0; color:#8b949e; }
+    .customer-portal .standing-badge { color:#3fb950; border:1px solid #238636; border-radius:20px; padding:8px 13px; white-space:nowrap; }
     .customer-portal .portal-kpis { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:0 0 18px; }
     .customer-portal .portal-kpis .loan-summary-card { padding:17px 20px; }
-    .customer-portal .portal-kpis h3 { font-size:12px; color:#8b99aa; text-transform:uppercase; letter-spacing:.05em; }
+    .customer-portal .portal-kpis h3 { font-size:12px; color:#8b949e; text-transform:uppercase; letter-spacing:.05em; }
     .customer-portal .portal-kpis .summary-value { font-size:26px; font-weight:700; margin:6px 0; }
-    .customer-portal .portal-kpis .summary-label { color:#8b99aa; }
+    .customer-portal .portal-kpis .summary-label { color:#8b949e; }
     .customer-portal #statusSummaryCards { display:none; }
     .customer-portal .board-card { padding:18px; margin-bottom:16px; }
     .customer-portal .overview-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-    .customer-portal .summary-inline-card { background:#1b2129; border:1px solid #29313b; border-radius:9px; padding:15px; }
+    .customer-portal .summary-inline-card { background:#1c2128; border:1px solid #30363d; border-radius:9px; padding:15px; }
     .customer-portal .history-filters { display:none; }
     .customer-portal .loan-list { padding:0; list-style:none; }
-    .customer-portal .loan-card { background:#161b22; border:1px solid #29313b; border-radius:10px; margin:10px 0; padding:16px; cursor:pointer; }
-    .customer-portal .loan-meta { color:#a9b4c1; margin-top:9px; }
+    .customer-portal .loan-card { background:#161b22; border:1px solid #30363d; border-radius:10px; margin:10px 0; padding:16px; cursor:pointer; }
+    .customer-portal .loan-meta { color:#8b949e; margin-top:9px; }
     .customer-portal .request-field-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
     .customer-portal .request-field-grid:first-child { grid-template-columns:1fr; }
     .customer-portal .field-label { display:block; margin-bottom:6px; }
     @media(max-width:650px) { .customer-portal .dashboard{padding:12px}.customer-portal .portal-kpis,.customer-portal .overview-grid{grid-template-columns:1fr}.customer-portal .welcome-card{align-items:flex-start;flex-direction:column}.customer-portal .request-field-grid{grid-template-columns:1fr} }
+
+    /*── PrymeBMF — BMF Master Fidelity skin ─────────────────── */
+    *, *::before, *::after, html, body { font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif; }
+    .customer-portal .standing-badge.warn { color:#d29922; border-color:#9e6a03; }
+    .customer-portal .standing-badge.alert { color:#f85149; border-color:#da3633; }
   </style>
 </head>
 <body class="customer-portal">
@@ -56,7 +64,7 @@
 
   <div class="dashboard">
     <div class="dash-header">
-      <h1 class="brand animated-text">BMF</h1>
+      <h1 class="brand animated-text">PrymeBMF</h1>
     </div>
 
     <div class="loan-tabs">
@@ -71,7 +79,7 @@
       <div id="summarySection" class="screen-section active">
         <div class="welcome-card">
           <div><h2><span id="greetingLabel">Welcome back</span>, <span id="welcomeName">--</span> 👋</h2><p>Logged in as <span id="welcomeAccount">--</span> · Buraza Micro Finance</p></div>
-          <span class="standing-badge">✓ Good Standing</span>
+          <span class="standing-badge" id="standingBadge">Account status</span>
         </div>
         <div class="loan-summary-grid portal-kpis">
           <div class="loan-summary-card">
@@ -896,6 +904,29 @@
       panel.classList.remove('hidden');
     }
 
+    function updateStandingBadge(loans) {
+      const badge = document.getElementById('standingBadge');
+      if (!badge) return;
+      const statusOf = loan => loanStatusOf(loan);
+      const risky = loans.some(loan => ['defaulted', 'liquidated'].includes(statusOf(loan)));
+      const dueSoon = loans.some(loan => statusOf(loan) === 'grace');
+      const open = loans.filter(loan => !['paid', 'declined'].includes(statusOf(loan)));
+      badge.classList.remove('warn', 'alert');
+      if (risky) {
+        badge.textContent = '⚠ Payment overdue';
+        badge.classList.add('alert');
+      } else if (dueSoon) {
+        badge.textContent = '⚠ Repayment due soon';
+        badge.classList.add('warn');
+      } else if (open.length) {
+        badge.textContent = '✓ Repayment on track';
+      } else if (loans.length) {
+        badge.textContent = '✓ All loans settled';
+      } else {
+        badge.textContent = '✓ No active loans';
+      }
+    }
+
     async function loadLoans(filterDays = currentHistoryFilter) {
       const loanList = document.getElementById('loan-list');
       const deviceToken = localStorage.getItem('deviceToken');
@@ -903,6 +934,7 @@
         loanList.innerHTML = '<li>Please login again to see your loan information.</li>';
         document.getElementById('loanTotal').textContent = '0 loans';
         document.getElementById('loanOutstanding').textContent = 'K0';
+        updateStandingBadge([]);
         renderLoanSummaryCounts([]);
         return false;
       }
@@ -938,6 +970,7 @@
         document.getElementById('loanSettled').textContent = String(settledLoans.length);
         document.getElementById('settledTotalLabel').textContent = `${formatKwacha(settledLoans.reduce((sum, loan) => sum + Number(loan.totalRepayment || loan.amount || 0), 0))} fully paid`;
         renderLoanSummaryCounts(allLoans);
+        updateStandingBadge(allLoans);
         renderLoanList();
         renderPaymentOverview();
         loadCustomerNotifications();

@@ -63,6 +63,13 @@ PORT: Number(process.env.PORT) || 3000,
   // docs/plans/public-internet-access.md.
   TRUSTED_TOKENS: [],
 
+  // Option A public share links: PUBLIC_URL is the public origin stamped on
+  // generated links (e.g. https://prymebfm.com). SHARE_PUBLIC_KEY is the first
+  // door (?key=) on HTML page loads. Both from env only — never hardcoded.
+  // Key never replaces login, invite tokens, OTP, or x-device-token auth.
+  PUBLIC_URL: process.env.PUBLIC_URL || process.env.APP_URL || '',
+  SHARE_PUBLIC_KEY: process.env.SHARE_PUBLIC_KEY || '',
+
   // Routes reachable WITHOUT a device token (deviceAuth skips these). Invite
   // validation must stay public so a prospective borrower can validate their
   // link on signup.html before any account/device token exists.

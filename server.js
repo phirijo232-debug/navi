@@ -13,6 +13,7 @@ const { ensureDataIntegrity } = require('./middleware/dataStore');
 const { startHealthWatch } = require('./middleware/healthWatch');
 const { errorAudit, captureOrigin, appendAudit } = require('./middleware/errorAudit');
 const { isPrivateControlClient } = require('./middleware/localControl');
+const { shareKeyGate } = require('./middleware/shareLinks');
 
 const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || null;
 const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
@@ -86,6 +87,16 @@ app.use((req, res, next) => {
 // Raw ?token= is rejected inside serveFile.
 app.get('/uploads/:filename', serveFile);
 
+// Option A public share links: key gate MUST run before express.static —
+// static answers publicly, so a gate after it would never fire. Only HTML
+// page loads are checked; APIs, assets, /status, /health and invite
+// validation pass through. /signin.html is an alias of login.html (no
+// duplicate file). Both mount before deviceAuth so public visitors can
+// reach the login page with a valid ?key=.
+app.use(shareKeyGate);
+app.get('/signin.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 function hasValidAdminKey(req) {

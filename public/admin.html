@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>(function(){try{var m=localStorage.getItem('mode')==='light'?'light':'dark';document.documentElement.classList.add(m);}catch(_){document.documentElement.classList.add('dark');}})();</script>
-  <title>Admin Dashboard - Pryme Vertex</title>
+  <title>PrymeBMF Admin — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="style.css?v=20261017-shared-theme-refresh">
   <style>
     body {
@@ -19,9 +22,16 @@
     .admin-shell {
       position: relative;
       z-index: 1;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 32px 18px 60px;
+      width: 100%;
+      max-width: 100vw;
+      margin: 0;
+      padding: 24px clamp(16px, 4vw, 32px) 60px;
+      box-sizing: border-box;
+    }
+    @media (max-width: 640px) {
+      .admin-shell {
+        padding: 16px 12px 50px;
+      }
     }
     .panel {
       background: #161B22;
@@ -366,6 +376,33 @@
       0% { transform: translateY(0); opacity: 0.5; }
       100% { transform: translateY(-6px); opacity: 1; }
     }
+
+    /* ════════════════════════════════════════════════════════
+       PrymeBMF Admin — BMF Master Fidelity skin (GitHub dark)
+       ════════════════════════════════════════════════════════ */
+    :root {
+      --bmf-bg:#0d1117; --bmf-card:#161b22; --bmf-surface:#1c2128; --bmf-border:#30363d;
+      --bmf-text:#e6edf3; --bmf-muted:#8b949e;
+      --bmf-blue:#2f81f7; --bmf-green:#3fb950; --bmf-amber:#d29922; --bmf-red:#f85149; --bmf-purple:#a371f7;
+    }
+    *, *::before, *::after, html, body { font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif; }
+    body { background:var(--bmf-bg); color:var(--bmf-text); }
+    body.dark::before { display:none; }
+    .panel { background:var(--bmf-card); border:1px solid var(--bmf-border); border-radius:8px; box-shadow:none; backdrop-filter:none; }
+    .auth-input, .search-box, .modal-input { background:var(--bmf-bg); border:1px solid var(--bmf-border); border-radius:6px; }
+    .auth-input:focus, .search-box:focus, .modal-input:focus { outline:none; border-color:var(--bmf-blue); box-shadow:0 0 0 3px rgba(47,129,247,.35); }
+    .modal { background:rgba(1,4,9,.72); }
+    .modal-content { background:var(--bmf-surface); border:1px solid var(--bmf-border); border-radius:8px; }
+    .enter-btn { background:var(--bmf-blue); border:1px solid var(--bmf-blue); border-radius:6px; box-shadow:none; letter-spacing:.5px; }
+    .enter-btn:hover { background:#388bfd; box-shadow:0 4px 14px rgba(47,129,247,.35); opacity:1; }
+    .store-card:hover:not(:disabled) { border-color:var(--bmf-blue); }
+    .report-metric { background:var(--bmf-bg); border:1px solid var(--bmf-border); border-radius:8px; }
+    .loan-filter.active { border-color:var(--bmf-blue); background:rgba(47,129,247,.16); color:var(--bmf-text); }
+    .user-card { background:var(--bmf-bg); border:1px solid var(--bmf-border); border-radius:8px; }
+    .user-card:hover { border-color:var(--bmf-blue); }
+    .loan-item { background:var(--bmf-bg); border:1px solid var(--bmf-border); border-radius:8px; }
+    .request-row, .feedback-item { border-top-color:var(--bmf-border); }
+    .admin-topbar h1 { font-weight:700; }
   </style>
 </head>
 <body>
@@ -385,7 +422,7 @@
   <button class="toggle-mode" id="modeBtn" type="button" hidden aria-hidden="true">Theme</button>
 
   <div class="admin-shell">
-    <header class="brand-header"><a class="brand-mark" href="index.html">Pryme Vertex</a><span class="store-context" id="storeContext"></span></header>
+    <header class="brand-header"><a class="brand-mark" href="index.html">PrymeBMF Admin</a><span class="store-context" id="storeContext"></span></header>
 
     <section id="storeSelect">
       <h1 class="screen-title">Choose a store</h1>
@@ -446,7 +483,7 @@
     <section id="adminDashboard" class="hidden">
       <header class="admin-appbar">
         <span id="loggedInAdmin" hidden></span>
-        <div class="admin-brand"><strong>BMF</strong><span>| Admin</span><small>Buraza Micro Finance</small></div>
+        <div class="admin-brand"><strong>PrymeBMF</strong><span>| Admin</span><small>Buraza Micro Finance</small></div>
         <label class="admin-search-wrap"><span aria-hidden="true">Find:</span><input id="adminDashboardSearch" type="search" placeholder="Loans, borrowers, receipts..." aria-label="Search dashboard"></label>
         <div class="admin-user-controls">
           <div class="notification-anchor"><button id="adminNotificationBtn" type="button" aria-label="Notifications" aria-expanded="false">&#128276;<span id="adminNotificationCount" class="notification-count hidden">0</span></button><section id="adminNotificationMenu" class="notification-menu hidden" aria-label="Notifications"><header><strong>Notifications</strong><button id="markAllNotificationsRead" type="button">Mark all read</button></header><div id="adminNotificationList"></div></section></div>
@@ -458,7 +495,7 @@
       </header>
 
       <section id="portfolioOverview" class="dashboard-screen" aria-labelledby="portfolioOverviewTitle">
-        <h1 id="portfolioOverviewTitle" class="visually-hidden">BMF Admin Dashboard</h1>
+        <h1 id="portfolioOverviewTitle" class="visually-hidden">PrymeBMF Admin Dashboard</h1>
         <div id="portfolioKpis" class="admin-kpi-grid"></div>
         <section class="panel admin-chart-panel"><header><strong>Collections This Month</strong><span id="collectionMonthLabel"></span><button type="button" class="toggle-mode" id="refreshPortfolioBtn">Refresh</button></header><div id="collectionsChart" aria-live="polite"></div></section>
         <section class="panel admin-activity-panel"><h2>Recent Activity</h2><ul id="recentActivity" class="activity-list"></ul></section>
