@@ -811,13 +811,9 @@ async function requestLoan(req, res) {
       const adminSummary = emailService.buildLoanSummaryText(newLoan);
       const adminAlert = {
         subject: `New loan request alert: ${product} — ${formatCurrency(newLoan.amount)} — ${String(newLoan.urgency || 'standard').toLowerCase()}`,
-        text: `A new loan request has been submitted by ${email}.
-
-` +
+        text: `A new loan request has been submitted by ${email}.\n\n` +
           adminSummary +
-          `Created: ${new Date().toISOString()}
-
-` +
+          `Created: ${new Date().toISOString()}\n\n` +
           'Please review the request in the admin dashboard.'
       };
 
@@ -1110,9 +1106,7 @@ async function updateLoanStatus(req, res) {
       await emailService.sendCustomerEmail({
         to: adminRecipients,
         subject: `Loan audit report — ${new Date().toISOString().slice(0, 10)}`,
-        text: `Loan audit report for Pryme Vertex
-
-${reportLines || 'No loan activity recorded.'}`
+        text: `Loan audit report for Pryme Vertex\n\n${reportLines || 'No loan activity recorded.'}`
       });
     }
 
@@ -1225,23 +1219,9 @@ async function sendLoanNotification(req, res) {
 
     if (messageType === 'overdue') {
       subject = 'URGENT: Your Loan is Overdue';
-      text = `Dear customer,
-
-This is a notification that your loan for ${loan.product} is currently overdue. 
-
-Outstanding Amount: ${formatCurrency(loan.outstanding)}
-Due Date: ${loan.dueDate}
-
-Please make a payment as soon as possible to avoid further penalties.`;
+      text = `Dear customer,\n\nThis is a notification that your loan for ${loan.product} is currently overdue. \n\nOutstanding Amount: ${formatCurrency(loan.outstanding)}\nDue Date: ${loan.dueDate}\n\nPlease make a payment as soon as possible to avoid further penalties.`;
     } else {
-      text = `Hello,
-
-This is a reminder regarding your loan for ${loan.product}.
-
-Outstanding Amount: ${formatCurrency(loan.outstanding)}
-Due Date: ${loan.dueDate}
-
-Thank you.`;
+      text = `Hello,\n\nThis is a reminder regarding your loan for ${loan.product}.\n\nOutstanding Amount: ${formatCurrency(loan.outstanding)}\nDue Date: ${loan.dueDate}\n\nThank you.`;
     }
 
     const result = await emailService.sendCustomerEmail({
@@ -1289,8 +1269,7 @@ async function notifyUser(req, res) {
     const activeLoans = loans.filter(loan => Number(loan.outstanding || 0) > 0);
     const totalInterestAdded = loans.reduce((sum, loan) => sum + Number(loan.graceInterestAdded || 0), 0);
 
-    const today = new Date().toISOString().slice(0, 10);
-    activeLoans.forEach(loan => {
+      const today = new Date().toISOString().slice(0, 10);
       const interestBefore = Number(loan.graceAccrued || 0);
       applyGraceAccrual(loan, today);
       const interestAfter = Number(loan.graceAccrued || 0);
@@ -1298,9 +1277,8 @@ async function notifyUser(req, res) {
       Object.assign(loan, { graceInterestBefore: interestBefore, graceInterestAfter: interestAfter, graceInterestAdded: interestAdded });
       const outstanding = Number(loan.outstanding || 0);
       return `- ${loan.product || 'Loan'} ${loan.receiptNumber || `#${loan.id}`}: outstanding ${formatCurrency(outstanding)}, due ${loan.dueDate || 'date unavailable'}, grace interest: K ${preciseCurrency(interestAdded)} (1.8%/day)`;
-    });
+    }).join('\n');
 
-    const outstandingTotal = activeLoans.reduce((sum, loan) => sum + Number(loan.outstanding || 0), 0);
     const loanDetails = activeLoans.map(loan =>
       `- ${loan.product || 'Loan'} ${loan.receiptNumber || `#${loan.id}`}: ` +
       `outstanding ${formatCurrency(loan.outstanding)}, due ${loan.dueDate || 'date unavailable'}`
@@ -1308,13 +1286,14 @@ async function notifyUser(req, res) {
 // Grace interest already calculated - display with 1.8%/day accrual rate
     const loanDetailsWithInterest = activeLoans.map(loan =>
       `- ${loan.product || 'Loan'} ${loan.receiptNumber || `#${loan.id}`}: ` +
-      `outstanding ${formatCurrency(loan.outstanding)}, due ${loan.dueDate || 'date unavailable'}, grace interest: K ${preciseCurrency(loan.graceInterestAdded || 0)} (1.8%/day)`
+      `outstanding ${formatCurrency(loan.outstanding)}, due ${loan.dueDate || 'date unavailable'}, grace interest: K ${preciseCurrency(loan.graceInterestAdded || 0)} (1.8%/day)` +
     ).join('\n');
 
     const subject = 'BMF Loan Reminder';
     const text = `Hello,\n\nThis is a reminder from Buraza Micro Finance (BMF) regarding your loan account.\n\n` +
       (activeLoans.length
-        ? `Open balance(s):\n${loanDetailsWithInterest}\n\nTotal outstanding: ${formatCurrency(outstandingTotal)}\n\nKindly settle the outstanding balance to continue enjoying the BMF loan service.\n`
+? `Open balance(s):\n${loanDetailsWithInterest}\n\nTotal outstanding: ${formatCurrency(outstandingTotal)}\n\nKindly settle the outstanding balance to continue enjoying the BMF loan service.\n`
+        ? `Open balance(s):\n${loanDetails}\n\nTotal outstanding: ${formatCurrency(outstandingTotal)}\n\nKindly settle the outstanding balance to continue enjoying the BMF loan service.\n`
         : `Our records show no open balance on your account. Thank you for staying up to date.\n`) +
       `\nRegards,\nBuraza Micro Finance (BMF), a Pryme Vertex subsidiary.`;
 
@@ -1378,15 +1357,7 @@ async function notifyAllOverdue(req, res) {
       const result = await emailService.sendCustomerEmail({
         to: email,
         subject: 'Buraza Micro Finance (BMF): overdue loan notice',
-        text: `Dear customer,
-
-Our records show the following Buraza loan balance(s) are overdue:
-${loanDetails}
-
-Please contact Buraza Micro Finance to arrange payment. If you have already paid, please disregard this notice.
-
-Regards,
-Buraza Micro Finance (BMF), a Pryme Vertex subsidiary.`
+        text: `Dear customer,\n\nOur records show the following Buraza loan balance(s) are overdue:\n${loanDetails}\n\nPlease contact Buraza Micro Finance to arrange payment. If you have already paid, please disregard this notice.\n\nRegards,\nBuraza Micro Finance (BMF), a Pryme Vertex subsidiary.`
       });
       if (result?.ok) sent += 1;
       else { failed += 1; failureReasons.push(String(result?.reason || 'Delivery failed.').slice(0, 240)); }
