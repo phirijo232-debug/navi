@@ -44,6 +44,92 @@
     *, *::before, *::after, html, body { font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif; }
     .customer-portal .standing-badge.warn { color:#d29922; border-color:#9e6a03; }
     .customer-portal .standing-badge.alert { color:#f85149; border-color:#da3633; }
+
+    /* Request lock box overlay */
+    .customer-portal .request-lock-box {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(4px);
+    }
+    .customer-portal .request-lock-box.hidden { display: none; }
+    .customer-portal .lock-box-content {
+      text-align: center;
+      padding: 32px 24px;
+      border-radius: 14px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+      max-width: 360px;
+      width: 90vw;
+    }
+    .customer-portal .lock-icon { font-size: 48px; margin-bottom: 16px; }
+    .customer-portal .lock-heading {
+      margin: 0 0 12px;
+      font-size: 18px;
+      color: #f85149;
+    }
+    .customer-portal .lock-message {
+      margin: 0 0 24px;
+      color: #8b949e;
+      line-height: 1.5;
+    }
+    .customer-portal .lock-close-btn {
+      background: #da3633;
+      color: white;
+      border: none;
+      border-radius: 7px;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .customer-portal .lock-close-btn:hover { background: #f85149; }
+
+    /* Record Payment button on loan cards */
+    .customer-portal .record-payment-btn {
+      background: #2f81f7;
+      color: white;
+      border: none;
+      border-radius: 7px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .customer-portal .record-payment-btn:hover { background: #3b93f9; }
+
+    /* Support sub-list */
+    .customer-portal .support-sub-list {
+      list-style: none;
+      padding: 0;
+      margin: 16px 0 0;
+      border-top: 1px solid #30363d;
+      padding-top: 16px;
+    }
+    .customer-portal .support-sub-list li {
+      margin: 8px 0;
+    }
+    .customer-portal .support-sub-list .support-link {
+      background: transparent;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      border-radius: 7px;
+      padding: 10px 16px;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .customer-portal .support-sub-list .support-link:hover {
+      background: #1c2128;
+      color: #e6edf3;
+      border-color: #484f58;
+    }
   </style>
 </head>
 <body class="customer-portal">
@@ -51,13 +137,8 @@
   <button class="menu-toggle" id="menuBtn">⋮</button>
   <div class="dropdown-menu" id="menuDropdown">
     <button class="menu-action" data-view="loans">Loans</button>
-    <button class="menu-action" data-view="payments">Payments</button>
-    <button class="menu-action" data-view="reports">Reports</button>
-    <button class="menu-action" data-view="complaints">Complaints</button>
-    <button class="menu-action" data-view="improvements">Improvements</button>
-    <button class="menu-action" data-view="inquiries">Inquiries</button>
-    <button class="menu-action" data-view="experience">Experience</button>
-    <button class="menu-action" data-view="about">About Us</button>
+    <button class="menu-action" data-view="payments">Record Payment</button>
+    <button class="menu-action" data-view="support">Support</button>
     <button id="logoutBtn">Logout</button>
   </div>
   <button class="toggle-mode" id="modeBtn">Switch Mode</button>
@@ -146,7 +227,7 @@
           <div class="loan-filters support-tabs" role="tablist" aria-label="Payments and support">
             <button type="button" class="loan-filter active" data-support-view="history">Payment History</button>
             <button type="button" class="loan-filter" data-support-view="inquiry">Inquiries</button>
-            <button type="button" class="loan-filter" data-support-view="dispute">Dispute Payment</button>
+            <button type="button" class="loan-filter" data-support-view="record-payment">Record Payment</button>
             <button type="button" class="loan-filter" data-support-view="schedule">Due Schedule</button>
             <button type="button" class="toggle-mode support-refresh" id="refreshSupportBtn">Refresh</button>
           </div>
@@ -167,17 +248,35 @@
             </form>
             <h3>Previous Inquiries</h3><div id="customerInquiryHistory"><p>Loading inquiries...</p></div>
           </section>
-          <section data-support-panel="dispute" class="hidden">
-            <h3>Dispute a Payment</h3><p>Use this if a payment was recorded incorrectly or your balance seems wrong.</p>
-            <form id="customerDisputeForm" class="auth-form">
+          <section data-support-panel="record-payment" class="hidden">
+            <h3>Record Payment</h3>
+            <p>Record a payment against an active loan. Your expected balance is locked from your loan record — enter the amount you paid and the receipt number. <strong>Find your receipt number in My Loans.</strong></p>
+            <form id="customerRecordPaymentForm" class="auth-form">
               <div class="request-field-grid two-up">
-                <label class="field-label">Receipt no. in dispute<input id="disputeReceipt" class="auth-input" required placeholder="e.g. PAY-YYYYMMDD-0001"></label>
-                <label class="field-label">Expected amount (K)<input id="disputeExpected" class="auth-input" type="number" min="0" step="0.01" required></label>
-                <label class="field-label">Recorded amount (K)<input id="disputeRecorded" class="auth-input" type="number" min="0" step="0.01" required></label>
+                <label class="field-label">Loan<select id="recordPaymentLoanId" class="auth-input" required><option value="">Choose a loan...</option></select></label>
+                <label class="field-label">Expected balance (K)<input id="recordPaymentExpectedBalance" class="auth-input" type="number" min="0" step="0.01" readonly required></label>
               </div>
-              <label class="field-label">Details<textarea id="disputeDetails" class="auth-input" rows="4" required placeholder="Explain the discrepancy."></textarea></label>
-              <button class="enter-btn" type="submit">Submit Dispute</button>
+              <div class="request-field-grid two-up">
+                <label class="field-label">Amount paid (K)<input id="recordPaymentAmount" class="auth-input" type="number" min="0.01" step="0.01" required placeholder="Amount you paid"></label>
+                <label class="field-label">Receipt number<input id="recordPaymentReceipt" class="auth-input" required placeholder="e.g. PAY-YYYYMMDD-0001"></label>
+              </div>
+              <div class="request-field-grid two-up">
+                <label class="field-label">Transfer method<select id="recordPaymentMode" class="auth-input" required><option value="">Select method...</option><option>Airtel Money</option><option>MTN MoMo</option><option>Bank Transfer</option><option>Cash</option><option>Other</option></select></label>
+                <label class="field-label">Payment proof (optional)<input id="recordPaymentProof" class="auth-input" type="file" accept="image/jpeg,image/png,image/webp"></label>
+              </div>
+              <label class="field-label">Notes (optional)<textarea id="recordPaymentNotes" class="auth-input" rows="3" placeholder="Any notes for the payment team."></textarea></label>
+              <button class="enter-btn" type="submit">Record Payment</button>
             </form>
+          </section>
+          <section class="hidden support-extra">
+            <h3>More options</h3>
+            <ul class="support-sub-list">
+              <li><button type="button" class="menu-action support-link" data-view="reports">Reports</button></li>
+              <li><button type="button" class="menu-action support-link" data-view="complaints">Complaints</button></li>
+              <li><button type="button" class="menu-action support-link" data-view="inquiries">Inquiries</button></li>
+              <li><button type="button" class="menu-action support-link" data-view="experience">Experience</button></li>
+              <li><button type="button" class="menu-action support-link" data-view="about">About</button></li>
+            </ul>
           </section>
           <section data-support-panel="schedule" class="hidden"><h3>Due Schedule</h3><div id="customerDueSchedule"></div></section>
         </div>
@@ -617,6 +716,16 @@
     }
 
     function setActiveLoanTab(tab) {
+      // Lock gate: block New Request if user has any unsettled loans
+      if (tab === 'request') {
+        const unsettled = allLoans.filter(loan =>
+          ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan)) && Number(loan.outstanding || 0) > 0
+        );
+        if (unsettled.length > 0) {
+          showRequestLockBox();
+          return;
+        }
+      }
       localStorage.setItem('lastUserView', tab);
       document.querySelectorAll('.loan-tab').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tab);
@@ -629,6 +738,30 @@
       }
       if (tab === 'payments') { renderPaymentOverview(); loadCustomerSupport(); }
       if (tab === 'reports') loadCustomerReport();
+    }
+
+    function showRequestLockBox() {
+      let box = document.getElementById('requestLockBox');
+      if (!box) {
+        box = document.createElement('div');
+        box.id = 'requestLockBox';
+        box.className = 'request-lock-box';
+        box.innerHTML = `
+          <div class="lock-box-content">
+            <div class="lock-icon">🔒</div>
+            <h2 class="lock-heading">Cannot request a new loan</h2>
+            <p class="lock-message">You must settle your current loan before a new request is allowed.</p>
+            <button class="enter-btn lock-close-btn" onclick="hideRequestLockBox()">Understood</button>
+          </div>
+        `;
+        document.body.appendChild(box);
+      }
+      box.classList.remove('hidden');
+    }
+
+    function hideRequestLockBox() {
+      const box = document.getElementById('requestLockBox');
+      if (box) box.classList.add('hidden');
     }
 
     function renderPaymentOverview() {
@@ -1087,29 +1220,44 @@
     document.getElementById('customerInquiryForm')?.addEventListener('submit', async event => {
       event.preventDefault();
       const button = document.getElementById('submitInquiryBtn'); const note = document.getElementById('supportMessage');
-      button.disabled = true; button.textContent = 'Sending…'; note.textContent = 'Sending inquiry…';
+      button.disabled = true; button.textContent = 'Recording inquiry'; note.textContent = 'Recording payment';
+      const loanId = document.getElementById('recordPaymentLoanId').value;
+      if (!loanId) { note.textContent = 'Please choose a loan.'; return; }
       try {
-        const category = document.getElementById('inquiryType').value;
-        const relatedLoanId = document.getElementById('inquiryLoanId').value;
-        const details = document.getElementById('inquiryDetails').value.trim();
-        const response = await fetch('/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-device-token': localStorage.getItem('deviceToken') || '' }, body: JSON.stringify({ email: userEmail, category: 'inquiry', relatedLoanId, message: `${category}: ${details}` }) });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || 'Inquiry could not be sent.');
-        event.currentTarget.reset(); note.textContent = 'Inquiry sent successfully.'; await loadCustomerSupport();
-      } catch (error) { note.textContent = `Could not send inquiry: ${error.message}`; }
-      finally { button.disabled = false; button.textContent = 'Submit Inquiry'; }
+        const formData = new FormData();
+        formData.append('amount', document.getElementById('recordPaymentAmount').value);
+        formData.append('mode', document.getElementById('recordPaymentMode').value || 'Cash');
+        formData.append('transactionReference', document.getElementById('recordPaymentReceipt').value.trim());
+        const proof = document.getElementById('recordPaymentProof').files[0];
+        if (proof) formData.append('paymentProof', proof);
+        const notes = document.getElementById('recordPaymentNotes').value.trim();
+        if (notes) formData.append('note', notes);
+
+        const response = await fetch(`/loans/${loanId}/payment-submissions`, {
+          method: 'POST', headers: { 'x-device-token': localStorage.getItem('deviceToken') || '' }, body: formData
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Could not record payment.');
+        event.currentTarget.reset();
+        document.getElementById('recordPaymentExpectedBalance').value = '0';
+        note.textContent = 'Payment recorded successfully. It will be reviewed by BMF.';
+        showBmfToast('Payment recorded successfully.');
+        await loadLoans(currentHistoryFilter);
+        await loadCustomerSupport();
+      } catch (error) { note.textContent = Could not record payment: ; }
+      finally { button.disabled = false; button.textContent = 'Record Payment'; }
     });
-    document.getElementById('customerDisputeForm')?.addEventListener('submit', async event => {
-      event.preventDefault();
-      const note = document.getElementById('supportMessage'); const button = event.currentTarget.querySelector('button[type="submit"]');
-      button.disabled = true; button.textContent = 'Sending…'; note.textContent = 'Sending payment dispute…';
-      try {
-        const message = `Payment dispute for receipt ${document.getElementById('disputeReceipt').value.trim()}. Expected K ${document.getElementById('disputeExpected').value}; recorded K ${document.getElementById('disputeRecorded').value}. ${document.getElementById('disputeDetails').value.trim()}`;
-        const response = await fetch('/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-device-token': localStorage.getItem('deviceToken') || '' }, body: JSON.stringify({ email: userEmail, category: 'complaint', message }) });
-        const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error || 'Dispute could not be sent.');
-        event.currentTarget.reset(); note.textContent = 'Payment dispute sent successfully. BMF will review it.'; await loadCustomerSupport();
-      } catch (error) { note.textContent = `Could not send dispute: ${error.message}`; }
-      finally { button.disabled = false; button.textContent = 'Submit Dispute'; }
+
+    document.querySelectorAll('.support-link').forEach(button => {
+      button.addEventListener('click', () => {
+        const view = button.dataset.view;
+        if (view === 'reports') { setOverviewSection('reports'); }
+        if (view === 'complaints') { setOverviewSection('complaints'); }
+        if (view === 'inquiries') { setOverviewSection('complaints'); }
+        if (view === 'experience') { setOverviewSection('complaints'); }
+        if (view === 'about') { setOverviewSection('about'); }
+      });
+    };
     });
 
     document.getElementById('submitComplaintBtn').addEventListener('click', async () => {
@@ -1154,28 +1302,10 @@
       button.addEventListener('click', () => {
         const view = button.dataset.view;
         const menu = document.getElementById('menuDropdown');
-        const feedbackCategoryField = document.getElementById('feedbackCategory');
 
         if (view === 'loans') { setActiveLoanTab('loans'); }
         if (view === 'payments') { setOverviewSection('payments'); }
-        if (view === 'reports') { setOverviewSection('reports'); }
-        if (view === 'complaints') {
-          setOverviewSection('complaints');
-          if (feedbackCategoryField) feedbackCategoryField.value = 'complaint';
-        }
-        if (view === 'improvements') {
-          setOverviewSection('complaints');
-          if (feedbackCategoryField) feedbackCategoryField.value = 'improvement';
-        }
-        if (view === 'inquiries') {
-          setOverviewSection('complaints');
-          if (feedbackCategoryField) feedbackCategoryField.value = 'inquiry';
-        }
-        if (view === 'experience') {
-          setOverviewSection('complaints');
-          if (feedbackCategoryField) feedbackCategoryField.value = 'experience';
-        }
-        if (view === 'about') { setOverviewSection('about'); }
+        if (view === 'support') { setOverviewSection('payments'); }
         if (menu) menu.classList.remove('active');
       });
     });
@@ -1253,7 +1383,7 @@
         // Loan DECISIONS are store_admin-only (backend returns 403 for role
         // 'admin' per tested franchise-scoping policy) — match that gate here so
         // the buttons we show are exactly the ones the API will accept.
-        const hasAdminAccess = userRole === 'store_admin';
+        const hasAdminAccess = ['store_admin', 'franchise_admin'].includes(userRole);
         const collateralText = loan.collateralDescription || loan.collateralFront || loan.collateralBack || 'No collateral provided';
 
         renderLoanDetailPanel(loan);
@@ -1323,3 +1453,5 @@
   </div>
 </body>
 </html>
+
+

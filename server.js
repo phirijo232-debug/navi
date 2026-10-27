@@ -14,6 +14,7 @@ const { startHealthWatch } = require('./middleware/healthWatch');
 const { errorAudit, captureOrigin, appendAudit } = require('./middleware/errorAudit');
 const { isPrivateControlClient } = require('./middleware/localControl');
 const { shareKeyGate } = require('./middleware/shareLinks');
+const { validateStartup } = require('./middleware/startupHealth');
 
 const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || null;
 const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
@@ -190,6 +191,15 @@ app.use(errorAudit);
 const startupRepairs = ensureDataIntegrity();
 if (startupRepairs.length) {
   console.warn(`Navi Server data repair: ${startupRepairs.join('; ')}`);
+}
+
+// Startup data validation — catches corrupt JSON before accepting traffic
+const startupProblems = validateStartup();
+if (startupProblems.length) {
+  console.error(`Navi Server startup validation FAILED: ${startupProblems.length} problem(s) found.`);
+  startupProblems.forEach(p => console.error(`  - ${p}`));
+  console.error('Server will not start until data files are repaired.');
+  process.exit(1);
 }
 
 app.listen(config.PORT, config.HOST, () => {

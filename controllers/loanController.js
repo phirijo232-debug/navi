@@ -311,6 +311,11 @@ function deriveLoanStatus(loan, today = new Date().toISOString().slice(0, 10)) {
 const GRACE_DAILY_RATE = 0.018;
 const PENALTY_CAP_RATIO = 0.5; // cap: 50% additional on the original principal
 
+/** Format currency as K X,XXX.XX with full decimal precision. */
+function preciseCurrency(value) {
+  return Number(Number(value || 0).toFixed(2));
+}
+
 /** Accepts YYYY-MM-DD or DD/MM/YYYY; returns YYYY-MM-DD or null. */
 function parseDateInput(value) {
   const raw = String(value || '').trim();
@@ -512,14 +517,17 @@ function ensureStatusHistory(loan) {
   return loan.statusHistory;
 }
 
-function recordStatusHistory(loan, status, reason, actor = 'system', source = 'system') {
+function recordStatusHistory(loan, status, reason, actor = 'system', source = 'system', beforeAmount, afterAmount, interestRate) {
   const history = ensureStatusHistory(loan);
   history.push({
     status: normalizeLoanStatus(status),
     reason: reason || 'No note provided.',
     actor: actor || 'system',
     source,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    ...(beforeAmount !== undefined && { beforeAmount }),
+    ...(afterAmount !== undefined && { afterAmount }),
+    ...(interestRate !== undefined && { interestRate })
   });
   loan.statusHistory = history.slice(-25);
 }
@@ -803,9 +811,13 @@ async function requestLoan(req, res) {
       const adminSummary = emailService.buildLoanSummaryText(newLoan);
       const adminAlert = {
         subject: `New loan request alert: ${product} — ${formatCurrency(newLoan.amount)} — ${String(newLoan.urgency || 'standard').toLowerCase()}`,
-        text: `A new loan request has been submitted by ${email}.\n\n` +
+        text: `A new loan request has been submitted by ${email}.
+
+` +
           adminSummary +
-          `Created: ${new Date().toISOString()}\n\n` +
+          `Created: ${new Date().toISOString()}
+
+` +
           'Please review the request in the admin dashboard.'
       };
 
@@ -974,13 +986,13 @@ async function updateLoanStatus(req, res) {
   try {
     // Loan DECISIONS stay restricted to the assigned store admin (tested
     // franchise-scoping policy); payments/notifications use isAdminRole instead.
-    if (req.authUser?.role !== 'store_admin') {
-      return res.status(403).json({ error: 'Loan decisions are restricted to the assigned store admin.' });
+    if (req.authUser?.role !== 'store_admin' && req.authUser?.role !== 'franchise_admin') {
+      return res.status(403).json({ error: 'Loan decisions are restricted to the assigned store admin or franchise admin.' });
     }
     const id = Number(req.params.id);
     const { action, amount, collateralGrade, collateralVerified, nextPayment, reason, graceUntil } = req.body;
     const authEmail = req.authUser?.email;
-    const isAdmin = req.authUser?.role === 'store_admin';
+    const isAdmin = isAdminRole(req.authUser?.role);
     const normalizedAction = String(action || '').trim().toLowerCase().replace(/\s+/g, '_');
 
     const loans = getLoansData();
@@ -1025,11 +1037,21 @@ async function updateLoanStatus(req, res) {
       if (agreed <= today) {
         return res.status(400).json({ error: 'The agreed grace date must be in the future.' });
       }
+/* Capture grace interest before accrual */
+      const interestBefore = Number(loan.graceAccrued || 0);
+      // Apply grace accrual — this calculates 1.8%/day and updates graceAccrued
+      applyGraceAccrual(loan, today);
+      const interestAfter = Number(loan.graceAccrued || 0);
+      const interestAdded = Number((interestAfter - interestBefore).toFixed(2));
+      //
       loan.status = 'grace';
       loan.graceUntil = agreed;
       loan.graceDailyRate = GRACE_DAILY_RATE;
+      loan.graceInterestBefore = interestBefore;
+      loan.graceInterestAfter = interestAfter;
+      loan.graceInterestAdded = interestAdded;
       loan.adminReason = reason ||
-        `Grace entered by admin — agreed until ${agreed}; 1.8% per day accrues on the outstanding balance.`;
+        `Grace entered by admin — agreed until ${agreed}; 1.8% per day accrues on the outstanding balance. Interest added: K ${preciseCurrency(interestAdded)}.`;
     } else if (['verify_overdue', 'verify-overdue', 'mark_overdue', 'confirm_overdue'].includes(normalizedAction) && isAdmin) {
       if (Number(loan.outstanding || 0) <= 0) {
         return res.status(400).json({ error: 'Loan is already settled — nothing to verify.' });
@@ -1061,7 +1083,7 @@ async function updateLoanStatus(req, res) {
     }
 
     const decisionText = loan.adminReason || reason || 'Reviewed by our team.';
-    recordStatusHistory(loan, loan.status, decisionText, req.authUser?.email || 'admin', isAdmin ? 'admin' : 'customer');
+    recordStatusHistory(loan, loan.status, decisionText, req.authUser?.email || 'admin', isAdmin ? 'admin' : 'customer', loan.graceInterestBefore, loan.graceInterestAfter, loan.graceDailyRate);
 
     loan.updatedAt = new Date().toISOString();
     loan.reviewedBy = req.authUser?.email || null;
@@ -1088,7 +1110,9 @@ async function updateLoanStatus(req, res) {
       await emailService.sendCustomerEmail({
         to: adminRecipients,
         subject: `Loan audit report — ${new Date().toISOString().slice(0, 10)}`,
-        text: `Loan audit report for Pryme Vertex\n\n${reportLines || 'No loan activity recorded.'}`
+        text: `Loan audit report for Pryme Vertex
+
+${reportLines || 'No loan activity recorded.'}`
       });
     }
 
@@ -1174,7 +1198,7 @@ function recordPayment(req, res) {
       loans[index].status = 'paid';
       loans[index].settledAt = recordedAt;
     }
-    recordStatusHistory(loans[index], loans[index].status, `Payment of ${formatCurrency(payment.amount)} recorded.`, req.authUser?.email || 'admin', 'admin');
+    recordStatusHistory(loans[index], loans[index].status, `Payment of ${formatCurrency(payment.amount)} recorded.`, req.authUser?.email || 'admin', 'admin', balanceBefore, balanceAfter);
     loans[index].updatedAt = recordedAt;
 
     saveLoansData(loans);
@@ -1201,9 +1225,23 @@ async function sendLoanNotification(req, res) {
 
     if (messageType === 'overdue') {
       subject = 'URGENT: Your Loan is Overdue';
-      text = `Dear customer,\n\nThis is a notification that your loan for ${loan.product} is currently overdue. \n\nOutstanding Amount: ${formatCurrency(loan.outstanding)}\nDue Date: ${loan.dueDate}\n\nPlease make a payment as soon as possible to avoid further penalties.`;
+      text = `Dear customer,
+
+This is a notification that your loan for ${loan.product} is currently overdue. 
+
+Outstanding Amount: ${formatCurrency(loan.outstanding)}
+Due Date: ${loan.dueDate}
+
+Please make a payment as soon as possible to avoid further penalties.`;
     } else {
-      text = `Hello,\n\nThis is a reminder regarding your loan for ${loan.product}.\n\nOutstanding Amount: ${formatCurrency(loan.outstanding)}\nDue Date: ${loan.dueDate}\n\nThank you.`;
+      text = `Hello,
+
+This is a reminder regarding your loan for ${loan.product}.
+
+Outstanding Amount: ${formatCurrency(loan.outstanding)}
+Due Date: ${loan.dueDate}
+
+Thank you.`;
     }
 
     const result = await emailService.sendCustomerEmail({
@@ -1227,7 +1265,7 @@ async function notifyUser(req, res) {
   try {
     const { email } = req.body || {};
     const authRole = req.authUser?.role;
-    if (authRole !== 'admin' && authRole !== 'store_admin') {
+    if (authRole === 'admin') {
       return res.status(403).json({ error: 'Admin access required.' });
     }
     const target = String(email || '').trim().toLowerCase();
@@ -1249,16 +1287,34 @@ async function notifyUser(req, res) {
     }
 
     const activeLoans = loans.filter(loan => Number(loan.outstanding || 0) > 0);
+    const totalInterestAdded = loans.reduce((sum, loan) => sum + Number(loan.graceInterestAdded || 0), 0);
+
+    const today = new Date().toISOString().slice(0, 10);
+    activeLoans.forEach(loan => {
+      const interestBefore = Number(loan.graceAccrued || 0);
+      applyGraceAccrual(loan, today);
+      const interestAfter = Number(loan.graceAccrued || 0);
+      const interestAdded = Number((interestAfter - interestBefore).toFixed(2));
+      Object.assign(loan, { graceInterestBefore: interestBefore, graceInterestAfter: interestAfter, graceInterestAdded: interestAdded });
+      const outstanding = Number(loan.outstanding || 0);
+      return `- ${loan.product || 'Loan'} ${loan.receiptNumber || `#${loan.id}`}: outstanding ${formatCurrency(outstanding)}, due ${loan.dueDate || 'date unavailable'}, grace interest: K ${preciseCurrency(interestAdded)} (1.8%/day)`;
+    });
+
     const outstandingTotal = activeLoans.reduce((sum, loan) => sum + Number(loan.outstanding || 0), 0);
     const loanDetails = activeLoans.map(loan =>
       `- ${loan.product || 'Loan'} ${loan.receiptNumber || `#${loan.id}`}: ` +
       `outstanding ${formatCurrency(loan.outstanding)}, due ${loan.dueDate || 'date unavailable'}`
     ).join('\n');
+// Grace interest already calculated - display with 1.8%/day accrual rate
+    const loanDetailsWithInterest = activeLoans.map(loan =>
+      `- ${loan.product || 'Loan'} ${loan.receiptNumber || `#${loan.id}`}: ` +
+      `outstanding ${formatCurrency(loan.outstanding)}, due ${loan.dueDate || 'date unavailable'}, grace interest: K ${preciseCurrency(loan.graceInterestAdded || 0)} (1.8%/day)`
+    ).join('\n');
 
     const subject = 'BMF Loan Reminder';
     const text = `Hello,\n\nThis is a reminder from Buraza Micro Finance (BMF) regarding your loan account.\n\n` +
       (activeLoans.length
-        ? `Open balance(s):\n${loanDetails}\n\nTotal outstanding: ${formatCurrency(outstandingTotal)}\n\nKindly settle the outstanding balance to continue enjoying the BMF loan service.\n`
+        ? `Open balance(s):\n${loanDetailsWithInterest}\n\nTotal outstanding: ${formatCurrency(outstandingTotal)}\n\nKindly settle the outstanding balance to continue enjoying the BMF loan service.\n`
         : `Our records show no open balance on your account. Thank you for staying up to date.\n`) +
       `\nRegards,\nBuraza Micro Finance (BMF), a Pryme Vertex subsidiary.`;
 
@@ -1322,7 +1378,15 @@ async function notifyAllOverdue(req, res) {
       const result = await emailService.sendCustomerEmail({
         to: email,
         subject: 'Buraza Micro Finance (BMF): overdue loan notice',
-        text: `Dear customer,\n\nOur records show the following Buraza loan balance(s) are overdue:\n${loanDetails}\n\nPlease contact Buraza Micro Finance to arrange payment. If you have already paid, please disregard this notice.\n\nRegards,\nBuraza Micro Finance (BMF), a Pryme Vertex subsidiary.`
+        text: `Dear customer,
+
+Our records show the following Buraza loan balance(s) are overdue:
+${loanDetails}
+
+Please contact Buraza Micro Finance to arrange payment. If you have already paid, please disregard this notice.
+
+Regards,
+Buraza Micro Finance (BMF), a Pryme Vertex subsidiary.`
       });
       if (result?.ok) sent += 1;
       else { failed += 1; failureReasons.push(String(result?.reason || 'Delivery failed.').slice(0, 240)); }

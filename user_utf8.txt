@@ -1,0 +1,1457 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrymeBMF — My Account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="style.css?v=20261017-shared-theme-refresh">
+  <style>
+    body.customer-portal { background:#0d1117; color:#e6edf3; }
+    .customer-portal .dashboard { width: 100%; max-width: 100vw; margin: 0; padding: 18px clamp(12px, 3vw, 24px); box-sizing: border-box; }
+    .customer-portal .dash-header { display:flex; align-items:center; justify-content:space-between; min-height:44px; }
+    .customer-portal .brand { margin:0; font-size:20px; }
+    .customer-portal .loan-tabs { display:flex; align-items:center; gap:8px; overflow-x:auto; padding:8px 0 14px; border-bottom:1px solid #30363d; }
+    .customer-portal .loan-tab { border:0; border-radius:7px; padding:10px 16px; white-space:nowrap; color:#8b949e; background:transparent; }
+    .customer-portal .loan-tab.active { color:white; background:#2f81f7; }
+    .customer-portal .screen-section { padding-top:16px; }
+    .customer-portal .welcome-card,.customer-portal .board-card,.customer-portal .loan-summary-card,.customer-portal .panel { background:#161b22; border:1px solid #30363d; border-radius:10px; box-shadow:none; }
+    .customer-portal .welcome-card { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 24px; margin-bottom:18px; border-left:4px solid #2f81f7; }
+    .customer-portal .welcome-card h2 { margin:0 0 5px; font-size:20px; }
+    .customer-portal .welcome-card p { margin:0; color:#8b949e; }
+    .customer-portal .standing-badge { color:#3fb950; border:1px solid #238636; border-radius:20px; padding:8px 13px; white-space:nowrap; }
+    .customer-portal .portal-kpis { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:0 0 18px; }
+    .customer-portal .portal-kpis .loan-summary-card { padding:17px 20px; }
+    .customer-portal .portal-kpis h3 { font-size:12px; color:#8b949e; text-transform:uppercase; letter-spacing:.05em; }
+    .customer-portal .portal-kpis .summary-value { font-size:26px; font-weight:700; margin:6px 0; }
+    .customer-portal .portal-kpis .summary-label { color:#8b949e; }
+    .customer-portal #statusSummaryCards { display:none; }
+    .customer-portal .board-card { padding:18px; margin-bottom:16px; }
+    .customer-portal .overview-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+    .customer-portal .summary-inline-card { background:#1c2128; border:1px solid #30363d; border-radius:9px; padding:15px; }
+    .customer-portal .history-filters { display:none; }
+    .customer-portal .loan-list { padding:0; list-style:none; }
+    .customer-portal .loan-card { background:#161b22; border:1px solid #30363d; border-radius:10px; margin:10px 0; padding:16px; cursor:pointer; }
+    .customer-portal .loan-meta { color:#8b949e; margin-top:9px; }
+    .customer-portal .request-field-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .customer-portal .request-field-grid:first-child { grid-template-columns:1fr; }
+    .customer-portal .field-label { display:block; margin-bottom:6px; }
+    @media(max-width:650px) { .customer-portal .dashboard{padding:12px}.customer-portal .portal-kpis,.customer-portal .overview-grid{grid-template-columns:1fr}.customer-portal .welcome-card{align-items:flex-start;flex-direction:column}.customer-portal .request-field-grid{grid-template-columns:1fr} }
+
+    /*── PrymeBMF — BMF Master Fidelity skin ─────────────────── */
+    *, *::before, *::after, html, body { font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif; }
+    .customer-portal .standing-badge.warn { color:#d29922; border-color:#9e6a03; }
+    .customer-portal .standing-badge.alert { color:#f85149; border-color:#da3633; }
+
+    /* Request lock box overlay */
+    .customer-portal .request-lock-box {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(4px);
+    }
+    .customer-portal .request-lock-box.hidden { display: none; }
+    .customer-portal .lock-box-content {
+      text-align: center;
+      padding: 32px 24px;
+      border-radius: 14px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+      max-width: 360px;
+      width: 90vw;
+    }
+    .customer-portal .lock-icon { font-size: 48px; margin-bottom: 16px; }
+    .customer-portal .lock-heading {
+      margin: 0 0 12px;
+      font-size: 18px;
+      color: #f85149;
+    }
+    .customer-portal .lock-message {
+      margin: 0 0 24px;
+      color: #8b949e;
+      line-height: 1.5;
+    }
+    .customer-portal .lock-close-btn {
+      background: #da3633;
+      color: white;
+      border: none;
+      border-radius: 7px;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .customer-portal .lock-close-btn:hover { background: #f85149; }
+
+    /* Record Payment button on loan cards */
+    .customer-portal .record-payment-btn {
+      background: #2f81f7;
+      color: white;
+      border: none;
+      border-radius: 7px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .customer-portal .record-payment-btn:hover { background: #3b93f9; }
+
+    /* Support sub-list */
+    .customer-portal .support-sub-list {
+      list-style: none;
+      padding: 0;
+      margin: 16px 0 0;
+      border-top: 1px solid #30363d;
+      padding-top: 16px;
+    }
+    .customer-portal .support-sub-list li {
+      margin: 8px 0;
+    }
+    .customer-portal .support-sub-list .support-link {
+      background: transparent;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      border-radius: 7px;
+      padding: 10px 16px;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .customer-portal .support-sub-list .support-link:hover {
+      background: #1c2128;
+      color: #e6edf3;
+      border-color: #484f58;
+    }
+  </style>
+</head>
+<body class="customer-portal">
+  <div id="bmfToast" class="bmf-toast" role="status" aria-live="polite"></div>
+  <button class="menu-toggle" id="menuBtn">⋮</button>
+  <div class="dropdown-menu" id="menuDropdown">
+    <button class="menu-action" data-view="loans">Loans</button>
+    <button class="menu-action" data-view="payments">Record Payment</button>
+    <button class="menu-action" data-view="support">Support</button>
+    <button id="logoutBtn">Logout</button>
+  </div>
+  <button class="toggle-mode" id="modeBtn">Switch Mode</button>
+
+  <div class="dashboard">
+    <div class="dash-header">
+      <h1 class="brand animated-text">PrymeBMF</h1>
+    </div>
+
+    <div class="loan-tabs">
+      <button class="loan-tab active" data-tab="summary">Loan Summary</button>
+      <button class="loan-tab" data-tab="loans">My Loans</button>
+      <button class="loan-tab" data-tab="request">New Request</button>
+      <button class="loan-tab" data-tab="payments">Record Payment &amp; Support</button>
+      <button class="loan-tab" data-tab="reports">Reports</button>
+    </div>
+
+    <div class="screen-sections">
+      <div id="summarySection" class="screen-section active">
+        <div class="welcome-card">
+          <div><h2><span id="greetingLabel">Welcome back</span>, <span id="welcomeName">--</span> 👋</h2><p>Logged in as <span id="welcomeAccount">--</span> · Buraza Micro Finance</p></div>
+          <span class="standing-badge" id="standingBadge">Account status</span>
+        </div>
+        <div class="loan-summary-grid portal-kpis">
+          <div class="loan-summary-card">
+            <h3>Total loans</h3>
+            <p class="summary-value" id="loanTotal">0</p>
+            <p class="summary-label" id="totalRequestedLabel">K 0.00 total requested</p>
+          </div>
+          <div class="loan-summary-card">
+            <h3>Outstanding</h3>
+            <p class="summary-value" id="loanOutstanding">K 0.00</p>
+            <p class="summary-label">Balance remaining</p>
+          </div>
+          <div class="loan-summary-card">
+            <h3>Settled</h3>
+            <p class="summary-value" id="loanSettled">0</p>
+            <p class="summary-label" id="settledTotalLabel">K 0.00 fully paid</p>
+          </div>
+        </div>
+        <div class="loan-summary-grid" id="statusSummaryCards">
+          <div class="loan-summary-card">
+            <h3>Pending</h3>
+            <p class="summary-value" id="loanPending">0</p>
+          </div>
+          <div class="loan-summary-card">
+            <h3>Running</h3>
+            <p class="summary-value" id="loanRunning">0</p>
+          </div>
+          <div class="loan-summary-card">
+            <h3>Closed</h3>
+            <p class="summary-value" id="loanClosed">0</p>
+          </div>
+        </div>
+        <div class="board-card loan-overview-card">
+          <h3>Loan Overview</h3>
+          <div id="overviewSummary" class="overview-grid"></div>
+          <div class="notification-panel"><h3>Notifications</h3><ul id="customerNotifications"><li>Loading notifications…</li></ul></div>
+        </div>
+      </div>
+
+      <div id="loansSection" class="screen-section hidden">
+        <div class="loan-filters">
+          <button class="loan-filter active" data-filter="all">All</button>
+          <button class="loan-filter" data-filter="pending">Pending</button>
+          <button class="loan-filter" data-filter="running">Running</button>
+          <button class="loan-filter" data-filter="closed">Closed</button>
+        </div>
+        <div class="loan-filters history-filters">
+          <button class="history-filter" data-range="today">Today</button>
+          <button class="history-filter" data-range="yesterday">Yesterday</button>
+          <button class="history-filter" data-range="7">Last 7 days</button>
+          <button class="history-filter" data-range="30">Last 30 days</button>
+          <button class="history-filter" data-range="month">This month</button>
+          <button class="history-filter" data-range="year">This year</button>
+          <button class="history-filter active" data-range="all">All time</button>
+        </div>
+        <ul class="loan-list" id="loan-list"></ul>
+        <div id="loanDetailPanel" class="loan-detail-panel hidden"></div>
+      </div>
+
+      <div id="paymentsSection" class="screen-section hidden">
+        <div class="board-card">
+          <h2>Record Payment &amp; Support</h2>
+          <p>To record a payment, open a running loan and submit your payment proof. Track your payment history or contact BMF below.</p>
+          <div class="loan-filters support-tabs" role="tablist" aria-label="Payments and support">
+            <button type="button" class="loan-filter active" data-support-view="history">Payment History</button>
+            <button type="button" class="loan-filter" data-support-view="inquiry">Inquiries</button>
+            <button type="button" class="loan-filter" data-support-view="record-payment">Record Payment</button>
+            <button type="button" class="loan-filter" data-support-view="schedule">Due Schedule</button>
+            <button type="button" class="toggle-mode support-refresh" id="refreshSupportBtn">Refresh</button>
+          </div>
+          <p id="supportMessage" class="message-text" role="status"></p>
+          <section data-support-panel="history">
+          <div class="overview-grid" id="paymentSummary"></div>
+          <div class="table-scroll"><table class="customer-payment-table"><thead><tr><th>Date</th><th>Loan</th><th>Amount</th><th>Method</th><th>Receipt</th><th>Proof</th></tr></thead><tbody id="customerPaymentHistory"></tbody></table></div>
+          </section>
+          <section data-support-panel="inquiry" class="hidden">
+            <h3>Submit an Inquiry</h3>
+            <form id="customerInquiryForm" class="auth-form">
+              <div class="request-field-grid two-up">
+                <label class="field-label">Inquiry type<select id="inquiryType" class="auth-input" required><option value="">Select type...</option><option>Payment not recorded</option><option>Balance discrepancy</option><option>Loan status query</option><option>Extension request</option><option>Receipt request</option><option>Other</option></select></label>
+                <label class="field-label">Related loan ID (optional)<select id="inquiryLoanId" class="auth-input"><option value="">Choose a loan...</option></select></label>
+              </div>
+              <label class="field-label">Details<textarea id="inquiryDetails" class="auth-input" rows="4" required placeholder="Tell us how we can help."></textarea></label>
+              <button class="enter-btn" type="submit" id="submitInquiryBtn">Submit Inquiry</button>
+            </form>
+            <h3>Previous Inquiries</h3><div id="customerInquiryHistory"><p>Loading inquiries...</p></div>
+          </section>
+          <section data-support-panel="record-payment" class="hidden">
+            <h3>Record Payment</h3>
+            <p>Record a payment against an active loan. Your expected balance is locked from your loan record — enter the amount you paid and the receipt number. <strong>Find your receipt number in My Loans.</strong></p>
+            <form id="customerRecordPaymentForm" class="auth-form">
+              <div class="request-field-grid two-up">
+                <label class="field-label">Loan<select id="recordPaymentLoanId" class="auth-input" required><option value="">Choose a loan...</option></select></label>
+                <label class="field-label">Expected balance (K)<input id="recordPaymentExpectedBalance" class="auth-input" type="number" min="0" step="0.01" readonly required></label>
+              </div>
+              <div class="request-field-grid two-up">
+                <label class="field-label">Amount paid (K)<input id="recordPaymentAmount" class="auth-input" type="number" min="0.01" step="0.01" required placeholder="Amount you paid"></label>
+                <label class="field-label">Receipt number<input id="recordPaymentReceipt" class="auth-input" required placeholder="e.g. PAY-YYYYMMDD-0001"></label>
+              </div>
+              <div class="request-field-grid two-up">
+                <label class="field-label">Transfer method<select id="recordPaymentMode" class="auth-input" required><option value="">Select method...</option><option>Airtel Money</option><option>MTN MoMo</option><option>Bank Transfer</option><option>Cash</option><option>Other</option></select></label>
+                <label class="field-label">Payment proof (optional)<input id="recordPaymentProof" class="auth-input" type="file" accept="image/jpeg,image/png,image/webp"></label>
+              </div>
+              <label class="field-label">Notes (optional)<textarea id="recordPaymentNotes" class="auth-input" rows="3" placeholder="Any notes for the payment team."></textarea></label>
+              <button class="enter-btn" type="submit">Record Payment</button>
+            </form>
+          </section>
+          <section class="hidden support-extra">
+            <h3>More options</h3>
+            <ul class="support-sub-list">
+              <li><button type="button" class="menu-action support-link" data-view="reports">Reports</button></li>
+              <li><button type="button" class="menu-action support-link" data-view="complaints">Complaints</button></li>
+              <li><button type="button" class="menu-action support-link" data-view="inquiries">Inquiries</button></li>
+              <li><button type="button" class="menu-action support-link" data-view="experience">Experience</button></li>
+              <li><button type="button" class="menu-action support-link" data-view="about">About</button></li>
+            </ul>
+          </section>
+          <section data-support-panel="schedule" class="hidden"><h3>Due Schedule</h3><div id="customerDueSchedule"></div></section>
+        </div>
+      </div>
+
+      <div id="reportsSection" class="screen-section hidden">
+        <div class="board-card"><div class="section-heading"><div><h2>My account report</h2><p>Loan totals and repayment history from your account.</p></div><button type="button" id="refreshCustomerReport" class="toggle-mode">Refresh report</button></div>
+          <div id="customerReportSummary" class="overview-grid"></div>
+          <div class="table-scroll"><table class="customer-payment-table"><thead><tr><th>Loan receipt</th><th>Purpose</th><th>Status</th><th>Borrowed</th><th>Outstanding</th></tr></thead><tbody id="customerReportLoans"></tbody></table></div>
+          <h3>Repayment records</h3><div class="table-scroll"><table class="customer-payment-table"><thead><tr><th>Date</th><th>Loan receipt</th><th>Amount</th><th>Method</th><th>Payment receipt</th><th>Proof</th></tr></thead><tbody id="customerReportPayments"></tbody></table></div>
+        </div>
+      </div>
+
+      <div id="complaintsSection" class="screen-section hidden">
+        <div class="board-card">
+          <h2>Customer Feedback</h2>
+          <div class="request-field-grid two-up compact-row">
+            <label class="field-label" for="feedbackCategory">Feedback type</label>
+            <select id="feedbackCategory" class="auth-input">
+              <option value="complaint">Complaint</option>
+              <option value="improvement">Improvement</option>
+              <option value="inquiry">Inquiry</option>
+              <option value="experience">Experience</option>
+            </select>
+          </div>
+          <textarea id="complaintMessage" class="auth-input" rows="6" placeholder="Tell us what you want fixed, improved, or clarified in the system."></textarea>
+          <button type="button" class="enter-btn" id="submitComplaintBtn">Send Feedback</button>
+          <p id="complaintMessageText" class="message-text"></p>
+        </div>
+      </div>
+
+      <div id="aboutSection" class="screen-section hidden">
+        <div class="board-card">
+          <h2>About You</h2>
+          <div id="aboutUserDetails" class="about-user-grid"></div>
+        </div>
+      </div>
+
+      <div id="requestSection" class="screen-section hidden">
+        <div class="panel">
+          <h2>Request New Loan</h2>
+          <form id="loanRequestForm" class="auth-form" enctype="multipart/form-data">
+            <div class="request-field-grid">
+              <input type="text" id="loanProduct" placeholder="Loan purpose" required class="auth-input">
+              <input type="number" id="loanAmount" placeholder="Amount" min="1" required class="auth-input">
+            </div>
+
+            <div class="request-field-grid two-up">
+              <div class="timeframe-field">
+                <label class="field-label" for="loanDueDate">Timeframe</label>
+                <div class="timeframe-toggle" role="group" aria-label="Choose timeframe mode">
+                  <button type="button" class="timeframe-mode-btn active" data-mode="weeks">Weeks</button>
+                  <button type="button" class="timeframe-mode-btn" data-mode="date">Custom date</button>
+                </div>
+              </div>
+              <select id="loanUrgency" class="auth-input">
+                <option value="low">Low urgency</option>
+                <option value="standard" selected>Standard</option>
+                <option value="urgent">Urgent</option>
+                <option value="emergency">Emergency</option>
+              </select>
+            </div>
+
+            <div class="request-field-grid two-up compact-row">
+              <input type="date" id="loanDueDate" class="auth-input" disabled>
+              <select id="loanTenureWeeks" class="auth-input">
+                <option value="1">1 week</option>
+                <option value="2" selected>2 weeks</option>
+                <option value="3">3 weeks</option>
+                <option value="4">4 weeks</option>
+              </select>
+            </div>
+
+            <div class="request-field-grid two-up compact-row">
+              <select id="loanPaymentMode" class="auth-input">
+                <option value="">Payment mode (optional)</option>
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank transfer</option>
+                <option value="mobile_money">Mobile money</option>
+                <option value="salary_deduction">Salary deduction</option>
+                <option value="custom">Custom</option>
+              </select>
+              <input type="text" id="loanCustomPaymentMode" class="auth-input hidden" placeholder="Custom payment mode">
+            </div>
+
+            <input type="text" id="loanCollateralDescription" class="auth-input" placeholder="Collateral description">
+
+            <div class="upload-stack">
+              <div class="upload-field-wrap">
+                <label class="field-label" for="loanNrcFront">NRC front image (clear and readable) *</label>
+                <input type="file" id="loanNrcFront" accept="image/jpeg,image/png,image/webp" required class="auth-input file-input">
+                <img id="loanNrcFrontPreview" class="document-preview hidden" alt="NRC front preview">
+              </div>
+              <div class="upload-field-wrap">
+                <label class="field-label" for="loanNrcBack">NRC back image (clear and readable) *</label>
+                <input type="file" id="loanNrcBack" accept="image/jpeg,image/png,image/webp" required class="auth-input file-input">
+                <img id="loanNrcBackPreview" class="document-preview hidden" alt="NRC back preview">
+              </div>
+            </div>
+
+            <div class="upload-stack">
+              <div class="upload-field-wrap">
+                <label class="field-label" for="loanCollateralFront">Collateral front image</label>
+                <input type="file" id="loanCollateralFront" accept="image/*" class="auth-input file-input">
+              </div>
+              <div class="upload-field-wrap">
+                <label class="field-label" for="loanCollateralBack">Collateral back image</label>
+                <input type="file" id="loanCollateralBack" accept="image/*" class="auth-input file-input">
+              </div>
+            </div>
+
+            <select id="loanCollateralGrade" class="auth-input">
+              <option value="">Collateral grade (optional)</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+            </select>
+
+            <div class="loan-estimate-box" aria-live="polite">
+              <div><span>Rate</span> <strong id="loanRateDisplay">16%</strong></div>
+              <div><span>Interest</span> <strong id="loanInterestDisplay">K0</strong></div>
+              <div><span>Total</span> <strong id="loanTotalDisplay">K0</strong></div>
+              <div><span>Approval target</span> <strong id="loanApprovalDisplay">48h</strong></div>
+            </div>
+
+            <details class="terms-box" aria-live="polite">
+              <summary>Read more</summary>
+              <ul>
+                <li>I confirm the loan purpose and amount requested are true and necessary for my stated need.</li>
+                <li>I understand the approved amount, interest rate, total repayment, and repayment due date are based on my selected timeframe and urgency.</li>
+                <li>I agree to repay the full approved amount on or before the agreed due date, and I accept that unpaid balances may be recorded as outstanding.</li>
+                <li>I understand that all submitted information, supporting documents, and collateral details are provided honestly and may be reviewed by the platform or admin team.</li>
+                <li>I accept that approval is subject to review and that the platform may request additional information before processing.</li>
+                <li>I will not misrepresent my identity, documents, or repayment ability. BMF will review my NRC images for this loan request.</li>
+              </ul>
+            </details>
+
+            <label class="checkbox-row">
+              <input type="checkbox" id="loanAgreeTerms" required>
+              <span>I have read, understood, and agree to these terms and conditions before submitting this request.</span>
+            </label>
+            <button type="submit" class="enter-btn">Submit Request</button>
+          </form>
+          <p id="loanRequestMessage" class="message-text"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const deviceToken = localStorage.getItem('deviceToken');
+    localStorage.setItem('lastAppPage', 'user.html');
+    const savedMode = localStorage.getItem('mode') || 'dark';
+    applyTheme(savedMode);
+
+    async function handleInvalidDeviceToken() {
+      localStorage.removeItem('deviceToken');
+      localStorage.removeItem('username');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('userRole');
+      window.location.href = 'login.html';
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.classList.remove('dark', 'light');
+      document.body.classList.remove('dark', 'light');
+      document.documentElement.classList.add(theme);
+      document.body.classList.add(theme);
+    }
+
+    document.getElementById('modeBtn').addEventListener('click', function() {
+      const body = document.body;
+      const nextMode = body.classList.contains('dark') ? 'light' : 'dark';
+      applyTheme(nextMode);
+      localStorage.setItem('mode', nextMode);
+    });
+
+    const username = localStorage.getItem('username') || 'User';
+    const userEmail = localStorage.getItem('userEmail');
+    const userRole = localStorage.getItem('userRole') || 'user';
+    const isNewSignup = localStorage.getItem('newSignup') === 'true';
+    const justCreated = isNewSignup; // naming clarity for first-time flow
+
+    let toastTimer;
+    function showBmfToast(message, kind = 'success') {
+      const node = document.getElementById('bmfToast');
+      if (!node) return;
+      node.textContent = message;
+      node.dataset.kind = kind;
+      node.classList.add('visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => node.classList.remove('visible'), 4200);
+    }
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    }
+    function previewDocument(inputId, previewId) {
+      const input = document.getElementById(inputId);
+      const preview = document.getElementById(previewId);
+      input?.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (!file) { preview?.classList.add('hidden'); preview?.removeAttribute('src'); return; }
+        if (!/^image\/(jpeg|png|webp)$/i.test(file.type) || file.size > 5 * 1024 * 1024) {
+          input.value = '';
+          preview?.classList.add('hidden');
+          showBmfToast('Choose a JPG, PNG, or WEBP image up to 5 MB.', 'error');
+          return;
+        }
+        preview.src = URL.createObjectURL(file);
+        preview.classList.remove('hidden');
+      });
+    }
+    previewDocument('loanNrcFront', 'loanNrcFrontPreview');
+    previewDocument('loanNrcBack', 'loanNrcBackPreview');
+
+
+    document.getElementById('welcomeName').textContent = username;
+    document.getElementById('welcomeAccount').textContent = username;
+
+    if (isNewSignup) {
+      document.getElementById('greetingLabel').textContent = 'Welcome Aboard!';
+      localStorage.removeItem('newSignup');
+    } else {
+      document.getElementById('greetingLabel').textContent = 'Welcome Back';
+    }
+    if (localStorage.getItem('justLoggedIn') === 'true') {
+      showBmfToast('Signed in successfully. Your account is ready.');
+      localStorage.removeItem('justLoggedIn');
+    }
+
+    function formatKwacha(value) {
+      const amount = Number(value) || 0;
+      return `K ${amount.toLocaleString('en-ZM', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function formatDateDisplay(dateValue) {
+      if (!dateValue) return '';
+      const date = new Date(dateValue);
+      if (Number.isNaN(date.getTime())) return dateValue;
+      return date.toLocaleDateString('en-GB');
+    }
+
+    const dueDateInput = document.getElementById('loanDueDate');
+    const tenureSelect = document.getElementById('loanTenureWeeks');
+    const urgencySelect = document.getElementById('loanUrgency');
+    const amountInput = document.getElementById('loanAmount');
+    const timeframeButtons = document.querySelectorAll('.timeframe-mode-btn');
+
+    function getSelectedWeeksFromDate() {
+      if (!dueDateInput.value) return Number(tenureSelect.value) || 1;
+      const selectedDate = new Date(`${dueDateInput.value}T00:00:00`);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffDays = Math.max(1, Math.ceil((selectedDate - today) / (1000 * 60 * 60 * 24)));
+      return Math.min(4, Math.max(1, Math.ceil(diffDays / 7)));
+    }
+
+    function getLoanEstimate() {
+      const amount = Number(amountInput.value) || 0;
+      const weeks = dueDateInput.disabled ? (Number(tenureSelect.value) || 1) : getSelectedWeeksFromDate();
+      const rates = { 1: 10, 2: 16, 3: 24, 4: 32 };
+      const rate = rates[weeks] || 10;
+      const interest = amount * (rate / 100);
+      const total = amount + interest;
+      const approvalHours = { low: 72, standard: 48, urgent: 24, emergency: 4 };
+      const urgency = (urgencySelect.value || 'standard').toLowerCase();
+      const approvalTarget = approvalHours[urgency] || 48;
+      return { rate, interest, total, approvalTarget, weeks };
+    }
+
+    function setTimeframeMode(mode) {
+      const isDateMode = mode === 'date';
+      dueDateInput.disabled = !isDateMode;
+      dueDateInput.setAttribute('aria-disabled', String(!isDateMode));
+      if (!isDateMode) {
+        dueDateInput.value = '';
+      }
+      tenureSelect.disabled = isDateMode;
+      tenureSelect.setAttribute('aria-disabled', String(isDateMode));
+
+      timeframeButtons.forEach(button => {
+        const isActive = button.dataset.mode === mode;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+      });
+    }
+
+    function updateLoanEstimateDisplay() {
+      const estimate = getLoanEstimate();
+      document.getElementById('loanRateDisplay').textContent = `${estimate.rate}%`;
+      document.getElementById('loanInterestDisplay').textContent = formatKwacha(estimate.interest);
+      document.getElementById('loanTotalDisplay').textContent = formatKwacha(estimate.total);
+      document.getElementById('loanApprovalDisplay').textContent = `${estimate.approvalTarget}h`;
+    }
+
+    amountInput.addEventListener('input', updateLoanEstimateDisplay);
+    tenureSelect.addEventListener('change', updateLoanEstimateDisplay);
+    dueDateInput.addEventListener('change', updateLoanEstimateDisplay);
+    urgencySelect.addEventListener('change', updateLoanEstimateDisplay);
+
+    timeframeButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        setTimeframeMode(button.dataset.mode);
+        updateLoanEstimateDisplay();
+      });
+    });
+
+    setTimeframeMode('weeks');
+    updateLoanEstimateDisplay();
+
+    const paymentModeSelect = document.getElementById('loanPaymentMode');
+    const customPaymentMode = document.getElementById('loanCustomPaymentMode');
+
+    function toggleCustomPaymentMode() {
+      const showCustom = paymentModeSelect.value === 'custom';
+      customPaymentMode.classList.toggle('hidden', !showCustom);
+      customPaymentMode.required = showCustom;
+      if (!showCustom) customPaymentMode.value = '';
+    }
+
+    paymentModeSelect.addEventListener('change', toggleCustomPaymentMode);
+
+    document.getElementById('loanRequestForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const messageEl = document.getElementById('loanRequestMessage');
+      messageEl.textContent = '';
+      const product = document.getElementById('loanProduct').value.trim();
+      const amount = document.getElementById('loanAmount').value;
+      const dueDate = document.getElementById('loanDueDate').value;
+      const selectedWeeks = Number(document.getElementById('loanTenureWeeks').value) || 1;
+      const urgency = document.getElementById('loanUrgency').value;
+      const agreedToTerms = document.getElementById('loanAgreeTerms').checked;
+      const collateralDescription = document.getElementById('loanCollateralDescription').value.trim();
+      const collateralGrade = document.getElementById('loanCollateralGrade').value || '';
+      const deviceToken = localStorage.getItem('deviceToken');
+      const computedWeeks = dueDate ? getSelectedWeeksFromDate() : selectedWeeks;
+      const chosenPaymentMode = paymentModeSelect.value === 'custom'
+        ? (customPaymentMode.value.trim() || 'Custom')
+        : paymentModeSelect.value;
+
+      if (!product || !amount || (!dueDate && !selectedWeeks) || !urgency) {
+        messageEl.textContent = 'Please fill all required loan request fields.';
+        return;
+      }
+
+      if (!dueDate && !selectedWeeks) {
+        messageEl.textContent = 'Choose either a custom due date or a fixed duration.';
+        return;
+      }
+
+      if (!agreedToTerms) {
+        messageEl.textContent = 'You must agree to the loan terms to continue.';
+        return;
+      }
+
+      if (!deviceToken) {
+        messageEl.textContent = 'Device token missing. Please login again.';
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('email', userEmail);
+        formData.append('product', product);
+        formData.append('amount', amount);
+        formData.append('dueDate', dueDate || new Date(Date.now() + computedWeeks * 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+        formData.append('tenureWeeks', String(computedWeeks));
+        formData.append('urgency', urgency);
+        formData.append('agreedToTerms', String(agreedToTerms));
+        formData.append('paymentMode', chosenPaymentMode || '');
+        formData.append('collateralDescription', collateralDescription || '');
+        formData.append('collateralGrade', collateralGrade || '');
+
+        const frontFile = document.getElementById('loanCollateralFront').files[0];
+        const backFile = document.getElementById('loanCollateralBack').files[0];
+        const nrcFront = document.getElementById('loanNrcFront').files[0];
+        const nrcBack = document.getElementById('loanNrcBack').files[0];
+        if (!nrcFront || !nrcBack || nrcFront.size > 5 * 1024 * 1024 || nrcBack.size > 5 * 1024 * 1024) {
+          messageEl.textContent = 'Attach both NRC images. Each image must be 5 MB or smaller.';
+          return;
+        }
+        if (frontFile) formData.append('collateralFront', frontFile);
+        if (backFile) formData.append('collateralBack', backFile);
+        formData.append('nrcFront', nrcFront);
+        formData.append('nrcBack', nrcBack);
+
+        const res = await fetch('/loans/request', {
+          method: 'POST',
+          headers: { 'x-device-token': deviceToken },
+          body: formData
+        });
+        const data = await res.json();
+        if (data.error) {
+          messageEl.textContent = data.error;
+        } else {
+          messageEl.textContent = data.message || 'Request submitted.';
+          showBmfToast(data.message || 'BMF success: loan request submitted.');
+          document.getElementById('loanRequestForm').reset();
+          document.getElementById('loanTenureWeeks').value = '2';
+          document.getElementById('loanUrgency').value = 'standard';
+          paymentModeSelect.value = '';
+          toggleCustomPaymentMode();
+          setTimeframeMode('weeks');
+          updateLoanEstimateDisplay();
+          loadLoans(currentHistoryFilter);
+        }
+      } catch (err) {
+        messageEl.textContent = 'Unable to send loan request. Try again later.';
+      }
+    });
+
+    let allLoans = [];
+    let currentLoanFilter = 'all';
+    let currentHistoryFilter = 'all';
+
+    function setOverviewSection(sectionKey) {
+      document.querySelectorAll('.screen-section').forEach(section => {
+        const isMatch = section.id === `${sectionKey}Section`;
+        section.classList.toggle('hidden', !isMatch);
+      });
+      localStorage.setItem('lastUserView', sectionKey);
+
+      if (sectionKey === 'payments') {
+        setActiveLoanTab('payments');
+        renderPaymentOverview();
+        return;
+      }
+      if (sectionKey === 'reports') {
+        setActiveLoanTab('reports');
+        return;
+      }
+
+      if (sectionKey === 'about') {
+        renderAboutSection();
+      }
+    }
+
+    function setActiveLoanTab(tab) {
+      // Lock gate: block New Request if user has any unsettled loans
+      if (tab === 'request') {
+        const unsettled = allLoans.filter(loan =>
+          ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan)) && Number(loan.outstanding || 0) > 0
+        );
+        if (unsettled.length > 0) {
+          showRequestLockBox();
+          return;
+        }
+      }
+      localStorage.setItem('lastUserView', tab);
+      document.querySelectorAll('.loan-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+      document.querySelectorAll('.screen-section').forEach(section => {
+        section.classList.toggle('hidden', section.id !== `${tab}Section`);
+      });
+      if (tab === 'loans') {
+        renderLoanList();
+      }
+      if (tab === 'payments') { renderPaymentOverview(); loadCustomerSupport(); }
+      if (tab === 'reports') loadCustomerReport();
+    }
+
+    function showRequestLockBox() {
+      let box = document.getElementById('requestLockBox');
+      if (!box) {
+        box = document.createElement('div');
+        box.id = 'requestLockBox';
+        box.className = 'request-lock-box';
+        box.innerHTML = `
+          <div class="lock-box-content">
+            <div class="lock-icon">🔒</div>
+            <h2 class="lock-heading">Cannot request a new loan</h2>
+            <p class="lock-message">You must settle your current loan before a new request is allowed.</p>
+            <button class="enter-btn lock-close-btn" onclick="hideRequestLockBox()">Understood</button>
+          </div>
+        `;
+        document.body.appendChild(box);
+      }
+      box.classList.remove('hidden');
+    }
+
+    function hideRequestLockBox() {
+      const box = document.getElementById('requestLockBox');
+      if (box) box.classList.add('hidden');
+    }
+
+    function renderPaymentOverview() {
+      const container = document.getElementById('paymentSummary');
+      if (!container) return;
+
+      const active = allLoans.filter(loan => ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan)));
+      const settled = allLoans.filter(loan => loanStatusOf(loan) === 'paid');
+      const totalActive = active.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
+      const totalSettled = settled.reduce((sum, loan) => sum + (Number(loan.totalRepayment) || Number(loan.amount) || 0), 0);
+      const totalPaid = allLoans.reduce((sum, loan) => sum + (Number(loan.paidTotal) || 0), 0);
+
+      container.innerHTML = `
+        <div class="summary-inline-card">
+          <h3>Paid so far</h3>
+          <p>${allLoans.filter(loan => (Number(loan.paidTotal) || 0) > 0).length}</p>
+          <span>${formatKwacha(totalPaid)}</span>
+        </div>
+        <div class="summary-inline-card">
+          <h3>Active loans</h3>
+          <p>${active.length}</p>
+          <span>${formatKwacha(totalActive)}</span>
+        </div>
+        <div class="summary-inline-card">
+          <h3>Settled</h3>
+          <p>${settled.length}</p>
+          <span>${formatKwacha(totalSettled)}</span>
+        </div>
+        <div class="summary-inline-card">
+          <h3>Total to pay</h3>
+          <p>${active.length + settled.length}</p>
+          <span>${formatKwacha(totalActive + totalSettled)}</span>
+        </div>
+      `;
+      const history = document.getElementById('customerPaymentHistory');
+      const payments = allLoans.flatMap(loan => (Array.isArray(loan.payments) ? loan.payments : []).map(payment => ({ loan, payment })))
+        .sort((a, b) => new Date(b.payment.paymentDate || b.payment.date || 0) - new Date(a.payment.paymentDate || a.payment.date || 0));
+      if (history) history.innerHTML = payments.length ? payments.map(({ loan, payment }) => `<tr><td>${escapeHtml(formatDateDisplay(payment.paymentDate || payment.date))}</td><td>${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</td><td>${formatKwacha(payment.amount)}</td><td>${escapeHtml(payment.mode || 'Payment')}</td><td>${escapeHtml(payment.paymentReceiptId || payment.receiptNumber || '—')}</td><td>${payment.screenshot ? `<a href="#" data-upload-filename="${escapeHtml(payment.screenshot)}">View proof</a>` : '—'}</td></tr>`).join('') : '<tr><td colspan="6">No payments recorded yet.</td></tr>';
+    }
+
+    async function loadCustomerReport() {
+      const summary = document.getElementById('customerReportSummary');
+      const loanRows = document.getElementById('customerReportLoans');
+      const paymentRows = document.getElementById('customerReportPayments');
+      const token = localStorage.getItem('deviceToken');
+      if (!summary || !loanRows || !paymentRows || !userEmail || !token) return;
+      summary.innerHTML = '<p role="status">Refreshing your report…</p>';
+      loanRows.innerHTML = '<tr><td colspan="5">Loading loans…</td></tr>';
+      paymentRows.innerHTML = '<tr><td colspan="6">Loading payments…</td></tr>';
+      try {
+        const response = await fetch(`/reports/user/${encodeURIComponent(userEmail)}`, { headers: { 'x-device-token': token } });
+        const report = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(report.error || 'Unable to load your report.');
+        const totals = report.totals || {};
+        summary.innerHTML = [
+          ['Loans', String(totals.totalLoans || 0)], ['Paid', formatKwacha(totals.totalCollected || 0)],
+          ['Outstanding', formatKwacha(totals.totalOutstanding || 0)], ['Interest booked', formatKwacha(totals.totalInterestBooked || 0)]
+        ].map(([label, value]) => `<div class="summary-inline-card"><h3>${escapeHtml(label)}</h3><p>${escapeHtml(value)}</p></div>`).join('');
+        loanRows.innerHTML = report.loans?.length ? report.loans.map(loan => `<tr><td>${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</td><td>${escapeHtml(loan.product || 'Loan')}</td><td>${escapeHtml(loan.businessStatus || loan.status || 'pending')}</td><td>${escapeHtml(formatDateDisplay(loan.approvedAt || loan.borrowedDate || loan.createdAt))}</td><td>${formatKwacha(loan.outstanding || 0)}</td></tr>`).join('') : '<tr><td colspan="5">No loan records found.</td></tr>';
+        paymentRows.innerHTML = report.payments?.length ? report.payments.slice().reverse().map(payment => `<tr><td>${escapeHtml(formatDateDisplay(payment.paymentDate || payment.date))}</td><td>${escapeHtml(payment.loanReceiptNumber || '')}</td><td>${formatKwacha(payment.amount)}</td><td>${escapeHtml(payment.mode || 'Payment')}</td><td>${escapeHtml(payment.paymentReceiptId || payment.paymentReceiptNumber || '—')}</td><td>${payment.screenshot ? `<a href="#" data-upload-filename="${escapeHtml(payment.screenshot)}">View proof</a>` : '—'}</td></tr>`).join('') : '<tr><td colspan="6">No payment records found.</td></tr>';
+      } catch (error) { summary.textContent = error.message || 'Unable to load your report.'; }
+    }
+
+    async function loadCustomerSupport() {
+      const history = document.getElementById('customerInquiryHistory');
+      const loanSelect = document.getElementById('inquiryLoanId');
+      const schedule = document.getElementById('customerDueSchedule');
+      const token = localStorage.getItem('deviceToken') || '';
+      if (loanSelect) loanSelect.innerHTML = '<option value="">Choose a loan...</option>' + allLoans.map(loan => `<option value="${escapeHtml(loan.id)}">${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)} · ${escapeHtml(loan.product || 'Loan')}</option>`).join('');
+      if (schedule) {
+        const dueLoans = allLoans.filter(loan => Number(loan.outstanding) > 0).sort((a,b) => String(a.dueDate || '').localeCompare(String(b.dueDate || '')));
+        schedule.innerHTML = dueLoans.length ? `<div class="table-scroll"><table class="customer-payment-table"><thead><tr><th>Loan</th><th>Due date</th><th>Balance</th><th>Status</th></tr></thead><tbody>${dueLoans.map(loan => `<tr><td>${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</td><td>${escapeHtml(formatDateDisplay(loan.dueDate))}</td><td>${formatKwacha(loan.outstanding)}</td><td>${escapeHtml(formatStatusLabel(loanStatusOf(loan)))}</td></tr>`).join('')}</tbody></table></div>` : '<p>No outstanding loans.</p>';
+      }
+      if (!history || !token || !userEmail) return false;
+      history.innerHTML = '<p>Loading inquiries…</p>';
+      try {
+        const response = await fetch(`/feedback?email=${encodeURIComponent(userEmail)}`, { headers: { 'x-device-token': token } });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Unable to load inquiries.');
+        const records = Array.isArray(data.feedback) ? data.feedback.slice().reverse() : [];
+        history.innerHTML = records.length ? records.map(item => { const linkedLoan = allLoans.find(loan => String(loan.id) === String(item.relatedLoanId)); return `<article class="loan-card"><strong>${escapeHtml(item.category || 'Inquiry')}${item.relatedLoanId ? ` — ${escapeHtml(linkedLoan?.receiptNumber || `BMF-${item.relatedLoanId}`)}` : ''}</strong><span class="loan-badge ${escapeHtml(item.status || 'new')}">${escapeHtml(formatStatusLabel(item.status || 'new'))}</span><p>${escapeHtml(item.message || '')}</p><small>Submitted: ${escapeHtml(formatDateDisplay(item.createdAt))}${item.reviewNote ? ` · ${escapeHtml(item.reviewNote)}` : ''}</small></article>`; }).join('') : '<p>No previous inquiries.</p>';
+        return true;
+      } catch (error) { history.textContent = error.message || 'Unable to load inquiries.'; return false; }
+    }
+
+    function selectSupportView(view) {
+      document.querySelectorAll('[data-support-panel]').forEach(panel => panel.classList.toggle('hidden', panel.dataset.supportPanel !== view));
+      document.querySelectorAll('[data-support-view]').forEach(button => button.classList.toggle('active', button.dataset.supportView === view));
+    }
+
+    function renderOverviewSummary(loans) {
+      const container = document.getElementById('overviewSummary');
+      if (!container) return;
+
+      const totalRequested = loans.reduce((sum, loan) => sum + (Number(loan.amount) || 0), 0);
+      const totalOutstanding = loans.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
+      const pending = loans.filter(loan => loanStatusOf(loan) === 'pending').length;
+      const active = loans.filter(loan => ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan))).length;
+      const closed = loans.filter(loan => ['paid', 'declined'].includes(loanStatusOf(loan))).length;
+
+      container.innerHTML = `
+        <div class="summary-inline-card">
+          <h3>Total requested</h3>
+          <p>${loans.length}</p>
+          <span>${formatKwacha(totalRequested)}</span>
+        </div>
+        <div class="summary-inline-card">
+          <h3>Outstanding</h3>
+          <p>${pending + active}</p>
+          <span>${formatKwacha(totalOutstanding)}</span>
+        </div>
+        <div class="summary-inline-card">
+          <h3>Settled</h3>
+          <p>${closed}</p>
+          <span>${formatKwacha(loans.reduce((sum, loan) => sum + (Number(loan.totalRepayment) || Number(loan.amount) || 0), 0))}</span>
+        </div>
+      `;
+    }
+
+    function renderAboutSection() {
+      const container = document.getElementById('aboutUserDetails');
+      if (!container) return;
+
+      const user = {
+        name: localStorage.getItem('username') || 'User',
+        email: localStorage.getItem('userEmail') || 'Not available',
+        role: localStorage.getItem('userRole') || 'user',
+        theme: localStorage.getItem('mode') || 'dark'
+      };
+
+      container.innerHTML = `
+        <div class="info-row"><strong>Name:</strong> <span>${escapeHtml(user.name)}</span></div>
+        <div class="info-row"><strong>Email:</strong> <span>${escapeHtml(user.email)}</span></div>
+        <div class="info-row"><strong>Role:</strong> <span>${escapeHtml(user.role)}</span></div>
+        <div class="info-row"><strong>Theme:</strong> <span>${escapeHtml(user.theme)}</span></div>
+      `;
+    }
+
+    function setLoanFilter(filter) {
+      currentLoanFilter = filter;
+      document.querySelectorAll('.loan-filter').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+      });
+      renderLoanList();
+    }
+
+    function setHistoryFilter(range) {
+      currentHistoryFilter = range;
+      document.querySelectorAll('.history-filter').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.range === range);
+      });
+      loadLoans(range);
+    }
+
+    function formatStatusLabel(status) {
+      if (!status) return 'Unknown';
+      return String(status).replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+    }
+
+    // Canonical lifecycle only (config.LOAN_STATUSES): prefer the server's live
+    // businessStatus; map legacy stored values so old records render correctly.
+    const CANONICAL_STATUSES = ['pending', 'active', 'grace', 'defaulted', 'liquidated', 'paid', 'declined'];
+    const LEGACY_STATUS_MAP = {
+      awaiting_approval: 'pending', approved: 'active', in_progress: 'active',
+      'in-progress': 'active', running: 'active', overdue: 'grace',
+      default: 'defaulted', liquidation: 'liquidated', recovered: 'liquidated',
+      settled: 'paid', closed: 'paid', completed: 'paid', rejected: 'declined'
+    };
+    function loanStatusOf(loan) {
+      const canonical = String(loan?.businessStatus || '').trim().toLowerCase();
+      if (CANONICAL_STATUSES.includes(canonical)) return canonical;
+      const raw = String(loan?.status || 'pending').trim().toLowerCase().replace(/\s+/g, '_');
+      return LEGACY_STATUS_MAP[raw] || (CANONICAL_STATUSES.includes(raw) ? raw : 'pending');
+    }
+
+    function countLoanStatus(loans) {
+      return {
+        pending: loans.filter(loan => loanStatusOf(loan) === 'pending').length,
+        running: loans.filter(loan => ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan))).length,
+        closed: loans.filter(loan => ['paid', 'declined'].includes(loanStatusOf(loan))).length
+      };
+    }
+
+    function renderLoanSummaryCounts(loans) {
+      const counts = countLoanStatus(loans);
+      document.getElementById('loanPending').textContent = counts.pending;
+      document.getElementById('loanRunning').textContent = counts.running;
+      document.getElementById('loanClosed').textContent = counts.closed;
+      renderOverviewSummary(loans);
+    }
+
+    function renderLoanList() {
+      const loanList = document.getElementById('loan-list');
+      const filtered = allLoans.filter(loan => {
+        if (currentLoanFilter === 'pending') return loanStatusOf(loan) === 'pending';
+        if (currentLoanFilter === 'running') return ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan));
+        if (currentLoanFilter === 'closed') return ['paid', 'declined'].includes(loanStatusOf(loan));
+        return true;
+      });
+
+      loanList.innerHTML = filtered.length
+        ? filtered.map(loan => `
+            <li class="loan-card" title="Product: ${escapeHtml(loan.product || 'Loan')}\nRequested: ${formatKwacha(loan.amount)}\nInterest: ${formatKwacha(loan.interestAmount || 0)}\nTotal: ${formatKwacha(loan.totalRepayment || loan.amount || 0)}\nTenure: ${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'}\nUrgency: ${formatStatusLabel(loan.urgency || 'standard')}\nDue: ${formatDateDisplay(loan.dueDate)}\nDecision: ${escapeHtml(loan.adminReason || 'No decision reason yet.') }" onclick="openLoanDetails(${Number(loan.id)})">
+              <div class="loan-card-heading">
+                <strong>${escapeHtml(loan.product)}</strong>
+                <span class="loan-badge ${loanStatusOf(loan)}">${formatStatusLabel(loanStatusOf(loan)).toUpperCase()}</span>
+              </div>
+              <div class="loan-meta">
+                Amount: ${formatKwacha(loan.amount)} • Paid: ${formatKwacha(loan.paidTotal || 0)} • Balance: ${formatKwacha(loan.outstanding)}
+              </div>
+              <div class="loan-meta">
+                Requested: ${formatDateDisplay(loan.createdAt || loan.dueDate)} • Interest: ${formatKwacha(loan.interestAmount || 0)} • Total: ${formatKwacha(loan.totalRepayment || loan.amount || 0)}
+              </div>
+              <div class="loan-meta">
+                Tenure: ${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'} • Urgency: ${formatStatusLabel(loan.urgency || 'standard')}
+              </div>
+            </li>
+          `).join('')
+        : '<li class="loan-empty">No loans found for this category.</li>';
+    }
+
+    function renderLoanDetailPanel(loan) {
+      const panel = document.getElementById('loanDetailPanel');
+      if (!panel || !loan) return;
+      const collateralText = loan.collateralDescription || loan.collateralFront || loan.collateralBack || 'No collateral provided';
+      const decisionText = loan.adminReason || 'No decision reason provided yet.';
+
+      panel.innerHTML = `
+        <div class="loan-detail-card">
+          <div class="loan-detail-header">
+            <h3>${escapeHtml(loan.product || 'Loan Request')}</h3>
+            <span class="loan-badge ${loanStatusOf(loan)}">${formatStatusLabel(loanStatusOf(loan)).toUpperCase()}</span>
+          </div>
+          <div class="loan-detail-grid">
+            <p><strong>Requested by:</strong> ${escapeHtml(loan.email || 'Unknown')}</p>
+            <p><strong>Amount requested:</strong> ${formatKwacha(loan.amount)}</p>
+            <p><strong>Interest rate:</strong> ${loan.interestRate || 0}%</p>
+            <p><strong>Interest amount:</strong> ${formatKwacha(loan.interestAmount || 0)}</p>
+            <p><strong>Total after interest:</strong> ${formatKwacha(loan.totalRepayment || loan.amount || 0)}</p>
+            <p><strong>Amount paid:</strong> ${formatKwacha(loan.paidTotal || 0)}</p>
+            <p><strong>Outstanding:</strong> ${formatKwacha(loan.outstanding || 0)}</p>
+            <p><strong>Due date:</strong> ${formatDateDisplay(loan.dueDate)}</p>
+            <p><strong>Urgency:</strong> ${formatStatusLabel(loan.urgency || 'standard')}</p>
+            <p><strong>Collateral:</strong> ${escapeHtml(collateralText)}</p>
+            <p><strong>Requested:</strong> ${formatDateDisplay(loan.createdAt)}</p>
+            <p class="loan-detail-full"><strong>Decision reason:</strong> ${escapeHtml(decisionText)}</p>
+          </div>
+          <div class="loan-payment-history">
+            <h4>Payment history</h4>
+            ${(Array.isArray(loan.payments) && loan.payments.length)
+              ? `<ul>${loan.payments.map(payment => `
+                  <li>
+                    ${formatKwacha(payment.amount)} • ${payment.mode || 'payment'} • ${formatDateDisplay(payment.paymentDate || payment.date)}
+                    ${payment.receiptNumber || payment.paymentReceiptId ? ` • Ref: ${payment.receiptNumber || payment.paymentReceiptId}` : ''}
+                  </li>`).join('')}</ul>`
+              : '<p>No payments recorded yet.</p>'}
+          </div>
+          <div class="loan-payment-submit">
+            <h4>Make a payment</h4>
+            <p>Mobile money and bank transfer submissions are reviewed by BMF. Your balance changes only after approval.</p>
+            ${(loan.paymentSubmissions || []).map(item => `<p>Submission ${escapeHtml(item.transactionReference)}: <strong>${escapeHtml(item.status)}</strong>${item.reviewReason ? ` · ${escapeHtml(item.reviewReason)}` : ''}</p>`).join('')}
+            ${['active', 'grace', 'defaulted'].includes(loanStatusOf(loan)) && Number(loan.outstanding) > 0 ? `
+            <form data-customer-payment="${Number(loan.id)}" enctype="multipart/form-data">
+              <input name="amount" type="number" min="0.01" max="${Number(loan.outstanding)}" step="0.01" required placeholder="Amount paid (max ${formatKwacha(loan.outstanding)})">
+              <select name="mode" required><option value="">Transfer method</option><option>Airtel Money</option><option>MTN MoMo</option><option>Bank Transfer</option></select>
+              <input name="transactionReference" maxlength="64" required placeholder="Transaction reference">
+              <label>Payment proof <input name="paymentProof" type="file" accept="image/jpeg,image/png,image/webp" required></label>
+              <button class="enter-btn" type="submit">Submit for review</button>
+            </form>` : '<p>Payments are available when a loan is active.</p>'}
+          </div>
+        </div>
+      `;
+      panel.classList.remove('hidden');
+    }
+
+    function updateStandingBadge(loans) {
+      const badge = document.getElementById('standingBadge');
+      if (!badge) return;
+      const statusOf = loan => loanStatusOf(loan);
+      const risky = loans.some(loan => ['defaulted', 'liquidated'].includes(statusOf(loan)));
+      const dueSoon = loans.some(loan => statusOf(loan) === 'grace');
+      const open = loans.filter(loan => !['paid', 'declined'].includes(statusOf(loan)));
+      badge.classList.remove('warn', 'alert');
+      if (risky) {
+        badge.textContent = '⚠ Payment overdue';
+        badge.classList.add('alert');
+      } else if (dueSoon) {
+        badge.textContent = '⚠ Repayment due soon';
+        badge.classList.add('warn');
+      } else if (open.length) {
+        badge.textContent = '✓ Repayment on track';
+      } else if (loans.length) {
+        badge.textContent = '✓ All loans settled';
+      } else {
+        badge.textContent = '✓ No active loans';
+      }
+    }
+
+    async function loadLoans(filterDays = currentHistoryFilter) {
+      const loanList = document.getElementById('loan-list');
+      const deviceToken = localStorage.getItem('deviceToken');
+      if (!userEmail) {
+        loanList.innerHTML = '<li>Please login again to see your loan information.</li>';
+        document.getElementById('loanTotal').textContent = '0 loans';
+        document.getElementById('loanOutstanding').textContent = 'K0';
+        updateStandingBadge([]);
+        renderLoanSummaryCounts([]);
+        return false;
+      }
+
+      if (!deviceToken) {
+        loanList.innerHTML = '<li>Device token missing. Please login again.</li>';
+        return false;
+      }
+
+      try {
+        loanList.innerHTML = '<li class="loan-empty">Loading your loans…</li>';
+        const params = new URLSearchParams({ email: userEmail });
+        if (filterDays && filterDays !== 'all') params.set('filter', String(filterDays));
+        const res = await fetch(`/loans?${params.toString()}`, {
+          headers: {
+            'x-device-token': deviceToken
+          }
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          loanList.innerHTML = `<li>${escapeHtml(data.error)}</li>`;
+          return false;
+        }
+
+        allLoans = data.loans || [];
+        const totalLoans = data.summary?.total || 0;
+        const outstanding = data.summary?.outstanding || 0;
+        document.getElementById('loanTotal').textContent = `${totalLoans} loan${totalLoans === 1 ? '' : 's'}`;
+        document.getElementById('loanOutstanding').textContent = formatKwacha(outstanding);
+        document.getElementById('totalRequestedLabel').textContent = `${formatKwacha(data.summary?.totalRequested || 0)} total requested`;
+        const settledLoans = allLoans.filter(loan => loanStatusOf(loan) === 'paid');
+        document.getElementById('loanSettled').textContent = String(settledLoans.length);
+        document.getElementById('settledTotalLabel').textContent = `${formatKwacha(settledLoans.reduce((sum, loan) => sum + Number(loan.totalRepayment || loan.amount || 0), 0))} fully paid`;
+        renderLoanSummaryCounts(allLoans);
+        updateStandingBadge(allLoans);
+        renderLoanList();
+        renderPaymentOverview();
+        loadCustomerNotifications();
+        return true;
+      } catch (err) {
+        loanList.innerHTML = '<li>Unable to load loan information. Please try again later.</li>';
+        return false;
+      }
+    }
+
+    async function loadCustomerNotifications() {
+      const list = document.getElementById('customerNotifications');
+      const token = localStorage.getItem('deviceToken');
+      if (!list || !token) return;
+      try {
+        const response = await fetch('/notifications', { headers: { 'x-device-token': token } });
+        if (!response.ok) throw new Error('Unable to load notifications.');
+        const items = await response.json();
+        list.innerHTML = items.length ? items.slice().reverse().map(item => `<li class="${item.readAt ? 'read' : 'unread'}">${escapeHtml(item.message)} <small>${escapeHtml(formatDateDisplay(item.createdAt))}</small>${item.readAt ? '' : ` <button type="button" data-read-notification="${escapeHtml(item.id)}">Mark read</button>`}</li>`).join('') : '<li>You are all caught up.</li>';
+      } catch { list.textContent = 'Notifications are temporarily unavailable.'; }
+    }
+
+    document.getElementById('customerNotifications')?.addEventListener('click', async event => {
+      const button = event.target.closest('[data-read-notification]');
+      if (!button) return;
+      const response = await fetch(`/notifications/${encodeURIComponent(button.dataset.readNotification)}/read`, {
+        method: 'PATCH', headers: { 'x-device-token': localStorage.getItem('deviceToken') || '' }
+      });
+      if (response.ok) loadCustomerNotifications();
+    });
+
+    document.getElementById('loanDetailPanel')?.addEventListener('submit', async event => {
+      const form = event.target.closest('[data-customer-payment]');
+      if (!form) return;
+      event.preventDefault();
+      const file = form.elements.paymentProof.files[0];
+      if (!file || file.size > 5 * 1024 * 1024 || !/^image\/(jpeg|png|webp)$/i.test(file.type)) {
+        showBmfToast('Attach a JPG, PNG, or WEBP proof image up to 5 MB.', 'error');
+        return;
+      }
+      try {
+        const response = await fetch(`/loans/${Number(form.dataset.customerPayment)}/payment-submissions`, {
+          method: 'POST', headers: { 'x-device-token': localStorage.getItem('deviceToken') || '' }, body: new FormData(form)
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Could not submit payment proof.');
+        showBmfToast(`BMF success: ${result.message}`);
+        await openLoanDetails(Number(form.dataset.customerPayment));
+        loadLoans(currentHistoryFilter);
+      } catch (error) { showBmfToast(error.message || 'Payment submission failed.', 'error'); }
+    });
+
+    document.addEventListener('click', async event => {
+      const link = event.target.closest('[data-upload-filename]');
+      if (!link) return;
+      event.preventDefault();
+      const previewWindow = window.open('about:blank', '_blank');
+      if (previewWindow) previewWindow.opener = null;
+      try {
+        const response = await fetch('/uploads/sign', { method: 'POST', headers: {
+          'Content-Type': 'application/json', 'x-device-token': localStorage.getItem('deviceToken') || ''
+        }, body: JSON.stringify({ filename: link.dataset.uploadFilename }) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to open file.');
+        if (previewWindow) previewWindow.location.replace(result.url);
+        else window.location.assign(result.url);
+      } catch (error) { previewWindow?.close(); showBmfToast(error.message, 'error'); }
+    });
+
+    // First-time / loan-business behavior:
+    // - On first-time signup, user should see ONLY what they entered (their current loan requests).
+    // - Keep tab defaults consistent.
+    // - Any invitation/unique onboarding is handled by /signup.html?invite=... and auth flow (no backend change).
+    // If a signup just happened, force the UI to stay on Loan Summary (do not show other tabs by default).
+    if (isNewSignup) {
+      currentLoanFilter = 'all';
+    }
+
+    const savedUserView = localStorage.getItem('lastUserView');
+    if (savedUserView && ['summary', 'loans', 'request', 'payments', 'reports', 'complaints', 'about'].includes(savedUserView)) {
+      if (['payments', 'reports', 'complaints', 'about'].includes(savedUserView)) {
+        setOverviewSection(savedUserView);
+      } else {
+        setActiveLoanTab(savedUserView);
+      }
+    }
+
+    loadLoans(currentHistoryFilter);
+
+    document.querySelectorAll('.loan-tab').forEach(btn => {
+      btn.addEventListener('click', () => setActiveLoanTab(btn.dataset.tab));
+    });
+
+    document.querySelectorAll('.loan-filter').forEach(btn => {
+      btn.addEventListener('click', () => setLoanFilter(btn.dataset.filter));
+    });
+
+    document.querySelectorAll('.history-filter').forEach(btn => {
+      btn.addEventListener('click', () => setHistoryFilter(btn.dataset.range));
+    });
+    document.getElementById('refreshCustomerReport')?.addEventListener('click', async event => {
+      const button = event.currentTarget;
+      button.disabled = true; button.textContent = 'Refreshing…';
+      try { await loadCustomerReport(); } finally { button.disabled = false; button.textContent = 'Refresh report'; }
+    });
+    document.querySelectorAll('[data-support-view]').forEach(button => button.addEventListener('click', () => selectSupportView(button.dataset.supportView)));
+    document.getElementById('refreshSupportBtn')?.addEventListener('click', async event => {
+      const button = event.currentTarget; const note = document.getElementById('supportMessage');
+      button.disabled = true; button.textContent = 'Refreshing…'; note.textContent = 'Refreshing payment history and support…';
+      try { const loansLoaded = await loadLoans(currentHistoryFilter); const supportLoaded = await loadCustomerSupport(); note.textContent = loansLoaded && supportLoaded ? 'Updated just now.' : 'Some information could not be refreshed. Please try again.'; }
+      catch { note.textContent = 'Refresh failed. Please try again.'; }
+      finally { button.disabled = false; button.textContent = 'Refresh'; }
+    });
+    document.getElementById('customerInquiryForm')?.addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = document.getElementById('submitInquiryBtn'); const note = document.getElementById('supportMessage');
+      button.disabled = true; button.textContent = 'Recording�'; note.textContent = 'Recording payment�';
+      const loanId = document.getElementById('recordPaymentLoanId').value;
+      if (!loanId) { note.textContent = 'Please choose a loan.'; return; }
+      try {
+        const formData = new FormData();
+        formData.append('amount', document.getElementById('recordPaymentAmount').value);
+        formData.append('mode', document.getElementById('recordPaymentMode').value || 'Cash');
+        formData.append('transactionReference', document.getElementById('recordPaymentReceipt').value.trim());
+        const proof = document.getElementById('recordPaymentProof').files[0];
+        if (proof) formData.append('paymentProof', proof);
+        const notes = document.getElementById('recordPaymentNotes').value.trim();
+        if (notes) formData.append('note', notes);
+
+        const response = await fetch(/loans//payment-submissions, {
+          method: 'POST', headers: { 'x-device-token': localStorage.getItem('deviceToken') || '' }, body: formData
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Could not record payment.');
+        event.currentTarget.reset();
+        document.getElementById('recordPaymentExpectedBalance').value = '0';
+        note.textContent = 'Payment recorded successfully. It will be reviewed by BMF.';
+        showBmfToast('Payment recorded successfully.');
+        await loadLoans(currentHistoryFilter);
+        await loadCustomerSupport();
+      } catch (error) { note.textContent = Could not record payment: ; }
+      finally { button.disabled = false; button.textContent = 'Record Payment'; }
+    });
+
+    document.querySelectorAll('.support-link').forEach(button => {
+      button.addEventListener('click', () => {
+        const view = button.dataset.view;
+        if (view === 'reports') { setOverviewSection('reports'); }
+        if (view === 'complaints') { setOverviewSection('complaints'); }
+        if (view === 'inquiries') { setOverviewSection('complaints'); }
+        if (view === 'experience') { setOverviewSection('complaints'); }
+        if (view === 'about') { setOverviewSection('about'); }
+      });
+    };
+    });
+
+    document.getElementById('submitComplaintBtn').addEventListener('click', async () => {
+      const field = document.getElementById('complaintMessage');
+      const categoryField = document.getElementById('feedbackCategory');
+      const message = document.getElementById('complaintMessageText');
+
+      if (!field || !field.value.trim()) {
+        message.textContent = 'Please add a complaint, improvement area, or inquiry before sending.';
+        return;
+      }
+
+      try {
+        const res = await fetch('/feedback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-device-token': localStorage.getItem('deviceToken') || ''
+          },
+          body: JSON.stringify({
+            email: userEmail,
+            message: field.value.trim(),
+            category: categoryField ? categoryField.value : 'complaint'
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          message.textContent = data.error || 'Unable to send feedback right now.';
+          return;
+        }
+
+        message.textContent = 'Thank you. Your feedback has been saved and categorized for review.';
+        showBmfToast('Your feedback has been saved for review.');
+        field.value = '';
+      } catch (err) {
+        message.textContent = 'Unable to send feedback right now.';
+      }
+    });
+
+    document.querySelectorAll('.menu-action').forEach(button => {
+      button.addEventListener('click', () => {
+        const view = button.dataset.view;
+        const menu = document.getElementById('menuDropdown');
+
+        if (view === 'loans') { setActiveLoanTab('loans'); }
+        if (view === 'payments') { setOverviewSection('payments'); }
+        if (view === 'support') { setOverviewSection('payments'); }
+        if (menu) menu.classList.remove('active');
+      });
+    });
+
+    function setupMenu() {
+      const toggle = document.getElementById('menuBtn');
+      const dropdown = document.getElementById('menuDropdown');
+      const logout = document.getElementById('logoutBtn');
+      if (toggle && dropdown) {
+        toggle.addEventListener('click', () => dropdown.classList.toggle('active'));
+        window.addEventListener('click', event => {
+          if (!dropdown.contains(event.target) && event.target !== toggle) {
+            dropdown.classList.remove('active');
+          }
+        });
+      }
+      if (logout) {
+        logout.addEventListener('click', () => {
+          localStorage.removeItem('deviceToken');
+          localStorage.removeItem('username');
+          localStorage.removeItem('userEmail');
+          window.location.href = 'login.html';
+        });
+      }
+    }
+
+    setupMenu();
+
+    // Loan Details modal
+    function closeLoanModal() {
+      const m = document.getElementById('loanModal');
+      if (m) m.classList.remove('active');
+    }
+
+    async function submitLoanDecision(action, loanId) {
+      const reasonField = document.getElementById('adminDecisionReason');
+      const reason = (reasonField?.value || '').trim();
+      const token = localStorage.getItem('deviceToken');
+      if (!token) return window.location.href = 'login.html';
+
+      try {
+        const res = await fetch(`/loans/${loanId}/action`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-device-token': token
+          },
+          body: JSON.stringify({ action, reason })
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          document.getElementById('loanRequestMessage').textContent = data.error || 'Unable to update loan status.';
+          return;
+        }
+
+        document.getElementById('loanRequestMessage').textContent = `Loan marked as ${formatStatusLabel(action)}.`;
+        closeLoanModal();
+        await loadLoans(currentHistoryFilter);
+      } catch (err) {
+        document.getElementById('loanRequestMessage').textContent = 'Unable to update loan status.';
+      }
+    }
+
+    async function openLoanDetails(id) {
+      const token = localStorage.getItem('deviceToken');
+      if (!token) return window.location.href = 'login.html';
+      try {
+        const res = await fetch(`/loans/${id}`, {
+          headers: { 'x-device-token': token }
+        });
+        if (res.status === 403) return handleInvalidDeviceToken();
+        const data = await res.json();
+        const loan = data.loan;
+        const adminBox = document.getElementById('adminDecisionBox');
+        // Loan DECISIONS are store_admin-only (backend returns 403 for role
+        // 'admin' per tested franchise-scoping policy) — match that gate here so
+        // the buttons we show are exactly the ones the API will accept.
+        const hasAdminAccess = userRole === 'store_admin';
+        const collateralText = loan.collateralDescription || loan.collateralFront || loan.collateralBack || 'No collateral provided';
+
+        renderLoanDetailPanel(loan);
+
+        document.getElementById('modalLoanProduct').dataset.loanId = String(loan.id || '');
+        document.getElementById('modalLoanProduct').textContent = loan.product || 'Loan';
+        document.getElementById('modalLoanBorrower').textContent = loan.email || 'Unknown';
+        document.getElementById('modalLoanAmount').textContent = formatKwacha(loan.amount);
+        document.getElementById('modalLoanInterestRate').textContent = `${loan.interestRate || 0}%`;
+        document.getElementById('modalLoanInterest').textContent = formatKwacha(loan.interestAmount || 0);
+        document.getElementById('modalLoanTotal').textContent = formatKwacha(loan.totalRepayment || loan.amount || 0);
+        document.getElementById('modalLoanOutstanding').textContent = formatKwacha(loan.outstanding || 0);
+        document.getElementById('modalLoanDue').textContent = formatDateDisplay(loan.dueDate);
+        document.getElementById('modalLoanStatus').textContent = formatStatusLabel(loan.status);
+        document.getElementById('modalLoanRequested').textContent = formatDateDisplay(loan.createdAt);
+        document.getElementById('modalLoanUrgency').textContent = formatStatusLabel(loan.urgency || 'standard');
+        document.getElementById('modalLoanCollateral').textContent = collateralText;
+        document.getElementById('modalLoanDecision').textContent = loan.adminReason || 'No decision reason provided yet.';
+        document.getElementById('adminDecisionReason').value = loan.adminReason || '';
+
+        adminBox.hidden = !hasAdminAccess;
+        document.getElementById('loanModal').classList.add('active');
+      } catch (err) {
+        console.warn('Could not load loan details', err);
+      }
+    }
+
+    document.querySelectorAll('.decision-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const loanId = document.getElementById('modalLoanProduct').dataset.loanId;
+        const action = button.dataset.action;
+        if (!loanId) return;
+        submitLoanDecision(action, Number(loanId));
+      });
+    });
+  </script>
+  <!-- Loan Details Modal -->
+  <div id="loanModal" class="modal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeLoanModal()">×</button>
+      <h3 id="modalLoanProduct">Loan</h3>
+      <div class="modal-grid">
+        <p><strong>Requested by:</strong> <span id="modalLoanBorrower">-</span></p>
+        <p><strong>Amount requested:</strong> <span id="modalLoanAmount">-</span></p>
+        <p><strong>Interest rate:</strong> <span id="modalLoanInterestRate">-</span></p>
+        <p><strong>Interest amount:</strong> <span id="modalLoanInterest">-</span></p>
+        <p><strong>Total after interest:</strong> <span id="modalLoanTotal">-</span></p>
+        <p><strong>Outstanding:</strong> <span id="modalLoanOutstanding">-</span></p>
+        <p><strong>Due date:</strong> <span id="modalLoanDue">-</span></p>
+        <p><strong>Urgency:</strong> <span id="modalLoanUrgency">-</span></p>
+        <p><strong>Collateral:</strong> <span id="modalLoanCollateral">-</span></p>
+        <p><strong>Status:</strong> <span id="modalLoanStatus">-</span></p>
+        <p><strong>Requested:</strong> <span id="modalLoanRequested">-</span></p>
+        <p><strong>Decision reason:</strong> <span id="modalLoanDecision">-</span></p>
+      </div>
+
+      <div id="adminDecisionBox" class="admin-decision-box" hidden>
+        <label for="adminDecisionReason">Provide decision reason</label>
+        <textarea id="adminDecisionReason" rows="3" placeholder="Add admin notes for approval, in-progress, or decline."></textarea>
+        <div class="admin-decision-actions">
+          <button type="button" class="decision-btn" data-action="in_progress">In Progress</button>
+          <button type="button" class="decision-btn" data-action="approve">Approve</button>
+          <button type="button" class="decision-btn decline" data-action="decline">Decline</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+
+
