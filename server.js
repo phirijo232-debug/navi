@@ -8,6 +8,7 @@ const { verifyOTP, sendOTP } = require('./middleware/otp');
 const { trackSession } = require('./controllers/sessionController');
 const { serveFile } = require('./controllers/fileController');
 const routes = require('./routes');
+const applyRouter = require('./routes/apply');
 const { startScheduler } = require('./scheduler');
 const { ensureDataIntegrity } = require('./middleware/dataStore');
 const { startHealthWatch } = require('./middleware/healthWatch');
@@ -162,6 +163,17 @@ app.post('/internal-shutdown', (req, res) => {
   logError('SERVER SHUTDOWN VIA CMD');
   setTimeout(() => process.exit(0), 500);
 });
+
+// Share-key gate: protects the public signup entry page (?key= required when SHARE_PUBLIC_KEY is set).
+app.use(shareKeyGate);
+
+// Public quick-screen loan application (no auth required).
+app.get('/quick-screen', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'quick-screen.html'));
+});
+
+// Public loan application API (no device token required).
+app.use('/api/apply', applyRouter);
 
 app.use(deviceAuth);
 app.use(logAccess);

@@ -100,6 +100,19 @@
     // enforces the same rule, this just explains it up front.
     const inviteParams = new URLSearchParams(window.location.search);
     const inviteToken = (inviteParams.get('invite') || inviteParams.get('token') || '').trim();
+
+    // Pre-fill from quick-screen referral: ?email=, ?name=
+    const preEmail = (inviteParams.get('email') || '').trim();
+    const preName = (inviteParams.get('name') || '').trim();
+    if (preEmail) {
+      const emailInput = document.getElementById('email');
+      emailInput.value = preEmail;
+      emailInput.readOnly = true;
+      emailInput.style.opacity = '0.6';
+    }
+    if (preName) {
+      document.getElementById('username').value = preName;
+    }
     if (!inviteToken) {
       document.getElementById('signupForm').classList.add('hidden');
       document.getElementById('message').textContent = 'Sign-up is invitation only. Please open the personal invite link sent to you by the administrator.';

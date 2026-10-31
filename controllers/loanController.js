@@ -1269,15 +1269,15 @@ async function notifyUser(req, res) {
     const activeLoans = loans.filter(loan => Number(loan.outstanding || 0) > 0);
     const totalInterestAdded = loans.reduce((sum, loan) => sum + Number(loan.graceInterestAdded || 0), 0);
 
-      const today = new Date().toISOString().slice(0, 10);
+    // Apply grace accrual to each loan before building notification details
+    const today = new Date().toISOString().slice(0, 10);
+    loans.forEach(loan => {
       const interestBefore = Number(loan.graceAccrued || 0);
       applyGraceAccrual(loan, today);
       const interestAfter = Number(loan.graceAccrued || 0);
       const interestAdded = Number((interestAfter - interestBefore).toFixed(2));
       Object.assign(loan, { graceInterestBefore: interestBefore, graceInterestAfter: interestAfter, graceInterestAdded: interestAdded });
-      const outstanding = Number(loan.outstanding || 0);
-      return `- ${loan.product || 'Loan'} ${loan.receiptNumber || `#${loan.id}`}: outstanding ${formatCurrency(outstanding)}, due ${loan.dueDate || 'date unavailable'}, grace interest: K ${preciseCurrency(interestAdded)} (1.8%/day)`;
-    }).join('\n');
+    });
 
     const loanDetails = activeLoans.map(loan =>
       `- ${loan.product || 'Loan'} ${loan.receiptNumber || `#${loan.id}`}: ` +
@@ -1286,14 +1286,15 @@ async function notifyUser(req, res) {
 // Grace interest already calculated - display with 1.8%/day accrual rate
     const loanDetailsWithInterest = activeLoans.map(loan =>
       `- ${loan.product || 'Loan'} ${loan.receiptNumber || `#${loan.id}`}: ` +
-      `outstanding ${formatCurrency(loan.outstanding)}, due ${loan.dueDate || 'date unavailable'}, grace interest: K ${preciseCurrency(loan.graceInterestAdded || 0)} (1.8%/day)` +
+      `outstanding ${formatCurrency(loan.outstanding)}, due ${loan.dueDate || 'date unavailable'}, grace interest: K ${preciseCurrency(loan.graceInterestAdded || 0)} (1.8%/day)`
     ).join('\n');
+
+    const outstandingTotal = activeLoans.reduce((sum, loan) => sum + Number(loan.outstanding || 0), 0);
 
     const subject = 'BMF Loan Reminder';
     const text = `Hello,\n\nThis is a reminder from Buraza Micro Finance (BMF) regarding your loan account.\n\n` +
       (activeLoans.length
-? `Open balance(s):\n${loanDetailsWithInterest}\n\nTotal outstanding: ${formatCurrency(outstandingTotal)}\n\nKindly settle the outstanding balance to continue enjoying the BMF loan service.\n`
-        ? `Open balance(s):\n${loanDetails}\n\nTotal outstanding: ${formatCurrency(outstandingTotal)}\n\nKindly settle the outstanding balance to continue enjoying the BMF loan service.\n`
+        ? `Open balance(s):\n${loanDetailsWithInterest}\n\nTotal outstanding: ${formatCurrency(outstandingTotal)}\n\nKindly settle the outstanding balance to continue enjoying the BMF loan service.\n`
         : `Our records show no open balance on your account. Thank you for staying up to date.\n`) +
       `\nRegards,\nBuraza Micro Finance (BMF), a Pryme Vertex subsidiary.`;
 

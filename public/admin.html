@@ -413,6 +413,7 @@
     <div class="admin-menu-heading">Pryme Vertex Holdings</div>
     <button class="menu-action" type="button" id="adminMenuDashboard"><svg class="menu-icon icon-dashboard" viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="2" width="6" height="7" rx="1"/><rect x="12" y="2" width="6" height="4" rx="1"/><rect x="12" y="9" width="6" height="9" rx="1"/><rect x="2" y="12" width="6" height="6" rx="1"/></svg><span>Dashboard</span></button>
     <button class="menu-action" type="button" id="adminMenuCustomers"><svg class="menu-icon icon-customers" viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="6" r="3"/><circle cx="14" cy="7" r="2.4"/><path d="M1.5 17c.3-3 2.4-4.7 5.5-4.7s5.2 1.7 5.5 4.7z"/><path d="M12 12.8c3.6-.9 6.2.7 6.5 3.8h-4.4"/></svg><span>Customers</span></button>
+    <button class="menu-action" type="button" id="adminMenuApplications"><svg class="menu-icon icon-applications" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6zm14 0a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V6zM2 12a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4zm14 0a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-4z"/></svg><span>Applications</span></button>
     <button class="menu-action" type="button" id="adminMenuHr"><svg class="menu-icon icon-hr" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6" r="3.1"/><path d="M3.5 18c.4-4 2.7-6 6.5-6s6.1 2 6.5 6z"/><path d="M15 2.5v4M13 4.5h4"/></svg><span>HR</span></button>
     <div class="admin-menu-divider"></div>
     <button class="menu-action" type="button" id="backToStoresDashboard" hidden><svg class="menu-icon icon-store" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8.5 4.5 3h11L17 8.5M4 8.5V17h12V8.5M7 17v-5h6v5"/><path d="M3 8.5a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/></svg><span>Switch Store</span></button>
@@ -574,6 +575,22 @@
           </form>
         </div>
       </section>
+    </section>
+
+    <section id="applicationsView" class="hidden">
+      <div class="admin-topbar">
+        <div>
+          <h1>Loan Applications</h1>
+          <p class="message-text">Review and decide on new loan applications from the Quick Screen.</p>
+          <p id="applicationsCount" class="directory-status" aria-live="polite"></p>
+        </div>
+        <div class="button-row">
+          <button type="button" class="toggle-mode" id="applicationsRefreshBtn" style="max-width: 180px;">Refresh</button>
+          <button type="button" class="toggle-mode" id="applicationsBackBtn" style="max-width: 220px;">Back to dashboard</button>
+        </div>
+      </div>
+      <div id="applicationsList"><div class="directory-empty" role="status">Loading applications…</div></div>
+      <p id="applicationsMessage" class="message-text"></p>
     </section>
   </div>
 

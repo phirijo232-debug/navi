@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+  <style>
+    .qs-estimate { background: rgba(28,33,40,0.8); border: 1px solid var(--qs-border); border-radius: 12px; padding: 20px; margin-top: 8px; }
+    .qs-estimate h3 { margin: 0 0 16px; font-size: 1rem; color: var(--qs-blue); }
+    .qs-est-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 14px; }
+    .qs-est-row:last-child { border-bottom: none; }
+    .qs-est-row .label { color: var(--qs-text-muted); }
+    .qs-est-row .value { font-weight: 700; }
+    .qs-est-row .value.amber { color: var(--qs-amber); }
+    .qs-file-zone { border: 2px dashed var(--qs-border); border-radius: 10px; padding: 16px; background: transparent; cursor: pointer; text-align: center; position: relative; }
+    .qs-file-zone:hover { border-color: var(--qs-blue); background: rgba(47,129,247,0.08); }
+    .qs-file-zone.has-file { border-color: var(--qs-success); background: rgba(63,185,80,0.08); }
+    .qs-file-zone input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 2; }
+    .qs-file-icon { font-size: 24px; margin-bottom: 8px; }
+    .qs-file-text { font-size: 13px; color: var(--qs-text-muted); }
+    .qs-file-name { font-size: 12px; color: var(--qs-success); margin-top: 6px; font-weight: 600; }
+    .qs-checkbox { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; }
+    .qs-checkbox input { width: 18px; height: 18px; accent-color: var(--qs-blue); margin-top: 2px; cursor: pointer; }
+    .qs-checkbox label { font-size: 13px; color: var(--qs-text-muted); line-height: 1.5; cursor: pointer; }
+    .qs-submit-btn { width: 100%; padding: 16px; border-radius: 10px; border: none; background: var(--qs-blue); color: white; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+    .qs-submit-btn:disabled { opacity: 0.65; cursor: not-allowed; }
+    .qs-submit-btn:hover:not(:disabled) { opacity: 0.95; }
+    .qs-message { margin-bottom: 12px; font-size: 13px; min-height: 18px; }
+    .qs-message.error { color: var(--qs-error); }
+    .qs-success-screen { display: none; text-align: center; padding: 40px 20px; background: var(--qs-card); border: 1px solid var(--qs-border); border-radius: 16px; margin-top: 24px; }
+    .qs-success-icon { width: 64px; height: 64px; background: rgba(47,129,247,0.10); color: var(--qs-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 20px; }
+    .qs-success-screen h2 { margin: 0 0 12px; font-size: 1.5rem; color: var(--qs-text); }
+    .qs-success-screen p { color: var(--qs-text-muted); margin: 0 0 16px; font-size: 15px; line-height: 1.5; }
+    .qs-app-id { display: inline-flex; align-items: center; gap: 8px; background: var(--qs-card-alt); border: 1px solid var(--qs-border); border-radius: 8px; padding: 10px 16px; margin-bottom: 20px; font-family: 'Courier New', monospace; font-weight: 700; color: var(--qs-blue); font-size: 14px; }
+    .qs-btn-secondary { width: 100%; padding: 14px; border-radius: 10px; border: 1px solid var(--qs-border); background: transparent; color: var(--qs-text); font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 12px; }
+    .qs-btn-secondary:hover { border-color: var(--qs-blue); color: var(--qs-blue); }
+    .qs-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 20px; border-radius: 10px; background: rgba(0,0,0,0.85); color: white; font-size: 13px; z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+    .qs-toast.show { opacity: 1; }
+    .qs-toast.success { background: rgba(63,185,80,0.9); }
+    .qs-toast.error { background: rgba(248,81,73,0.9); }
+    .qs-hidden { display: none !important; }
+  </style>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrymeBMF — Apply for a Loan</title>
+  <link rel="stylesheet" href="style.css?v=20261017-shared-theme-refresh">
+  <style>
+    :root { --qs-bg:#0d1117; --qs-card:#161b22; --qs-card-alt:#1c2128; --qs-border:#30363d; --qs-blue:#2f81f7; --qs-text:#e6edf3; --qs-text-muted:#8b949e; --qs-success:#3fb950; --qs-error:#f85149; --qs-amber:#d29922; }
+    * { box-sizing: border-box; }
+<div class="qs-page">
+  <header class="qs-header">
+    <a href="index.html" class="qs-back">← Back to Home</a>
+    <div class="qs-logo">Pryme Vertex</div>
+    <div class="qs-subtitle">Apply for a loan in 3 steps</div>
+    <div class="qs-stepper">
+      <div class="qs-step"><div class="qs-step-fill"></div><div class="qs-step-label active">1. Details</div></div>
+      <div class="qs-step"><div class="qs-step-label">2. Documents</div></div>
+      <div class="qs-step"><div class="qs-step-label">3. Submit</div></div>
+    </div>
+  </header>
+
+  <form id="applyForm" class="qs-form" novalidate>
+    <div id="qsMessage" class="qs-message"></div>
+
+    <section class="qs-section">
+      <h2>👤 Your Details</h2>
+      <div class="qs-grid">
+        <div class="qs-field"><label class="qs-label-required">Full Name <span style="color:var(--qs-error)">*</span></label><input type="text" id="fullName" class="qs-input" placeholder="James Phiri" required></div>
+        <div class="qs-field"><label class="qs-label-required">Email Address <span style="color:var(--qs-error)">*</span></label><input type="email" id="email" class="qs-input" placeholder="james@example.com" required></div>
+      </div>
+      <div class="qs-grid">
+        <div class="qs-field"><label class="qs-label-required">NRC Number <span style="color:var(--qs-error)">*</span></label><input type="text" id="nrcNumber" class="qs-input" placeholder="123456/78/9" required><div style="font-size:11px;color:var(--qs-text-muted);margin-top:4px;">Format: 123456/78/1</div></div>
+        <div class="qs-field"><label class="qs-label-required">Phone Number <span style="color:var(--qs-error)">*</span></label><input type="tel" id="phone" class="qs-input" placeholder="+260977000000" required><div style="font-size:11px;color:var(--qs-text-muted);margin-top:4px;">Zambian mobile number</div></div>
+      </div>
+    </section>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--qs-bg); color: var(--qs-text); }
+    .qs-page { max-width: 640px; margin: 0 auto; padding: 32px 20px 80px; min-height: 100vh; display: flex; flex-direction: column; }
+    .qs-header { margin-bottom: 32px; }
+    <section class="qs-section">
+      <h2>💰 Loan Details</h2>
+      <div class="qs-field"><label class="qs-label-required">Loan Purpose <span style="color:var(--qs-error)">*</span></label><select id="loanProduct" class="qs-select" required><option value="">Select purpose</option><option value="Business Capital">Business Capital</option><option value="Emergency">Emergency</option><option value="School Fees">School Fees</option><option value="Medical">Medical</option><option value="Other">Other</option></select></div>
+      <div class="qs-grid">
+        <div class="qs-field"><label class="qs-label-required">Amount (K) <span style="color:var(--qs-error)">*</span></label><input type="number" id="loanAmount" class="qs-input" placeholder="e.g. 3000" min="100" step="100" required></div>
+        <div class="qs-field"><label class="qs-label-required">Urgency <span style="color:var(--qs-error)">*</span></label><div class="qs-toggle-group"><button type="button" class="qs-toggle-btn active" data-urgency="standard">Standard</button><button type="button" class="qs-toggle-btn" data-urgency="urgent">Urgent</button><button type="button" class="qs-toggle-btn" data-urgency="emergency">Emergency</button></div><div style="font-size:11px;color:var(--qs-text-muted);margin-top:4px;">48 / 24 / 4 hours</div></div>
+      </div>
+      <div class="qs-field"><label class="qs-label-required">Repayment Timeframe <span style="color:var(--qs-error)">*</span></label><div class="qs-mode-group"><button type="button" class="qs-mode-tab active" data-mode="weeks">Fixed Weeks</button><button type="button" class="qs-mode-tab" data-mode="date">Custom Due Date</button></div><div class="qs-mode-content" id="weeksMode"><div class="qs-field"><label>Number of Weeks</label><select id="loanTenure" class="qs-select"><option value="1">1 week</option><option value="2">2 weeks</option><option value="3">3 weeks</option><option value="4">4 weeks</option></select></div></div><div class="qs-mode-content qs-hidden" id="dateMode"><div class="qs-field"><label>Due Date</label><input type="date" id="loanDueDate" class="qs-input"></div></div></div>
+    </section>
+    .qs-back { display: inline-flex; align-items: center; gap: 8px; color: var(--qs-blue); text-decoration: none; font-size: 14px; font-weight: 500; margin-bottom: 16px; }
+    .qs-back:hover { opacity: 0.9; }
+    .qs-logo { font-size: 2rem; font-weight: 800; margin-bottom: 4px; color: var(--qs-text); }
+    .qs-subtitle { color: var(--qs-text-muted); font-size: 15px; margin-bottom: 8px; }
+    .qs-stepper { display: flex; gap: 12px; margin-bottom: 24px; }
+    .qs-step { flex: 1; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; position: relative; overflow: hidden; }
+    .qs-step-fill { height: 100%; background: var(--qs-blue); width: 33%; border-radius: 2px; }
+    <div class="qs-estimate" id="estimateBox">
+      <h3>📊 Estimate</h3>
+      <div class="qs-est-row"><span class="label">Interest rate</span><span class="value" id="estRate">10%</span></div>
+      <div class="qs-est-row"><span class="label">Interest amount</span><span class="value" id="estInterest">K 0.00</span></div>
+      <div class="qs-est-row"><span class="label">Total to repay</span><span class="value amber" id="estTotal">K 0.00</span></div>
+      <div class="qs-est-row"><span class="label">Approval target</span><span class="value" id="estApproval">Within 48 hours</span></div>
+    </div>
+
+      <div class="qs-field"><label class="qs-label-required">NRC Front <span style="color:var(--qs-error)">*</span></label><div class="qs-file-zone" id="zoneNrcFront"><div class="qs-file-icon">📷</div><div class="qs-file-text">Choose NRC Front photo</div><input type="file" id="nrcFront" accept="image/jpeg,image/png,image/webp" required></div><div id="fileNameNrcFront" class="qs-file-name qs-hidden"></div></div>
+      <div class="qs-field"><label class="qs-label-required">NRC Back <span style="color:var(--qs-error)">*</span></label><div class="qs-file-zone" id="zoneNrcBack"><div class="qs-file-icon">📷</div><div class="qs-file-text">Choose NRC Back photo</div><input type="file" id="nrcBack" accept="image/jpeg,image/png,image/webp" required></div><div id="fileNameNrcBack" class="qs-file-name qs-hidden"></div></div>
+      <div class="qs-field"><label>Collateral Front <span style="color:var(--qs-text-muted)">(optional)</span></label><div class="qs-file-zone" id="zoneCollateralFront"><div class="qs-file-icon">📷</div><div class="qs-file-text">Choose Collateral Front photo</div><input type="file" id="collateralFront" accept="image/jpeg,image/png,image/webp"></div><div id="fileNameCollateralFront" class="qs-file-name qs-hidden"></div></div>
+      <div class="qs-field"><label>Collateral Back <span style="color:var(--qs-text-muted)">(optional)</span></label><div class="qs-file-zone" id="zoneCollateralBack"><div class="qs-file-icon">📷</div><div class="qs-file-text">Choose Collateral Back photo</div><input type="file" id="collateralBack" accept="image/jpeg,image/png,image/webp"></div><div id="fileNameCollateralBack" class="qs-file-name qs-hidden"></div></div>
+    </section>
+
+    <label class="qs-checkbox"><input type="checkbox" id="terms" required><label><span class="qs-label-bold">I agree to the BMF terms and conditions</span> and confirm the information provided is accurate.</label></label>
+    <button type="submit" id="applyBtn" class="qs-submit-btn">Submit Application</button>
+    <div id="qsLoader" style="display:none;justify-content:center;gap:8px;margin-top:10px;"><div style="width:8px;height:8px;background:var(--qs-blue);border-radius:50%;animation:qs-bounce 0.8s infinite alternate"></div><div style="width:8px;height:8px;background:var(--qs-blue);border-radius:50%;animation:qs-bounce 0.8s infinite alternate 0.15s"></div><div style="width:8px;height:8px;background:var(--qs-blue);border-radius:50%;animation:qs-bounce 0.8s infinite alternate 0.3s"></div></div>
+  </form>
+
+  <div id="qsSuccess" class="qs-success-screen">
+    <div class="qs-success-icon">✓</div>
+    <h2>Application Submitted!</h2>
+    <p>Thank you, <span id="qsSuccessName"></span>. Your application has been received and is under review.</p>
+    <div class="qs-app-id">Application ID: <span id="qsSuccessId"></span></div>
+    <p style="color:var(--qs-text-muted);font-size:13px;margin-top:24px;">We'll contact you within 48 hours. You can now log in to track your application.</p>
+    <button type="button" class="qs-btn-secondary" onclick="window.location.href='login.html'">Go to Login</button>
+  </div>
+</div>
+
+  <div id="qsToast" class="qs-toast"></div>
+
+  <script>
+    let selectedUrgency = 'standard';
+    let selectedMode = 'weeks';
+    const params = new URLSearchParams(window.location.search);
+    const preEmail = params.get('email') || '';
+    const preName = params.get('name') || '';
+    if (preEmail) { document.getElementById('email').value = preEmail; document.getElementById('email').readOnly = true; document.getElementById('email').style.opacity = '0.6'; }
+    if (preName) { document.getElementById('fullName').value = preName; }
+    document.querySelectorAll('[data-urgency]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-urgency]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active'); selectedUrgency = btn.dataset.urgency; updateEstimate();
+      });
+    });
+    document.querySelectorAll('[data-mode]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active'); selectedMode = btn.dataset.mode;
+        document.getElementById('weeksMode').classList.toggle('qs-hidden', selectedMode !== 'weeks');
+        document.getElementById('dateMode').classList.toggle('qs-hidden', selectedMode === 'weeks');
+        updateEstimate();
+      });
+    });
+    <section class="qs-section">
+      <h2>📄 Documents</h2>
+      <div style="font-size:13px;color:var(--qs-text-muted);margin-bottom:16px;">Upload clear photos of your documents.</div>
+    .qs-step-label { position: absolute; top: -24px; left: 0; width: 100%; text-align: center; font-size: 11px; color: var(--qs-text-muted); font-weight: 600; text-transform: uppercase; }
+    ['nrcFront','nrcBack','collateralFront','collateralBack'].forEach(id => {
+      const input = document.getElementById(id);
+      const zone = document.getElementById('zone' + id.charAt(0).toUpperCase() + id.slice(1));
+      const nameEl = document.getElementById('fileName' + id.charAt(0).toUpperCase() + id.slice(1));
+      input.addEventListener('change', () => {
+        if (input.files[0]) { zone.classList.add('has-file'); nameEl.textContent = input.files[0].name; nameEl.classList.remove('qs-hidden'); }
+        else { zone.classList.remove('has-file'); nameEl.textContent = ''; nameEl.classList.add('qs-hidden'); }
+      });
+    });
+    const WEEKLY_RATES = { 1: 0.10, 2: 0.16, 3: 0.24, 4: 0.32 };
+    const URGENCY_HOURS = { standard: 48, urgent: 24, emergency: 4 };
+    function updateEstimate() {
+      const amount = Number(document.getElementById('loanAmount').value) || 0;
+      const weeks = parseInt(document.getElementById('loanTenure').value, 10) || 1;
+      const rate = WEEKLY_RATES[weeks] ?? 0.10;
+      const interest = amount * rate; const total = amount + interest;
+    function showToast(msg, kind = 'success') {
+      const t = document.getElementById('qsToast');
+      t.textContent = msg; t.className = 'qs-toast ' + kind; t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 4000);
+    }
+    function setMessage(text, isError) {
+      const m = document.getElementById('qsMessage');
+      m.textContent = text; m.className = 'qs-message ' + (isError ? 'error' : '');
+    }
+    document.getElementById('applyForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('applyBtn'); const loader = document.getElementById('qsLoader'); setMessage('');
+      const formData = new FormData();
+      formData.append('fullName', document.getElementById('fullName').value.trim());
+      formData.append('email', document.getElementById('email').value.trim());
+      formData.append('nrcNumber', document.getElementById('nrcNumber').value.trim());
+      formData.append('phone', document.getElementById('phone').value.trim());
+      formData.append('product', document.getElementById('loanProduct').value);
+      formData.append('amount', document.getElementById('loanAmount').value);
+      formData.append('urgency', selectedUrgency);
+      if (selectedMode === 'weeks') { formData.append('tenureWeeks', document.getElementById('loanTenure').value); }
+      else { formData.append('dueDate', document.getElementById('loanDueDate').value); }
+      formData.append('agreedToTerms', 'true'); formData.append('source', 'quick_screen');
+      const nrcFront = document.getElementById('nrcFront').files[0];
+      const nrcBack = document.getElementById('nrcBack').files[0];
+      const collFront = document.getElementById('collateralFront').files[0];
+      const collBack = document.getElementById('collateralBack').files[0];
+      if (nrcFront) formData.append('nrcFront', nrcFront);
+      if (nrcBack) formData.append('nrcBack', nrcBack);
+      if (collFront) formData.append('collateralFront', collFront);
+      if (collBack) formData.append('collateralBack', collBack);
+      btn.disabled = true; loader.style.display = 'flex';
+      try {
+        const res = await fetch('/api/apply', { method: 'POST', body: formData });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setMessage(data.error || 'Submission failed.', true); showToast(data.error || 'Submission failed.', 'error'); return; }
+        document.getElementById('applyForm').style.display = 'none';
+        document.getElementById('qsSuccess').style.display = 'block';
+        document.getElementById('qsSuccessName').textContent = formData.get('fullName');
+        document.getElementById('qsSuccessId').textContent = data.applicationId;
+        showToast('Application submitted successfully!');
+      } catch (err) { setMessage('Connection error. Please try again.', true); showToast('Connection error. Please try again.', 'error'); }
+      finally { btn.disabled = false; loader.style.display = 'none'; }
+    });
+  </script>
+</body>
+</html>
+      const hours = URGENCY_HOURS[selectedUrgency] ?? 48;
+      document.getElementById('estRate').textContent = (rate * 100).toFixed(0) + '%';
+      document.getElementById('estInterest').textContent = 'K ' + interest.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      document.getElementById('estTotal').textContent = 'K ' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      document.getElementById('estApproval').textContent = 'Within ' + hours + ' hours';
+    }
+    document.getElementById('loanAmount').addEventListener('input', updateEstimate);
+    document.getElementById('loanTenure').addEventListener('change', updateEstimate);
+    updateEstimate();
+    .qs-step-label.active { color: var(--qs-blue); }
+    .qs-form { flex: 1; display: flex; flex-direction: column; gap: 24px; }
+    .qs-section { background: var(--qs-card); border: 1px solid var(--qs-border); border-radius: 12px; padding: 20px; }
+    .qs-section h2 { font-size: 1.15rem; margin: 0 0 16px; color: var(--qs-text); display: flex; align-items: center; gap: 8px; }
+    .qs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 480px) { .qs-grid { grid-template-columns: 1fr; } }
+    .qs-field { display: flex; flex-direction: column; gap: 8px; }
+    .qs-field label { font-size: 13px; font-weight: 600; color: var(--qs-text-muted); }
+    .qs-label-required { color: var(--qs-text); }
+    .qs-input, .qs-select { width: 100%; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--qs-border); background: transparent; color: var(--qs-text); font-size: 15px; outline: none; }
+    .qs-input:focus, .qs-select:focus { border-color: var(--qs-blue); }
+    .qs-select { appearance: none; padding-right: 36px; background-position: right 12px center; background-size: 16px; background-repeat: no-repeat; }
+    .qs-toggle-group { display: flex; gap: 8px; margin-top: 4px; }
+    .qs-toggle-btn { flex: 1; padding: 10px 12px; border: 1px solid var(--qs-border); border-radius: 8px; background: transparent; color: var(--qs-text-muted); font-size: 14px; cursor: pointer; }
+    .qs-toggle-btn.active { border-color: var(--qs-blue); background: rgba(47,129,247,0.10); color: var(--qs-blue); }
+    .qs-toggle-btn:hover:not(.active) { color: var(--qs-text); border-color: var(--qs-border-hi); }
+    .qs-mode-tab { padding: 10px 14px; border: 1px solid var(--qs-border); border-radius: 8px; background: transparent; color: var(--qs-text-muted); font-size: 14px; cursor: pointer; text-align: left; width: 100%; }
+    .qs-mode-tab.active { border-color: var(--qs-blue); background: rgba(47,129,247,0.10); color: var(--qs-blue); }
+    .qs-mode-content { margin-top: 12px; }
+  </style>
+</head>
+<body>

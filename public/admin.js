@@ -36,6 +36,7 @@ let storeFeedback = [];
 let activeFeedbackFilter = 'all';
 let portfolioLoans = [];
 let pendingPaymentReviews = [];
+let allApplications = [];
 let pendingEmail = '';
 let pendingResetEmail = '';
 let adminToastTimer;
@@ -97,7 +98,7 @@ function setViewVisibility(id, visible) {
 }
 
 function hideAdminViews() {
-  ['adminDashboard', 'customersView', 'hrView'].forEach(id => setViewVisibility(id, false));
+  ['adminDashboard', 'customersView', 'hrView', 'applicationsView'].forEach(id => setViewVisibility(id, false));
 }
 
 // ─── Logged-in admin header (topbar) ─────────────────────────────────────────
@@ -212,6 +213,16 @@ function showHrView() {
     return;
   }
   fetchHrEmployees();
+}
+
+function showApplicationsView() {
+  if (!ensureAdminAccess()) return;
+  setViewVisibility('storeSelect', false);
+  setViewVisibility('adminAuth', false);
+  hideAdminViews();
+  setViewVisibility('applicationsView', true);
+  setActiveAdminMenu('adminMenuApplications');
+  fetchApplications();
 }
 
 function showStoreSelection() {
@@ -879,6 +890,108 @@ async function updateStoreFeedback(id, status) {
     await fetchStoreFeedback();
   } catch (err) {
     window.alert(err.message || 'Unable to update feedback.');
+  }
+}
+
+// ─── Loan Applications (Quick Screen) ─────────────────────────────────────────
+async function fetchApplications() {
+  if (!ensureAdminAccess()) return;
+  const list = document.getElementById('applicationsList');
+  const countEl = document.getElementById('applicationsCount');
+  const message = document.getElementById('applicationsMessage');
+  if (!list) return;
+  list.innerHTML = '<div class="directory-empty" role="status">Loading applications…</div>';
+  message.textContent = '';
+
+  try {
+    const response = await fetch('/api/apply', { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to load applications.');
+    allApplications = Array.isArray(data.applications) ? data.applications : [];
+    renderApplications();
+    if (countEl) countEl.textContent = allApplications.length + ' application' + (allApplications.length !== 1 ? 's' : '') + ' awaiting review.';
+  } catch (err) {
+    const msg = err.status === 401 ? 'Your admin session expired. Please sign in again.' : err.status === 403 ? 'Your account is not allowed to view applications.' : err.message || 'Unable to load applications.';
+    list.innerHTML = `<div class="directory-empty" role="status">${escapeHtml(msg)}</div>`;
+    if (countEl) countEl.textContent = '';
+    if (message) message.textContent = msg;
+  }
+}
+
+function statusBadge(status) {
+  const map = { pending: 'status-pending', approved: 'status-approved', declined: 'status-declined', info_requested: 'status-pending' };
+  const cls = map[String(status).toLowerCase()] || 'status-pending';
+  return `<span class="status-tag ${cls}">${escapeHtml(String(status).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}</span>`;
+}
+
+function renderApplications() {
+  const list = document.getElementById('applicationsList');
+  if (!list) return;
+  if (!allApplications.length) {
+    list.innerHTML = '<div class="directory-empty" role="status">No loan applications found.</div>';
+    return;
+  }
+  list.innerHTML = allApplications.map(app => {
+    const weeklyRates = { 1: 0.10, 2: 0.16, 3: 0.24, 4: 0.32 };
+    const rate = weeklyRates[app.loanTenure] ?? 0.10;
+    const interest = app.loanAmount * rate;
+    const total = app.loanAmount + interest;
+    const reviewed = app.status !== 'pending' ? `
+      <p><strong>Reviewed:</strong> ${escapeHtml(formatDate(app.reviewedAt))} by ${escapeHtml(app.reviewedBy || '—')}</p>
+      ${app.reviewNote ? `<p><strong>Note:</strong> ${escapeHtml(app.reviewNote)}</p>` : ''}
+    ` : '';
+    const actions = app.status === 'pending' ? `
+      <div class="button-row" style="margin-top:8px;">
+        <button class="toggle-mode" type="button" data-app-action="approve" data-app-id="${escapeHtml(app.id)}" style="background:var(--bmf-green);">Approve</button>
+        <button class="toggle-mode" type="button" data-app-action="request_info" data-app-id="${escapeHtml(app.id)}" style="background:var(--bmf-amber);">Request Info</button>
+        <button class="toggle-mode" type="button" data-app-action="reject" data-app-id="${escapeHtml(app.id)}" style="background:var(--bmf-red);">Reject</button>
+      </div>
+      <div style="margin-top:8px;">
+        <label for="appNote-${escapeHtml(app.id)}">Review note (optional)</label>
+        <input type="text" id="appNote-${escapeHtml(app.id)}" class="modal-input" placeholder="Reason for decision..." maxlength="300">
+      </div>
+    ` : `<p style="margin-top:8px; opacity:0.7;">Decision already made.</p>`;
+    return `
+      <article class="panel loan-item" style="margin-top:10px;">
+        <div class="loan-header">
+          <strong style="margin-left:8px;">${escapeHtml(app.loanPurpose)} — ${escapeHtml(app.applicationId)}</strong>
+          ${statusBadge(app.status)}
+        </div>
+        <p><strong>Applicant:</strong> ${escapeHtml(app.fullName)}</p>
+        <p><strong>Email:</strong> ${escapeHtml(app.email)} · <strong>Phone:</strong> ${escapeHtml(app.phone)} · <strong>NRC:</strong> ${escapeHtml(app.nrc)}</p>
+        <p><strong>Amount:</strong> ${formatCurrency(app.loanAmount)} · <strong>Interest:</strong> ${formatCurrency(interest)} · <strong>Total:</strong> ${formatCurrency(total)}</p>
+        <p><strong>Tenure:</strong> ${app.loanTenure} week${app.loanTenure === 1 ? '' : 's'} · <strong>Urgency:</strong> ${escapeHtml(app.urgency)} · <strong>Requested:</strong> ${escapeHtml(formatDate(app.createdAt))}</p>
+        ${app.nrcFront ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(app.nrcFront)}">View NRC front</a></p>` : ''}
+        ${app.nrcBack ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(app.nrcBack)}">View NRC back</a></p>` : ''}
+        ${app.collateralPhoto ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(app.collateralPhoto)}">View collateral photo</a></p>` : ''}
+        ${reviewed}
+        ${actions}
+      </article>
+    `;
+  }).join('');
+}
+
+async function reviewApplication(appId, action) {
+  const noteInput = document.getElementById('appNote-' + appId);
+  const note = noteInput ? noteInput.value.trim() : '';
+  if (action === 'reject' && !note) {
+    document.getElementById('applicationsMessage').textContent = 'Rejection requires a reason.';
+    return;
+  }
+  try {
+    const response = await fetch('/api/apply/' + encodeURIComponent(appId), {
+      method: 'PATCH',
+      headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ action, note })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to review application.');
+    document.getElementById('applicationsMessage').textContent = data.message || 'Application reviewed.';
+    document.getElementById('applicationsMessage').style.color = 'var(--success)';
+    await fetchApplications();
+  } catch (err) {
+    document.getElementById('applicationsMessage').textContent = err.message || 'Unable to review application.';
+    document.getElementById('applicationsMessage').style.color = 'var(--danger)';
   }
 }
 
@@ -1781,6 +1894,10 @@ function setupAdminMenu() {
     dropdown.classList.remove('active');
     showCustomersView();
   });
+  document.getElementById('adminMenuApplications')?.addEventListener('click', () => {
+    dropdown.classList.remove('active');
+    showApplicationsView();
+  });
   document.getElementById('adminMenuHr')?.addEventListener('click', () => {
     dropdown.classList.remove('active');
     showHrView();
@@ -1793,7 +1910,7 @@ function setupAdminMenu() {
 }
 
 function setActiveAdminMenu(activeId) {
-  ['adminMenuDashboard', 'adminMenuCustomers', 'adminMenuHr'].forEach(id => {
+  ['adminMenuDashboard', 'adminMenuCustomers', 'adminMenuApplications', 'adminMenuHr'].forEach(id => {
     const button = document.getElementById(id);
     if (!button) return;
     const active = id === activeId;
@@ -2494,6 +2611,18 @@ async function restoreSession() {
     showAuthScreen();
   }
 }
+
+// ─── Applications view: action buttons + refresh/back ─────────────────────────
+document.getElementById('applicationsList')?.addEventListener('click', event => {
+  const btn = event.target.closest('[data-app-action]');
+  if (!btn) return;
+  const appId = btn.dataset.appId;
+  const action = btn.dataset.appAction;
+  if (appId && action) reviewApplication(appId, action);
+});
+
+document.getElementById('applicationsRefreshBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchApplications));
+document.getElementById('applicationsBackBtn')?.addEventListener('click', showDashboard);
 
 window.onload = () => {
   const savedMode = localStorage.getItem('mode') === 'light' ? 'light' : 'dark';
