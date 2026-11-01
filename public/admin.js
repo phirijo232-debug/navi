@@ -183,6 +183,9 @@ function showDashboard() {
   portfolioRefreshTimer = setInterval(() => {
     if (!document.getElementById('adminDashboard').classList.contains('hidden')) fetchNewRequests();
   }, 30000);
+  // Refresh bell count on load and every 60 seconds
+  refreshBellCount();
+  setInterval(refreshBellCount, 60000);
 }
 
 function showCustomersView() {
@@ -363,21 +366,32 @@ function ensureAdminAccess() {
 
 function applyRolePermissions() {
   const role = localStorage.getItem('userRole');
-  const canManageStore = role === 'admin' || role === 'franchise_admin' || role === 'store_admin';
+  // Super admins (admin) and franchise admins have absolute access to everything.
+  // store_admin is restricted to their own store only.
+  const isSuperAdmin = role === 'admin' || role === 'franchise_admin';
+  const isStoreOperator = role === 'store_admin';
   const isFranchiseLevel = role === 'admin' || role === 'franchise_admin';
-  // Announcements are store-operator only (the backend refuses role 'admin'
-  // with 403 — tested policy), so hide the button from the main admin too.
-  document.getElementById('announcementBtn').hidden = !(role === 'store_admin' || role === 'franchise_admin');
-  document.getElementById('notifyOverdueBtn').hidden = !canManageStore;
-  // HR (employee management) is only for the main admin and Franchise Employee Admin.
+  
+  // ALL buttons visible to super admins and franchise admins
+  document.getElementById('announcementBtn').hidden = false;
+  document.getElementById('notifyOverdueBtn').hidden = false;
+  
+  // HR menu only for main admin and franchise level
   const hrMenu = document.getElementById('adminMenuHr');
   if (hrMenu) hrMenu.hidden = !isFranchiseLevel;
+  
+  // Switch store button: show if more than 1 store OR if super admin
   const switchStoreButton = document.getElementById('backToStoresDashboard');
-  if (switchStoreButton) switchStoreButton.hidden = BMF_STORES.length < 2;
+  if (switchStoreButton) switchStoreButton.hidden = !isSuperAdmin && BMF_STORES.length < 2;
+  
   // Only franchise-level roles may create store admins; only the main admin may
   // create Franchise Employee Admins.
   document.querySelector('#newUserRole option[value="store_admin"]').hidden = !isFranchiseLevel;
   document.querySelector('#newUserRole option[value="franchise_admin"]').hidden = role !== 'admin';
+  
+  // Store selector: show only to super admins
+  const storeSelector = document.getElementById('hrSwitchStore');
+  if (storeSelector) storeSelector.hidden = !isSuperAdmin;
 }
 
 async function fetchUsers() {
@@ -703,6 +717,20 @@ async function fetchAdminNotifications() {
     adminNotifications = Array.isArray(data) ? data : Array.isArray(data.notifications) ? data.notifications : [];
     renderAdminNotifications();
   } catch { /* notification refresh is best effort; core dashboard remains available */ }
+}
+
+// Quick Screen bell badge: count pending applications
+async function refreshBellCount() {
+  try {
+    const res = await fetch('/api/apply?status=pending', { headers: getStoreHeaders() });
+    const data = await res.json().catch(() => ({}));
+    const pending = (data.applications || data).filter(a => String(a.status || '').toLowerCase() === 'pending').length;
+    const badge = document.getElementById('bell-badge');
+    if (badge) {
+      badge.textContent = String(pending);
+      badge.style.display = pending > 0 ? 'flex' : 'none';
+    }
+  } catch { /* bell badge is best effort */ }
 }
 
 function renderAdminNotifications() {

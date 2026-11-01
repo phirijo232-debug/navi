@@ -120,6 +120,7 @@ function buildLoanStatusNotification(action, product, reason, email, loanData = 
   const summary = buildLoanSummaryText({ ...loanData, product, urgency: loanData.urgency || 'standard' });
   const amount = Number(loanData.amount ?? loanData.requestedAmount ?? 0);
   const urgencyLabel = (loanData.urgency || 'standard').toString().toLowerCase();
+  const loanId = loanData.id || loanData.receiptNumber || 'N/A';
 
   if (normalizedAction.includes('approve')) {
     return {
@@ -128,6 +129,7 @@ function buildLoanStatusNotification(action, product, reason, email, loanData = 
         `We are pleased to confirm that your request for ${product || 'the loan'} has been approved.\n\n` +
         summary +
         `Reason: ${reasonText}\n\n` +
+        `Loan ID: ${loanId}\n\n` +
         `${getCommunicationChannelNote()}\n\n` +
         'Thank you for trusting BMF.\n\nWarm regards,\nThe BMF Team'
     };
@@ -140,6 +142,7 @@ function buildLoanStatusNotification(action, product, reason, email, loanData = 
         `We regret to inform you that your request for ${product || 'the loan'} has been declined at this time.\n\n` +
         summary +
         `Reason: ${reasonText}\n\n` +
+        `Loan ID: ${loanId}\n\n` +
         `${getCommunicationChannelNote()}\n\n` +
         'You are welcome to reach out so we can guide you on next steps.\n\nWarmly,\nThe BMF Team'
     };
@@ -151,6 +154,7 @@ function buildLoanStatusNotification(action, product, reason, email, loanData = 
       `Your request for ${product || 'the loan'} is now in progress.\n\n` +
       summary +
       `Reason: ${reasonText}\n\n` +
+      `Loan ID: ${loanId}\n\n` +
       `${getCommunicationChannelNote()}\n\n` +
       'Thank you for your patience.\n\nWarm regards,\nThe BMF Team'
   };

@@ -9,6 +9,7 @@ const { trackSession } = require('./controllers/sessionController');
 const { serveFile } = require('./controllers/fileController');
 const routes = require('./routes');
 const applyRouter = require('./routes/apply');
+const usersRouter = require('./routes/users');
 const { startScheduler } = require('./scheduler');
 const { ensureDataIntegrity } = require('./middleware/dataStore');
 const { startHealthWatch } = require('./middleware/healthWatch');
@@ -178,6 +179,7 @@ app.use('/api/apply', applyRouter);
 app.use(deviceAuth);
 app.use(logAccess);
 app.use(trackSession);
+app.use('/', usersRouter);
 app.use('/', routes);
 
 process.on('uncaughtException', (err) => {

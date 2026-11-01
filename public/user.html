@@ -268,16 +268,6 @@
               <button class="enter-btn" type="submit">Record Payment</button>
             </form>
           </section>
-          <section class="hidden support-extra">
-            <h3>More options</h3>
-            <ul class="support-sub-list">
-              <li><button type="button" class="menu-action support-link" data-view="reports">Reports</button></li>
-              <li><button type="button" class="menu-action support-link" data-view="complaints">Complaints</button></li>
-              <li><button type="button" class="menu-action support-link" data-view="inquiries">Inquiries</button></li>
-              <li><button type="button" class="menu-action support-link" data-view="experience">Experience</button></li>
-              <li><button type="button" class="menu-action support-link" data-view="about">About</button></li>
-            </ul>
-          </section>
           <section data-support-panel="schedule" class="hidden"><h3>Due Schedule</h3><div id="customerDueSchedule"></div></section>
         </div>
       </div>
@@ -969,6 +959,7 @@
                 <strong>${escapeHtml(loan.product)}</strong>
                 <span class="loan-badge ${loanStatusOf(loan)}">${formatStatusLabel(loanStatusOf(loan)).toUpperCase()}</span>
               </div>
+              ${['active', 'grace', 'defaulted', 'in_progress', 'started'].includes(loanStatusOf(loan)) ? `<div class="loan-action"><button class="btn-secondary" onclick="event.stopPropagation(); openRecordPayment(${loan.id})">Record Payment</button></div>` : ''}
               <div class="loan-meta">
                 Amount: ${formatKwacha(loan.amount)} • Paid: ${formatKwacha(loan.paidTotal || 0)} • Balance: ${formatKwacha(loan.outstanding)}
               </div>
@@ -1023,7 +1014,7 @@
             <h4>Make a payment</h4>
             <p>Mobile money and bank transfer submissions are reviewed by BMF. Your balance changes only after approval.</p>
             ${(loan.paymentSubmissions || []).map(item => `<p>Submission ${escapeHtml(item.transactionReference)}: <strong>${escapeHtml(item.status)}</strong>${item.reviewReason ? ` · ${escapeHtml(item.reviewReason)}` : ''}</p>`).join('')}
-            ${['active', 'grace', 'defaulted'].includes(loanStatusOf(loan)) && Number(loan.outstanding) > 0 ? `
+            ${['active', 'grace', 'defaulted', 'in_progress', 'started'].includes(loanStatusOf(loan)) && Number(loan.outstanding) > 0 ?`
             <form data-customer-payment="${Number(loan.id)}" enctype="multipart/form-data">
               <input name="amount" type="number" min="0.01" max="${Number(loan.outstanding)}" step="0.01" required placeholder="Amount paid (max ${formatKwacha(loan.outstanding)})">
               <select name="mode" required><option value="">Transfer method</option><option>Airtel Money</option><option>MTN MoMo</option><option>Bank Transfer</option></select>
@@ -1035,6 +1026,12 @@
         </div>
       `;
       panel.classList.remove('hidden');
+    }
+
+    function openRecordPayment(loanId) {
+      const loan = allLoans.find(l => Number(l.id) === Number(loanId));
+      if (!loan) return;
+      openLoanDetails(Number(loanId));
     }
 
     function updateStandingBadge(loans) {
@@ -1244,7 +1241,7 @@
         showBmfToast('Payment recorded successfully.');
         await loadLoans(currentHistoryFilter);
         await loadCustomerSupport();
-      } catch (error) { note.textContent = Could not record payment: ; }
+      } catch (error) { note.textContent = `Could not record payment: ${error.message}`; }
       finally { button.disabled = false; button.textContent = 'Record Payment'; }
     });
 
@@ -1257,7 +1254,6 @@
         if (view === 'experience') { setOverviewSection('complaints'); }
         if (view === 'about') { setOverviewSection('about'); }
       });
-    };
     });
 
     document.getElementById('submitComplaintBtn').addEventListener('click', async () => {

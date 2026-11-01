@@ -165,8 +165,13 @@ router.get('/', (req, res) => {
     }
 
     const apps = readApplications();
+    // Support ?status=pending filter for bell badge
+    if (req.query.status) {
+      const filtered = apps.filter(a => String(a.status || '').toLowerCase() === String(req.query.status).toLowerCase());
+      filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      return res.json({ applications: filtered, count: filtered.length });
+    }
     apps.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
     return res.json({ applications: apps, count: apps.length });
   } catch (err) {
     logError(`APPLICATIONS LIST FAILED: ${err.message}`);
