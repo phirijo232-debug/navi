@@ -7,14 +7,14 @@ const {
   upload, getLoans, requestLoan, getLoanById,
   updateLoanStatus, getAllLoans, recordPayment,
   notifyAllOverdue, searchByReceiptId, sendLoanNotification, notifyUser,
-  createAdminLoan
+  createAdminLoan, reversePayment
 } = require('../controllers/loanController');
 const {
   requestSignup, confirmSignup, resendOTP,
   requestLogin, confirmLogin,
   requestPasswordReset, confirmPasswordReset,
   createInvite, createAdminUser, validateInvite,
-  getAllUsers, sendAdminAnnouncement, listInvites,
+  getAllUsers, sendAdminAnnouncement,   listInvites, getMyProfile, saveCustomerKyc, setCreditLimit, previewLoginCode,
   listEmployees, editEmployee, setEmployeeRestriction,
   requestStoreSwitch, verifyStoreSwitch
 } = require('../controllers/authController');
@@ -27,7 +27,7 @@ const {
 const {
   getReportSummary, exportReport, getSingleUserReport,
   getAllUsersReport, getAnalyticsReport, getProfitAnalytics,
-  getDefaulterAnalytics, getOverdueAnalytics, getPaidAnalytics,
+  getDefaulterAnalytics, getMorningList, getOverdueAnalytics, getPaidAnalytics,
   getUserReport, searchReports, getPaymentsLedger,
   getPaymentsReportExport, getTrackingAnalytics, exportTrackingSheet,
   getTrackingSheet, getUserTracking
@@ -35,11 +35,15 @@ const {
 const {
   listExpenses, createExpense, updateExpense, deleteExpense
 } = require('../controllers/expenseController');
+const { loanReceipt, loanAgreement, customerStatement } = require('../controllers/documentController');
+const { listTill, saveTill } = require('../controllers/tillController');
+const { listPublicStores, createStore, goLiveChecklist } = require('../controllers/opsController');
 
 const { healthRateLimiter } = require('../middleware/security');
 
 router.get('/', (req, res) => res.send('Navi Server is running!'));
 
+router.get('/stores', listPublicStores);
 router.get('/status', getStatus);
 // IMMUNE: public tier returns {status, uptime} only; the admin tier (memory, db,
 // heartbeat) activates only with a valid admin x-device-token in the same call.
@@ -59,6 +63,7 @@ router.get('/reports/:scope/summary', getReportSummary);
 router.get('/reports/:scope/export', exportReport);
 router.get('/reports/:scope/profits', getProfitAnalytics);
 router.get('/reports/:scope/defaulters', getDefaulterAnalytics);
+router.get('/reports/:scope/morning', getMorningList);
 router.get('/reports/:scope/overdue', getOverdueAnalytics);
 router.get('/reports/:scope/paid', getPaidAnalytics);
 router.get('/reports/:scope/tracking', getTrackingSheet);
@@ -73,6 +78,17 @@ router.get('/payments', getPaymentsLedger);
 router.get('/payments/export', getPaymentsReportExport);
 router.post('/loans/notify-overdue', notifyAllOverdue);
 router.post('/loans/notify-user', notifyUser);
+router.get('/loans/:id/receipt', loanReceipt);
+router.get('/loans/:id/agreement', loanAgreement);
+router.get('/account/statement', customerStatement);
+router.get('/account/profile', getMyProfile);
+router.post('/account/kyc', upload.single('nrcPhoto'), saveCustomerKyc);
+router.post('/admin/credit-limit', setCreditLimit);
+router.get('/admin/login-code', previewLoginCode);
+router.get('/admin/go-live', goLiveChecklist);
+router.post('/admin/stores', createStore);
+router.get('/admin/till', listTill);
+router.post('/admin/till', saveTill);
 router.get('/loans/:id', getLoanById);
 router.post('/loans/request', upload.fields([
   { name: 'collateralFront', maxCount: 1 },
@@ -80,6 +96,7 @@ router.post('/loans/request', upload.fields([
 ]), requestLoan);
 router.post('/loans/:id/action', updateLoanStatus);
 router.post('/loans/:id/notify-overdue', sendLoanNotification);
+router.post('/loans/payment/reverse', reversePayment);
 router.post('/loans/payment', upload.fields([
   { name: 'screenshot', maxCount: 1 }
 ]), recordPayment);

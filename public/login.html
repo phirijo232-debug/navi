@@ -142,7 +142,7 @@
           localStorage.setItem('deviceToken', data.deviceToken);
           if (data.storeId) localStorage.setItem('userStoreId', data.storeId);
           const preferredMode = localStorage.getItem('mode') || 'dark';
-          const staffRoles = ['store_admin', 'franchise_admin'];
+          const staffRoles = ['store_admin', 'franchise_admin', 'cashier'];
           const nextPage = data.role === 'admin'
             ? 'dashboard.html'
             : (staffRoles.includes(data.role) ? 'admin.html' : 'user.html');

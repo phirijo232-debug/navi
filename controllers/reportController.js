@@ -6,8 +6,9 @@ const config = require('../config');
 const { logError, logBreakage } = require('../middleware/logger');
 const dataStore = require('../middleware/dataStore');
 const { getFeedbackData } = require('./feedbackController');
-const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole } = require('../middleware/storeScope');
-const { getEnrichedLoans, summarizeStore, searchLoansByReceipt, normalizeStatus, rebuildPaymentLedger } = require('./loanController');
+const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole, isStaffRole } = require('../middleware/storeScope');
+const { getEnrichedLoans, summarizeStore, searchLoansByReceipt, normalizeStatus, rebuildPaymentLedger, deriveLoanStatus } = require('./loanController');
+const { calendarToday } = require('../middleware/calendar');
 const { buildTrackingSheet, persistTracking } = require('./reportTracking');
 const { getExpensesData } = require('./expenseController');
 
@@ -20,6 +21,7 @@ function readArray(file) {
 
 function sumPayments(loan) {
   return (Array.isArray(loan.payments) ? loan.payments : [])
+    .filter(payment => !payment?.reversed)
     .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
 }
 
@@ -29,7 +31,7 @@ function getSettledAt(loan) {
   return payments.map(payment => payment.date).filter(Boolean).sort().at(-1) || null;
 }
 
-function categorizeLoan(loan, today = new Date().toISOString().slice(0, 10)) {
+function categorizeLoan(loan, today = calendarToday()) {
   const status = String(loan.status || 'pending').trim().toLowerCase().replace(/\s+/g, '_');
   const balance = Number(loan.outstanding || 0);
   const paid = sumPayments(loan);
@@ -107,10 +109,13 @@ function getReportData(scope = config.DEFAULT_STORE_ID, from = '', to = '') {
   const loans = allLoans.filter(loan => scope === 'all' || getRecordStoreId(loan) === scope);
   const feedback = allFeedback.filter(item => scope === 'all' || getRecordStoreId(item) === scope);
   const scopedUsers = users.filter(user => scope === 'all' || getRecordStoreId(user) === scope);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = calendarToday();
   const loanRows = loans.map(loan => ({ ...loan, reportCategory: categorizeLoan(loan, today), paidTotal: sumPayments(loan) }));
   const activeLoans = loanRows.filter(loan => !['declined', 'pending'].includes(String(loan.status || '').toLowerCase()));
-  const outstandingLoans = loanRows.filter(loan => Number(loan.outstanding || 0) > 0 && loan.reportCategory !== 'declined');
+  const outstandingLoans = loanRows.filter(loan => (
+    Number(loan.outstanding || 0) > 0 &&
+    !['declined', 'pending_application'].includes(loan.reportCategory)
+  ));
   const defaulterLoans = loanRows.filter(loan => loan.reportCategory === 'defaulter');
   const partialPaymentLoans = loanRows.filter(loan => loan.reportCategory === 'partial_payment');
   const settledLoans = loanRows.filter(loan => ['settled', 'settled_on_time'].includes(loan.reportCategory));
@@ -141,16 +146,29 @@ function getReportData(scope = config.DEFAULT_STORE_ID, from = '', to = '') {
   }, 0).toFixed(2));
   const feesCollected = Number(loanRows.reduce((sum, loan) => {
     const payments = Array.isArray(loan.payments) ? loan.payments : [];
-    return sum + payments.reduce((paid, payment) => paid + (Number(payment.fee ?? payment.feeAmount) || 0), 0);
+    return sum + payments.filter(payment => !payment.reversed).reduce((paid, payment) => paid + (Number(payment.fee ?? payment.feeAmount) || 0), 0);
   }, 0).toFixed(2));
   const operatingExpenses = Number(reportExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toFixed(2));
   const netProfit = Number((interestCollected + feesCollected - operatingExpenses).toFixed(2));
+  const collectionsByMode = { cash: 0, airtel: 0, mtn: 0, bank: 0, other: 0 };
+  loanRows.forEach(loan => {
+    (loan.payments || []).forEach(payment => {
+      if (payment.reversed) return;
+      const mode = String(payment.mode || '').toLowerCase();
+      const bucket = mode.includes('airtel') ? 'airtel'
+        : mode.includes('mtn') || mode.includes('momo') ? 'mtn'
+        : mode.includes('bank') ? 'bank'
+        : mode.includes('cash') ? 'cash'
+        : 'other';
+      collectionsByMode[bucket] = Number((collectionsByMode[bucket] + (Number(payment.amount) || 0)).toFixed(2));
+    });
+  });
 
   return {
     scope,
     generatedAt: new Date().toISOString(),
     period: { from: from || null, to: to || null },
-    note: 'Gross interest booked is contractual interest on non-declined loans. Principal reflects approved loan records because disbursement dates are not tracked. Net profit is collected interest and fees minus operating expenses. On-time loyalty requires settlement on or before the due date.',
+    note: 'Money owed does not include a request that has not been approved. Interest stays the full agreed amount even if the customer pays early. A fee is counted only when staff type one on the payment. Net profit is collected interest and fees minus operating expenses. On-time loyalty requires settlement on or before the due date.',
     summary: {
       customerAccounts: scopedUsers.filter(user => user.role === 'user').length,
       totalLoans: loanRows.length,
@@ -166,6 +184,7 @@ function getReportData(scope = config.DEFAULT_STORE_ID, from = '', to = '') {
       feesCollected,
       operatingExpenses,
       netProfit,
+      collectionsByMode,
       approvedLoanPrincipal: Number(principalIssued.toFixed(2)),
       feedback: {
         total: feedback.length,
@@ -194,7 +213,7 @@ function getReportData(scope = config.DEFAULT_STORE_ID, from = '', to = '') {
 }
 
 function isAuthorized(req, scope) {
-  if (!isAdminRole(req.authUser?.role)) return false;
+  if (!isStaffRole(req.authUser?.role)) return false;
   if (scope === 'all' && req.authUser.role !== 'admin') return false;
   return canAccessStore(req, scope === 'all' ? config.DEFAULT_STORE_ID : scope);
 }
@@ -231,13 +250,13 @@ function getTrackingAnalytics(req, res) {
   const { from, to, invalid } = readPeriod(req);
   if (invalid) return res.status(400).json({ error: 'from/to must be YYYY-MM-DD dates.' });
 
-  const enriched = getEnrichedLoans(new Date().toISOString().slice(0, 10));
+  const enriched = getEnrichedLoans(calendarToday());
   const loans = enriched.filter(loan => scope === 'all' || getRecordStoreId(loan) === scope);
   const customersByEmail = new Map();
   const usersData = dataStore.readJson(USERS_FILE, [], Array.isArray);
   usersData.forEach(u => customersByEmail.set(String(u.email || '').trim().toLowerCase(), u));
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = calendarToday();
   const storeSummary = summarizeStore(loans, today);
 
   const netProfit = Number((storeSummary.totalInterestBooked - storeSummary.totalOutstanding).toFixed(2));
@@ -308,9 +327,9 @@ function exportTrackingSheet(req, res) {
     const scope = req.params.scope === 'franchise' ? 'all' : (req.params.scope || 'buraza');
     if (!isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required.' });
 
-    const enriched = getEnrichedLoans(new Date().toISOString().slice(0, 10));
+    const enriched = getEnrichedLoans(calendarToday());
     const loans = enriched.filter(loan => scope === 'all' || getRecordStoreId(loan) === scope);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = calendarToday();
     const stats = summarizeStore(loans, today);
     const netProfit = Number((stats.totalInterestBooked - stats.totalOutstanding).toFixed(2));
     const netMargin = stats.totalInterestBooked > 0 ? Number(((stats.totalInterestBooked - stats.totalOutstanding) / stats.totalInterestBooked * 100).toFixed(2)) : 0;
@@ -870,7 +889,7 @@ async function buildExcelReport(data) {
 function buildPdfReport(data, res, label) {
   const doc = new PDFDocument({ margin: 48, size: 'A4' });
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${label}-ledger-${new Date().toISOString().slice(0, 10)}.pdf"`);
+  res.setHeader('Content-Disposition', `attachment; filename="${label}-ledger-${calendarToday()}.pdf"`);
   doc.pipe(res);
   doc.fontSize(20).text(`${label} Portfolio Report`);
   doc.moveDown(0.5).fontSize(10).text(`Generated ${new Date(data.generatedAt).toLocaleString('en-GB')}`);
@@ -920,7 +939,7 @@ async function exportReport(req, res) {
     if (format !== 'xlsx') return res.status(400).json({ error: 'Export format must be xlsx or pdf.' });
     const buffer = await buildExcelReport(data);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${label}-ledger-${new Date().toISOString().slice(0, 10)}.xlsx"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${label}-ledger-${calendarToday()}.xlsx"`);
     return res.send(Buffer.from(buffer));
   } catch (err) {
     logBreakage('reportController.js', 'exportReport', err, 'REPORT EXPORT FAILED');
@@ -1181,6 +1200,45 @@ function getTrackingSheet(req, res) {
   }
 }
 
+function getMorningList(req, res) {
+  try {
+    const scope = analyticsScope(req);
+    if (!isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required for this report scope.' });
+    const today = calendarToday();
+    const users = readArray(USERS_FILE);
+    const byEmail = new Map(users.map(user => [String(user.email || '').toLowerCase(), user]));
+    const rows = getEnrichedLoans(today)
+      .filter(loan => (scope === 'all' || getRecordStoreId(loan) === scope))
+      .filter(loan => ['grace', 'defaulted'].includes(loan.businessStatus || deriveLoanStatus(loan, today)))
+      .map(loan => {
+        const due = String(loan.dueDate || '').slice(0, 10);
+        const daysLate = /^\d{4}-\d{2}-\d{2}$/.test(due)
+          ? Math.max(0, Math.round((new Date(`${today}T00:00:00Z`) - new Date(`${due}T00:00:00Z`)) / 86400000))
+          : 0;
+        const payments = (loan.payments || []).filter(payment => !payment.reversed);
+        const last = payments[payments.length - 1];
+        const person = byEmail.get(String(loan.email || '').toLowerCase());
+        return {
+          loanId: loan.id,
+          receiptNumber: loan.receiptNumber,
+          customer: person?.username || loan.email,
+          phone: person?.phone || '',
+          product: loan.product,
+          status: loan.businessStatus || deriveLoanStatus(loan, today),
+          daysLate,
+          penalty: Number(loan.graceAccrued || 0),
+          outstanding: Number(loan.outstanding || 0),
+          lastPayment: last ? { amount: last.amount, date: last.paymentDate || last.date, mode: last.mode } : null
+        };
+      })
+      .sort((a, b) => b.daysLate - a.daysLate);
+    return res.json({ scope, today, rows });
+  } catch (err) {
+    logError(`MORNING LIST FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'The morning list is temporarily unavailable.' });
+  }
+}
+
 module.exports = {
   categorizeLoan,
   getReportData,
@@ -1190,6 +1248,7 @@ module.exports = {
   getAnalyticsReport,
   getProfitAnalytics,
   getDefaulterAnalytics,
+  getMorningList,
   getOverdueAnalytics,
   getPaidAnalytics,
   getUserReport,
