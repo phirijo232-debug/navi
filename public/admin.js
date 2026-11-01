@@ -827,6 +827,13 @@ function renderSelectedUser() {
     <p><strong>Email:</strong> ${escapeHtml(selectedUser.email)}</p>
     <p><strong>Phone:</strong> ${escapeHtml(selectedUser.phone || 'N/A')}</p>
     <p><strong>Role:</strong> ${escapeHtml(selectedUser.role || 'user')}</p>
+    <p><strong>NRC:</strong> ${escapeHtml(selectedUser.nrc || 'N/A')} · <strong>Home:</strong> ${escapeHtml(selectedUser.address || 'Not on file')} · <strong>Next of kin:</strong> ${escapeHtml(selectedUser.nextOfKinName || 'Not on file')} ${escapeHtml(selectedUser.nextOfKinPhone || '')}</p>
+    <p><strong>NRC photo:</strong> ${selectedUser.nrcPhoto ? 'On file' : 'Missing'}</p>
+    <form id="creditLimitForm" class="auth-form" style="margin: 10px 0;">
+      <input type="number" id="creditLimitInput" class="modal-input" min="0" step="0.01" value="${escapeHtml(selectedUser.creditLimit ?? '')}" placeholder="Borrowing limit (K)">
+      <label class="checkbox-row"><input type="checkbox" id="allowMultipleLoans" ${selectedUser.allowMultipleLoans ? 'checked' : ''}> Allow another loan while one is still open</label>
+      <button type="submit" class="toggle-mode">Save borrowing limit</button>
+    </form>
     ${canNotifyUser ? `
     <div class="button-row" style="margin: 10px 0;">
       <button class="toggle-mode" type="button" data-notify-user>Notify this customer</button>
@@ -855,6 +862,25 @@ function renderSelectedUser() {
       ${visibleLoans.length ? visibleLoans.map(renderLoanDetails).join('') : '<p>No loans match the selected filters.</p>'}
     </div>
   `;
+
+  document.getElementById('creditLimitForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const response = await fetch('/admin/credit-limit', {
+      method: 'POST',
+      headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        email: selectedUser.email,
+        creditLimit: Number(document.getElementById('creditLimitInput').value),
+        allowMultipleLoans: document.getElementById('allowMultipleLoans').checked
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    document.getElementById('detailFeedback').textContent = data.error || data.message || 'Saved.';
+    if (response.ok) {
+      selectedUser.creditLimit = data.creditLimit;
+      selectedUser.allowMultipleLoans = data.allowMultipleLoans;
+    }
+  });
 }
 
 async function viewUserDetails(userId) {

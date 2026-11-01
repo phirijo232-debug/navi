@@ -296,7 +296,7 @@ function isValidWhatsAppNumber(phone) {
 
 async function requestSignup(req, res) {
   try {
-    const { username, email, password, confirmPassword, phone, nrc, inviteToken } = req.body;
+    const { username, email, password, confirmPassword, phone, nrc, inviteToken, address, nextOfKinName, nextOfKinPhone } = req.body;
 
     if (!username || !email || !password || !confirmPassword) {
       return res.status(400).json({ error: 'All required fields must be filled.' });
@@ -339,7 +339,13 @@ async function requestSignup(req, res) {
       return res.status(400).json({ error: 'Email already registered.' });
     }
 
-    pendingSignups[email] = { username, email, password, phone: normalizedPhone, nrc: nrc ? String(nrc).trim() : null, inviteToken, createdAt: Date.now() };
+    pendingSignups[email] = {
+      username, email, password, phone: normalizedPhone, nrc: nrc ? String(nrc).trim() : null, inviteToken,
+      address: address ? String(address).trim() : null,
+      nextOfKinName: nextOfKinName ? String(nextOfKinName).trim() : null,
+      nextOfKinPhone: nextOfKinPhone ? String(nextOfKinPhone).trim() : null,
+      createdAt: Date.now()
+    };
     await otpService.sendOTP('Account Signup Verification', email, false);
     savePendingAuth();
     res.json({ message: 'OTP sent to your email. Please verify to complete signup.' + emailService.previewNotice() });
@@ -381,6 +387,9 @@ async function confirmSignup(req, res) {
       email: pending.email,
       phone: pending.phone,
       nrc: pending.nrc || null,
+      address: pending.address || null,
+      nextOfKinName: pending.nextOfKinName || null,
+      nextOfKinPhone: pending.nextOfKinPhone || null,
       password: hashedPassword,
       tokens,
       role: 'user',
@@ -1058,4 +1067,94 @@ function verifyStoreSwitch(req, res) {
   }
 }
 
-module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError, sweepExpiredAuth, cleanupExpiredInvites };
+function getMyProfile(req, res) {
+  try {
+    const email = String(req.authUser?.email || '').trim().toLowerCase();
+    const user = getUsers().find(item => String(item.email || '').trim().toLowerCase() === email);
+    if (!user) return res.status(404).json({ error: 'Account not found.' });
+    const { password, tokens, trustedDevices, ...safe } = user;
+    return res.json({
+      profile: safe,
+      kycComplete: Boolean(safe.address && safe.nextOfKinName && safe.nextOfKinPhone && safe.nrcPhoto),
+      creditLimit: Number(safe.creditLimit ?? config.DEFAULT_CREDIT_LIMIT),
+      allowMultipleLoans: Boolean(safe.allowMultipleLoans)
+    });
+  } catch (err) {
+    logError(`PROFILE READ FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Your details are temporarily unavailable.' });
+  }
+}
+
+function saveCustomerKyc(req, res) {
+  try {
+    const actor = req.authUser;
+    if (!actor?.email) return res.status(403).json({ error: 'Sign in to update these details.' });
+    const own = actor.role === 'user';
+    const email = own
+      ? String(actor.email).trim().toLowerCase()
+      : String(req.body?.email || actor.email).trim().toLowerCase();
+    if (!own && !isAdminRole(actor.role)) return res.status(403).json({ error: 'Access denied.' });
+
+    const users = getUsers();
+    const index = users.findIndex(item => String(item.email || '').trim().toLowerCase() === email);
+    if (index < 0) return res.status(404).json({ error: 'Account not found.' });
+    if (!own && !canAccessStore(req, getRecordStoreId(users[index]))) {
+      return res.status(403).json({ error: 'Access to this store is not allowed.' });
+    }
+
+    const address = String(req.body?.address || users[index].address || '').trim();
+    const nextOfKinName = String(req.body?.nextOfKinName || users[index].nextOfKinName || '').trim();
+    const nextOfKinPhone = String(req.body?.nextOfKinPhone || users[index].nextOfKinPhone || '').trim();
+    if (!address || !nextOfKinName || !nextOfKinPhone) {
+      return res.status(400).json({ error: 'Home area, next of kin name, and next of kin phone are required.' });
+    }
+    if (!isValidZambianMobile(nextOfKinPhone)) {
+      return res.status(400).json({ error: 'Next of kin needs a valid Zambian mobile number (e.g. 0977123456).' });
+    }
+    const photo = req.file?.filename || users[index].nrcPhoto || null;
+    if (!photo) return res.status(400).json({ error: 'A photo of the NRC is required.' });
+
+    users[index].address = address;
+    users[index].nextOfKinName = nextOfKinName;
+    users[index].nextOfKinPhone = normalizePhoneNumber(nextOfKinPhone);
+    users[index].nrcPhoto = photo;
+    users[index].kycUpdatedAt = new Date().toISOString();
+    saveUsers(users);
+    return res.json({ message: 'Identity details saved.', kycComplete: true });
+  } catch (err) {
+    logBreakage('authController.js', 'saveCustomerKyc', err, 'KYC SAVE FAILED');
+    return res.status(503).json({ error: 'Identity details could not be saved.' });
+  }
+}
+
+function setCreditLimit(req, res) {
+  try {
+    if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'Admin access required.' });
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const users = getUsers();
+    const index = users.findIndex(item => String(item.email || '').trim().toLowerCase() === email);
+    if (index < 0) return res.status(404).json({ error: 'Account not found.' });
+    if (!canAccessStore(req, getRecordStoreId(users[index]))) {
+      return res.status(403).json({ error: 'Access to this store is not allowed.' });
+    }
+    const limit = Number(req.body?.creditLimit);
+    if (!Number.isFinite(limit) || limit < 0) {
+      return res.status(400).json({ error: 'The borrowing limit must be zero or more.' });
+    }
+    users[index].creditLimit = Number(limit.toFixed(2));
+    users[index].allowMultipleLoans = req.body?.allowMultipleLoans === true || req.body?.allowMultipleLoans === 'true';
+    users[index].creditUpdatedAt = new Date().toISOString();
+    users[index].creditUpdatedBy = req.authUser.email;
+    saveUsers(users);
+    return res.json({
+      message: 'Borrowing limit saved.',
+      creditLimit: users[index].creditLimit,
+      allowMultipleLoans: users[index].allowMultipleLoans
+    });
+  } catch (err) {
+    logBreakage('authController.js', 'setCreditLimit', err, 'CREDIT LIMIT SAVE FAILED');
+    return res.status(503).json({ error: 'The borrowing limit could not be saved.' });
+  }
+}
+
+module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError, sweepExpiredAuth, cleanupExpiredInvites, getMyProfile, saveCustomerKyc, setCreditLimit };

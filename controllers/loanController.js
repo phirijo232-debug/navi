@@ -547,6 +547,37 @@ function formatCurrency(value) {
   return `K ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function assessBorrowerRequest({ user, loans, amount }) {
+  const missing = [];
+  if (!String(user?.address || '').trim()) missing.push('home area');
+  if (!String(user?.nextOfKinName || '').trim() || !String(user?.nextOfKinPhone || '').trim()) missing.push('next of kin');
+  if (!String(user?.nrcPhoto || '').trim()) missing.push('NRC photo');
+  if (missing.length) {
+    return { ok: false, error: `Add your ${missing.join(', ')} before requesting a loan.` };
+  }
+
+  const email = String(user.email || '').trim().toLowerCase();
+  const open = (Array.isArray(loans) ? loans : []).filter(loan =>
+    String(loan.email || '').trim().toLowerCase() === email &&
+    countsAsMoneyOwed(loan) &&
+    Number(loan.outstanding || 0) > 0
+  );
+  const maxOpen = Number(config.MAX_OPEN_LOANS) || 1;
+  if (!user.allowMultipleLoans && open.length >= maxOpen) {
+    return { ok: false, error: 'You already have an open loan. The shop must allow another before you can request one.' };
+  }
+
+  const limit = Number(user.creditLimit ?? config.DEFAULT_CREDIT_LIMIT);
+  const used = open.reduce((sum, loan) => sum + (Number(loan.amount) || 0), 0);
+  if (Number.isFinite(limit) && limit >= 0 && used + Number(amount) > limit) {
+    return {
+      ok: false,
+      error: `This request passes your borrowing limit of K ${limit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`
+    };
+  }
+  return { ok: true, limit, openCount: open.length };
+}
+
 function calculateInterest(amount, tenureWeeks) {
   const rates = { 1: 0.10, 2: 0.16, 3: 0.24, 4: 0.32 };
   const rate = rates[parseInt(tenureWeeks)] || 0.10;
@@ -606,6 +637,15 @@ async function requestLoan(req, res) {
     if (!['low', 'standard', 'urgent', 'emergency'].includes(normalizedUrgency)) {
       return res.status(400).json({ error: 'Urgency must be low, standard, urgent, or emergency.' });
     }
+
+    const users = dataStore.readJson(USERS_FILE, [], Array.isArray);
+    const borrower = users.find(user => String(user.email || '').trim().toLowerCase() === String(email).trim().toLowerCase());
+    const gate = assessBorrowerRequest({
+      user: borrower,
+      loans: getLoansData(),
+      amount: requestedAmount
+    });
+    if (!gate.ok) return res.status(400).json({ error: gate.error });
 
     const { rate, interest, total } = calculateInterest(requestedAmount, weeks);
     const approvalDeadline = getApprovalDeadline(normalizedUrgency);
@@ -1452,6 +1492,7 @@ module.exports = {
   notifyAllOverdue,
   createAdminLoan,
   calculateInterest,
+  assessBorrowerRequest,
   getApprovalDeadline,
   filterLoansByTimeframe,
   getLoanTimeframeWindow,

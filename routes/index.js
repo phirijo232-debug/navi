@@ -14,7 +14,7 @@ const {
   requestLogin, confirmLogin,
   requestPasswordReset, confirmPasswordReset,
   createInvite, createAdminUser, validateInvite,
-  getAllUsers, sendAdminAnnouncement, listInvites,
+  getAllUsers, sendAdminAnnouncement,   listInvites, getMyProfile, saveCustomerKyc, setCreditLimit,
   listEmployees, editEmployee, setEmployeeRestriction,
   requestStoreSwitch, verifyStoreSwitch
 } = require('../controllers/authController');
@@ -35,6 +35,7 @@ const {
 const {
   listExpenses, createExpense, updateExpense, deleteExpense
 } = require('../controllers/expenseController');
+const { loanReceipt, loanAgreement, customerStatement } = require('../controllers/documentController');
 
 const { healthRateLimiter } = require('../middleware/security');
 
@@ -73,6 +74,12 @@ router.get('/payments', getPaymentsLedger);
 router.get('/payments/export', getPaymentsReportExport);
 router.post('/loans/notify-overdue', notifyAllOverdue);
 router.post('/loans/notify-user', notifyUser);
+router.get('/loans/:id/receipt', loanReceipt);
+router.get('/loans/:id/agreement', loanAgreement);
+router.get('/account/statement', customerStatement);
+router.get('/account/profile', getMyProfile);
+router.post('/account/kyc', upload.single('nrcPhoto'), saveCustomerKyc);
+router.post('/admin/credit-limit', setCreditLimit);
 router.get('/loans/:id', getLoanById);
 router.post('/loans/request', upload.fields([
   { name: 'collateralFront', maxCount: 1 },
