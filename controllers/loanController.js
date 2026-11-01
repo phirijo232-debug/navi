@@ -1245,9 +1245,12 @@ async function notifyUser(req, res) {
   try {
     const { email } = req.body || {};
     const authRole = req.authUser?.role;
-    if (authRole === 'admin') {
+    // Allow admin, franchise_admin, and store_admin to notify users
+    // Block user role (customers) from accessing this endpoint
+    if (authRole === 'user') {
       return res.status(403).json({ error: 'Admin access required.' });
     }
+    // admin and franchise_admin have full access; store_admin access is checked via canAccessStore below
     const target = String(email || '').trim().toLowerCase();
     if (!target) {
       return res.status(400).json({ error: 'Customer email is required.' });

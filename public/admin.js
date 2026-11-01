@@ -356,12 +356,25 @@ function ensureAdminAccess() {
   const token = getDeviceToken();
   const role = localStorage.getItem('userRole');
   const userStoreId = localStorage.getItem('userStoreId') || 'buraza';
-  const isStoreOperator = (role === 'store_admin' || role === 'franchise_admin') && userStoreId === 'buraza';
-  if (!token || (role !== 'admin' && !isStoreOperator)) {
+  // Super admins (admin) have full access to all stores
+  // Franchise admins and store admins have access per their store restrictions
+  const isSuperAdmin = role === 'admin';
+  const isStoreOperator = role === 'store_admin' && userStoreId === 'buraza';
+  const isFranchiseAdmin = role === 'franchise_admin';
+  
+  if (!token) {
     showAuthScreen();
     return false;
   }
-  return true;
+  
+  // Allow: super admin, franchise admin, or store operator (store_admin on buraza)
+  if (isSuperAdmin || isFranchiseAdmin || isStoreOperator) {
+    return true;
+  }
+  
+  // For other roles, hide admin views
+  showAuthScreen();
+  return false;
 }
 
 function applyRolePermissions() {
@@ -1367,7 +1380,7 @@ function renderSelectedUser() {
     loanMatchesTimeframe(loan)
   );
 
-  const canNotifyUser = localStorage.getItem('userRole') === 'store_admin';
+  const canNotifyUser = ['admin', 'franchise_admin', 'store_admin'].includes(localStorage.getItem('userRole') || '');
 
   modalBody.innerHTML = `
     <h2>Customer: ${escapeHtml(selectedUser.username || 'Unknown user')}</h2>

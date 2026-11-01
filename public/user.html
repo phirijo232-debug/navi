@@ -1016,7 +1016,7 @@
             ${(loan.paymentSubmissions || []).map(item => `<p>Submission ${escapeHtml(item.transactionReference)}: <strong>${escapeHtml(item.status)}</strong>${item.reviewReason ? ` · ${escapeHtml(item.reviewReason)}` : ''}</p>`).join('')}
             ${['active', 'grace', 'defaulted', 'in_progress', 'started'].includes(loanStatusOf(loan)) && Number(loan.outstanding) > 0 ?`
             <form data-customer-payment="${Number(loan.id)}" enctype="multipart/form-data">
-              <input name="amount" type="number" min="0.01" max="${Number(loan.outstanding)}" step="0.01" required placeholder="Amount paid (max ${formatKwacha(loan.outstanding)})">
+              <input name="amount" type="number" min="0.01" max="${Number(loan.outstanding)}" step="0.01" required value="${Number(loan.outstanding)}" placeholder="Amount paid (max ${formatKwacha(loan.outstanding)})">
               <select name="mode" required><option value="">Transfer method</option><option>Airtel Money</option><option>MTN MoMo</option><option>Bank Transfer</option></select>
               <input name="transactionReference" maxlength="64" required placeholder="Transaction reference">
               <label>Payment proof <input name="paymentProof" type="file" accept="image/jpeg,image/png,image/webp" required></label>
