@@ -99,6 +99,7 @@
         <div class="board-card">
           <h2>Payments</h2>
           <div class="overview-grid" id="paymentSummary"></div>
+          <ul class="loan-list" id="paymentHistory"></ul>
         </div>
       </div>
 
@@ -197,8 +198,8 @@
 
             <div class="loan-estimate-box" aria-live="polite">
               <div><span>Rate</span> <strong id="loanRateDisplay">16%</strong></div>
-              <div><span>Interest</span> <strong id="loanInterestDisplay">K0</strong></div>
-              <div><span>Total</span> <strong id="loanTotalDisplay">K0</strong></div>
+              <div><span>Interest</span> <strong id="loanInterestDisplay">K 0.00</strong></div>
+              <div><span>Total</span> <strong id="loanTotalDisplay">K 0.00</strong></div>
               <div><span>Approval target</span> <strong id="loanApprovalDisplay">48h</strong></div>
             </div>
 
@@ -271,8 +272,15 @@
     }
 
     function formatKwacha(value) {
-      const amount = Number(value) || 0;
-      return `K${amount.toLocaleString('en-ZM')}`;
+      const amount = Number(value);
+      const safe = Number.isFinite(amount) ? amount : 0;
+      return `K ${safe.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[character]);
     }
 
     function formatDateDisplay(dateValue) {
@@ -345,6 +353,13 @@
         setTimeframeMode(button.dataset.mode);
         updateLoanEstimateDisplay();
       });
+    });
+    updateLoanEstimateDisplay();
+
+    document.getElementById('loan-list').addEventListener('click', event => {
+      const card = event.target.closest('[data-loan-id]');
+      if (!card) return;
+      openLoanDetails(card.dataset.loanId);
     });
 
     setTimeframeMode('weeks');
@@ -447,6 +462,7 @@
     let currentHistoryFilter = 'all';
 
     function setOverviewSection(sectionKey) {
+      document.querySelectorAll('.loan-tab').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.screen-section').forEach(section => {
         const isMatch = section.id === `${sectionKey}Section`;
         section.classList.toggle('hidden', !isMatch);
@@ -507,6 +523,28 @@
           <span>${formatKwacha(totalActive + totalSettled)}</span>
         </div>
       `;
+
+      const history = document.getElementById('paymentHistory');
+      if (history) {
+        const rows = [];
+        allLoans.forEach(loan => {
+          (Array.isArray(loan.payments) ? loan.payments : []).forEach(payment => {
+            rows.push({ loan, payment });
+          });
+        });
+        rows.sort((a, b) => new Date(b.payment.paymentDate || b.payment.date || 0) - new Date(a.payment.paymentDate || a.payment.date || 0));
+        history.innerHTML = rows.length
+          ? rows.map(({ loan, payment }) => `
+              <li class="loan-card">
+                <div class="loan-card-heading">
+                  <strong>${escapeHtml(loan.product || 'Loan')}</strong>
+                  <span>${escapeHtml(formatKwacha(payment.amount))}</span>
+                </div>
+                <div class="loan-meta">${escapeHtml(formatDateDisplay(payment.paymentDate || payment.date))} • ${escapeHtml(payment.mode || 'Payment')} • ${escapeHtml(payment.paymentReceiptId || payment.receiptNumber || 'No receipt')}</div>
+              </li>
+            `).join('')
+          : '<li class="loan-empty">No payments recorded yet.</li>';
+      }
     }
 
     function renderOverviewSummary(loans) {
@@ -555,7 +593,7 @@
         <div class="info-row"><strong>Email:</strong> <span>${user.email}</span></div>
         <div class="info-row"><strong>Role:</strong> <span>${user.role}</span></div>
         <div class="info-row"><strong>Theme:</strong> <span>${user.theme}</span></div>
-        <div class="info-row"><strong>Device token:</strong> <span>${user.deviceToken}</span></div>
+        <div class="info-row"><strong>Session:</strong> <span>${user.deviceToken && user.deviceToken !== 'Not available' ? 'Active' : 'Not signed in'}</span></div>
       `;
     }
 
@@ -623,19 +661,19 @@
 
       loanList.innerHTML = filtered.length
         ? filtered.map(loan => `
-            <li class="loan-card" title="Product: ${loan.product || 'Loan'}\nRequested: ${formatKwacha(loan.amount)}\nInterest: ${formatKwacha(loan.interestAmount || 0)}\nTotal: ${formatKwacha(loan.totalRepayment || loan.amount || 0)}\nTenure: ${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'}\nUrgency: ${formatStatusLabel(loan.urgency || 'standard')}\nDue: ${formatDateDisplay(loan.dueDate)}\nDecision: ${loan.adminReason || 'No decision reason yet.'}" onclick="openLoanDetails(${loan.id})">
+            <li class="loan-card" data-loan-id="${escapeHtml(loan.id)}">
               <div class="loan-card-heading">
-                <strong>${loan.product}</strong>
-                <span class="loan-badge ${loanStatusOf(loan)}">${formatStatusLabel(loanStatusOf(loan)).toUpperCase()}</span>
+                <strong>${escapeHtml(loan.product || 'Loan')}</strong>
+                <span class="loan-badge ${escapeHtml(loanStatusOf(loan))}">${escapeHtml(formatStatusLabel(loanStatusOf(loan)).toUpperCase())}</span>
               </div>
               <div class="loan-meta">
-                Amount: ${formatKwacha(loan.amount)} • Paid: ${formatKwacha(loan.paidTotal || 0)} • Balance: ${formatKwacha(loan.outstanding)}
+                Receipt: ${escapeHtml(loan.receiptNumber || 'Pending')} • Amount: ${escapeHtml(formatKwacha(loan.amount))} • Paid: ${escapeHtml(formatKwacha(loan.paidTotal || 0))} • Balance: ${escapeHtml(formatKwacha(loan.outstanding))}
               </div>
               <div class="loan-meta">
-                Requested: ${formatDateDisplay(loan.createdAt || loan.dueDate)} • Interest: ${formatKwacha(loan.interestAmount || 0)} • Total: ${formatKwacha(loan.totalRepayment || loan.amount || 0)}
+                Requested: ${escapeHtml(formatDateDisplay(loan.createdAt || loan.dueDate))} • Interest: ${escapeHtml(formatKwacha(loan.interestAmount || 0))} • Total: ${escapeHtml(formatKwacha(loan.totalRepayment || loan.amount || 0))}
               </div>
               <div class="loan-meta">
-                Tenure: ${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'} • Urgency: ${formatStatusLabel(loan.urgency || 'standard')}
+                Tenure: ${escapeHtml(loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided')} • Urgency: ${escapeHtml(formatStatusLabel(loan.urgency || 'standard'))} • Due: ${escapeHtml(formatDateDisplay(loan.dueDate))}
               </div>
             </li>
           `).join('')
@@ -651,30 +689,31 @@
       panel.innerHTML = `
         <div class="loan-detail-card">
           <div class="loan-detail-header">
-            <h3>${loan.product || 'Loan Request'}</h3>
-            <span class="loan-badge ${loanStatusOf(loan)}">${formatStatusLabel(loanStatusOf(loan)).toUpperCase()}</span>
+            <h3>${escapeHtml(loan.product || 'Loan Request')}</h3>
+            <span class="loan-badge ${escapeHtml(loanStatusOf(loan))}">${escapeHtml(formatStatusLabel(loanStatusOf(loan)).toUpperCase())}</span>
           </div>
           <div class="loan-detail-grid">
-            <p><strong>Requested by:</strong> ${loan.email || 'Unknown'}</p>
-            <p><strong>Amount requested:</strong> ${formatKwacha(loan.amount)}</p>
-            <p><strong>Interest rate:</strong> ${loan.interestRate || 0}%</p>
-            <p><strong>Interest amount:</strong> ${formatKwacha(loan.interestAmount || 0)}</p>
-            <p><strong>Total after interest:</strong> ${formatKwacha(loan.totalRepayment || loan.amount || 0)}</p>
-            <p><strong>Amount paid:</strong> ${formatKwacha(loan.paidTotal || 0)}</p>
-            <p><strong>Outstanding:</strong> ${formatKwacha(loan.outstanding || 0)}</p>
-            <p><strong>Due date:</strong> ${formatDateDisplay(loan.dueDate)}</p>
-            <p><strong>Urgency:</strong> ${formatStatusLabel(loan.urgency || 'standard')}</p>
-            <p><strong>Collateral:</strong> ${collateralText}</p>
-            <p><strong>Requested:</strong> ${formatDateDisplay(loan.createdAt)}</p>
-            <p class="loan-detail-full"><strong>Decision reason:</strong> ${decisionText}</p>
+            <p><strong>Requested by:</strong> ${escapeHtml(loan.email || 'Unknown')}</p>
+            <p><strong>Receipt:</strong> ${escapeHtml(loan.receiptNumber || 'Pending')}</p>
+            <p><strong>Amount requested:</strong> ${escapeHtml(formatKwacha(loan.amount))}</p>
+            <p><strong>Interest rate:</strong> ${escapeHtml(loan.interestRate || 0)}%</p>
+            <p><strong>Interest amount:</strong> ${escapeHtml(formatKwacha(loan.interestAmount || 0))}</p>
+            <p><strong>Total after interest:</strong> ${escapeHtml(formatKwacha(loan.totalRepayment || loan.amount || 0))}</p>
+            <p><strong>Amount paid:</strong> ${escapeHtml(formatKwacha(loan.paidTotal || 0))}</p>
+            <p><strong>Outstanding:</strong> ${escapeHtml(formatKwacha(loan.outstanding || 0))}</p>
+            <p><strong>Due date:</strong> ${escapeHtml(formatDateDisplay(loan.dueDate))}</p>
+            <p><strong>Urgency:</strong> ${escapeHtml(formatStatusLabel(loan.urgency || 'standard'))}</p>
+            <p><strong>Collateral:</strong> ${escapeHtml(collateralText)}</p>
+            <p><strong>Requested:</strong> ${escapeHtml(formatDateDisplay(loan.createdAt))}</p>
+            <p class="loan-detail-full"><strong>Decision reason:</strong> ${escapeHtml(decisionText)}</p>
           </div>
           <div class="loan-payment-history">
             <h4>Payment history</h4>
             ${(Array.isArray(loan.payments) && loan.payments.length)
               ? `<ul>${loan.payments.map(payment => `
                   <li>
-                    ${formatKwacha(payment.amount)} • ${payment.mode || 'payment'} • ${formatDateDisplay(payment.paymentDate || payment.date)}
-                    ${payment.receiptNumber || payment.paymentReceiptId ? ` • Ref: ${payment.receiptNumber || payment.paymentReceiptId}` : ''}
+                    ${escapeHtml(formatKwacha(payment.amount))} • ${escapeHtml(payment.mode || 'payment')} • ${escapeHtml(formatDateDisplay(payment.paymentDate || payment.date))}
+                    ${payment.receiptNumber || payment.paymentReceiptId ? ` • Ref: ${escapeHtml(payment.receiptNumber || payment.paymentReceiptId)}` : ''}
                   </li>`).join('')}</ul>`
               : '<p>No payments recorded yet.</p>'}
           </div>
@@ -689,7 +728,7 @@
       if (!userEmail) {
         loanList.innerHTML = '<li>Please login again to see your loan information.</li>';
         document.getElementById('loanTotal').textContent = '0 loans';
-        document.getElementById('loanOutstanding').textContent = 'K0';
+        document.getElementById('loanOutstanding').textContent = formatKwacha(0);
         renderLoanSummaryCounts([]);
         return;
       }

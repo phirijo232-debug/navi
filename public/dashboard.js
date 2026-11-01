@@ -44,7 +44,8 @@ function getLoanTimeframeLabel(loan) {
 
 function formatKwacha(value) {
   const amount = Number(value) || 0;
-  return `K${amount.toLocaleString('en-ZM')}`;
+  const safe = Number.isFinite(amount) ? amount : 0;
+  return `K ${safe.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatDate(value) {
@@ -359,10 +360,11 @@ async function fetchData() {
     const isAdmin = localStorage.getItem('userRole') === 'admin';
 
     const status = await fetch('/status', { headers }).then(r => r.json());
-    document.getElementById('status').textContent = status.status.toUpperCase();
-    document.getElementById('uptime').textContent = status.uptime;
-    document.getElementById('ram').textContent = status.ram.used;
-    document.getElementById('cpu').textContent = status.cpu.cores + ' Cores';
+    if (!status || !status.status) throw new Error('Status unavailable');
+    document.getElementById('status').textContent = String(status.status).toUpperCase();
+    document.getElementById('uptime').textContent = status.uptime || '--';
+    document.getElementById('ram').textContent = status.ram?.used || '--';
+    document.getElementById('cpu').textContent = status.cpu?.cores != null ? `${status.cpu.cores} Cores` : '--';
 
     // Active sessions + logs are admin-only now; non-admins see a notice instead
     // of a broken panel (and never trigger a 403 fetch loop).
@@ -379,22 +381,42 @@ async function fetchData() {
 
     const accessLogs = await fetch('/logs/access', { headers }).then(r => r.json());
     const accessList = document.getElementById('access-log');
-    accessList.innerHTML = (accessLogs.logs || []).slice(-10).reverse()
-      .map(l => `<li>${l}</li>`).join('');
+    const accessRows = (accessLogs.logs || []).slice(-10).reverse();
+    accessList.innerHTML = accessRows.length
+      ? accessRows.map(l => `<li>${escapeDashboardText(l)}</li>`).join('')
+      : '<li>No recent access.</li>';
 
     const errorLogs = await fetch('/logs/errors', { headers }).then(r => r.json());
     const errorList = document.getElementById('error-log');
-    errorList.innerHTML = (errorLogs.logs || []).slice(-10).reverse()
-      .map(l => `<li class="threat">${l}</li>`).join('');
+    const errorRows = (errorLogs.logs || []).slice(-10).reverse();
+    errorList.innerHTML = errorRows.length
+      ? errorRows.map(l => `<li class="threat">${escapeDashboardText(l)}</li>`).join('')
+      : '<li>No recent errors.</li>';
 
   } catch (err) {
     console.error('Dashboard fetch error:', err);
+    const statusEl = document.getElementById('status');
+    if (statusEl && (statusEl.textContent === 'Loading...' || !statusEl.textContent)) {
+      statusEl.textContent = 'Unavailable';
+    }
   }
 }
 
+function escapeDashboardText(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character]);
+}
+
 async function fetchFranchiseReport() {
-  if (localStorage.getItem('userRole') !== 'admin') return;
   const metrics = document.getElementById('franchiseMetrics');
+  if (!metrics) return;
+  if (localStorage.getItem('userRole') !== 'admin') {
+    metrics.innerHTML = '<p>The franchise portfolio is available to the main admin.</p>';
+    const note = document.getElementById('franchiseReportNote');
+    if (note) note.textContent = '';
+    return;
+  }
   try {
     const response = await fetch('/reports/franchise/summary', {
       headers: { 'x-device-token': localStorage.getItem('deviceToken') || '' }

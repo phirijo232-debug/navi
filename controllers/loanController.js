@@ -708,7 +708,10 @@ function getLoans(req, res) {
     // Always present payments with a reconciled ledger (paidTotal, outstanding,
     // balance before/after) so recorded payments show up identically for users
     // and admins — never depend on stale persisted balances.
-    loans = loans.map(loan => rebuildPaymentLedger({ ...loan, payments: (loan.payments || []).map(p => ({ ...p })) }));
+    loans = loans.map(loan => {
+      const rebuilt = rebuildPaymentLedger({ ...loan, payments: (loan.payments || []).map(p => ({ ...p })) });
+      return { ...rebuilt, businessStatus: deriveLoanStatus(rebuilt) };
+    });
 
     const summary = calculateSummary(loans);
     const totalRequested = loans.reduce((sum, l) => sum + (l.amount || 0), 0);
@@ -940,19 +943,25 @@ function getAllLoans(req, res) {
 
     const storeId = getRequestedStoreId(req);
     if (!canAccessStore(req, storeId)) return res.status(403).json({ error: 'Access to this store is not allowed.' });
-    const loans = getLoansData().filter(loan => storeId === 'all' || getRecordStoreId(loan) === storeId);
+    const stored = getLoansData().filter(loan => storeId === 'all' || getRecordStoreId(loan) === storeId);
     // Canonical buckets only (pending/active/grace/defaulted/liquidated/paid/
     // declined). Legacy stored values (approved, in_progress, overdue…) are
     // counted under the live status deriveLoanStatus maps them onto.
+    // Each returned loan also carries businessStatus so the admin screens
+    // follow the same clock (grace / defaulted) as the summary counts.
+    const loans = stored.map(loan => {
+      const copy = rebuildPaymentLedger({ ...loan, payments: (loan.payments || []).map(p => ({ ...p })) });
+      return { ...copy, businessStatus: deriveLoanStatus(copy) };
+    });
     const summary = {
       total: loans.length,
-      pending: loans.filter(l => deriveLoanStatus(l) === 'pending').length,
-      active: loans.filter(l => deriveLoanStatus(l) === 'active').length,
-      grace: loans.filter(l => deriveLoanStatus(l) === 'grace').length,
-      defaulted: loans.filter(l => deriveLoanStatus(l) === 'defaulted').length,
-      liquidated: loans.filter(l => deriveLoanStatus(l) === 'liquidated').length,
-      paid: loans.filter(l => deriveLoanStatus(l) === 'paid').length,
-      declined: loans.filter(l => deriveLoanStatus(l) === 'declined').length,
+      pending: loans.filter(l => l.businessStatus === 'pending').length,
+      active: loans.filter(l => l.businessStatus === 'active').length,
+      grace: loans.filter(l => l.businessStatus === 'grace').length,
+      defaulted: loans.filter(l => l.businessStatus === 'defaulted').length,
+      liquidated: loans.filter(l => l.businessStatus === 'liquidated').length,
+      paid: loans.filter(l => l.businessStatus === 'paid').length,
+      declined: loans.filter(l => l.businessStatus === 'declined').length,
       totalOutstanding: loans.reduce((sum, l) => sum + (l.outstanding || 0), 0)
     };
     res.json({ summary, loans });

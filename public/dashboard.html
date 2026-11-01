@@ -17,6 +17,7 @@
 <body>
   <button class="menu-toggle" id="menuBtn">⋮</button>
   <div class="dropdown-menu" id="menuDropdown">
+    <button type="button" id="controlPanelBtn" hidden>Control panel</button>
     <button id="logoutBtn">Logout</button>
   </div>
   <div class="dashboard">
@@ -73,6 +74,14 @@
   <script>
     const deviceToken = localStorage.getItem('deviceToken');
     localStorage.setItem('lastAppPage', 'dashboard.html');
+    const controlPanelBtn = document.getElementById('controlPanelBtn');
+    const signedInRole = localStorage.getItem('userRole') || '';
+    if (controlPanelBtn && ['admin', 'franchise_admin', 'store_admin'].includes(signedInRole)) {
+      controlPanelBtn.hidden = false;
+      controlPanelBtn.addEventListener('click', () => {
+        window.location.href = 'admin.html';
+      });
+    }
     const savedMode = localStorage.getItem('mode') || 'dark';
     applyTheme(savedMode);
 

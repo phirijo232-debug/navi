@@ -161,6 +161,8 @@ function applyRolePermissions() {
   // HR (employee management) is only for the main admin and Franchise Employee Admin.
   const hrMenu = document.getElementById('adminMenuHr');
   if (hrMenu) hrMenu.hidden = !isFranchiseLevel;
+  const healthMenu = document.getElementById('adminMenuHealth');
+  if (healthMenu) healthMenu.hidden = role !== 'admin';
   // Only franchise-level roles may create store admins; only the main admin may
   // create Franchise Employee Admins.
   document.querySelector('#newUserRole option[value="store_admin"]').hidden = !isFranchiseLevel;
@@ -214,7 +216,7 @@ async function fetchNewRequests() {
     if (!response.ok) throw new Error(data.error || 'Unable to load requests.');
 
     pendingRequests = (Array.isArray(data.loans) ? data.loans : [])
-      .filter(loan => String(loan.status || '').trim().toLowerCase().replace(/\s+/g, '_') === 'pending')
+      .filter(loan => getLoanStatus(loan) === 'pending')
       .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
     portfolioLoans = Array.isArray(data.loans) ? data.loans : [];
     renderNewRequests();
@@ -480,14 +482,26 @@ function downloadCsv(filename, headers, rows) {
 function getLoanStatus(loan) {
   // Prefer the server-computed canonical business status (single source of truth).
   const CANONICAL = ['pending', 'active', 'grace', 'defaulted', 'liquidated', 'paid', 'declined'];
+  const LEGACY = {
+    awaiting_approval: 'pending',
+    approved: 'active',
+    in_progress: 'active',
+    'in-progress': 'active',
+    running: 'active',
+    overdue: 'grace',
+    default: 'defaulted',
+    liquidation: 'liquidated',
+    recovered: 'liquidated',
+    settled: 'paid',
+    closed: 'paid',
+    completed: 'paid',
+    rejected: 'declined'
+  };
   const canonical = String(loan.businessStatus || '').toLowerCase();
   if (CANONICAL.includes(canonical)) return canonical;
   const status = String(loan.status || 'pending').toLowerCase().replace(/\s+/g, '_');
-  if (['declined', 'paid', 'defaulted', 'liquidated'].includes(status)) return status;
-  if (status === 'overdue') return 'grace'; // legacy label — past due lives in grace/defaulted
-  if (['approved', 'in_progress', 'in-progress', 'running'].includes(status)) return 'active';
-  if (['active', 'grace', 'pending'].includes(status)) return status;
-  return 'pending';
+  if (CANONICAL.includes(status)) return status;
+  return LEGACY[status] || 'pending';
 }
 
 function renderLoanDetails(loan) {
@@ -1218,6 +1232,10 @@ function setupAdminMenu() {
   document.getElementById('adminMenuHr')?.addEventListener('click', () => {
     dropdown.classList.remove('active');
     showHrView();
+  });
+  document.getElementById('adminMenuHealth')?.addEventListener('click', () => {
+    dropdown.classList.remove('active');
+    window.location.href = 'dashboard.html';
   });
   document.getElementById('customersBackBtn')?.addEventListener('click', showDashboard);
   document.getElementById('hrBackBtn')?.addEventListener('click', showDashboard);
