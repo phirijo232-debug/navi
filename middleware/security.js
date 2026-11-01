@@ -96,7 +96,8 @@ const PUBLIC_PATHS = new Set([
   '/password-reset/confirm',
   '/status',
   '/health',
-  '/favicon.ico'
+  '/favicon.ico',
+  '/stores'
 ]);
 
 function deviceAuth(req, res, next) {

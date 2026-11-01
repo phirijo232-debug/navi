@@ -28,6 +28,10 @@ module.exports = {
   CHARGE_GRACE_ENTRY_DAY: true,
   // Paying early does not reduce the interest agreed for the weeks.
   EARLY_PAYOFF_KEEPS_FULL_INTEREST: true,
+  // How much a customer may have out at once, until staff set their own limit.
+  DEFAULT_CREDIT_LIMIT: 10000,
+  // A second loan needs the shop to tick "allow another loan" on that customer.
+  MAX_OPEN_LOANS: 1,
   REMINDER_DAYS_BEFORE: 3,
 
   REPORTS: {

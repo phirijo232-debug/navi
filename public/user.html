@@ -125,6 +125,18 @@
         <div class="board-card">
           <h2>About You</h2>
           <div id="aboutUserDetails" class="about-user-grid"></div>
+          <form id="kycForm" class="auth-form" enctype="multipart/form-data" style="margin-top: 16px;">
+            <h3>Identity</h3>
+            <p class="message-text" style="text-align:left;">A loan request needs your home area, a next of kin, and a photo of your NRC.</p>
+            <input type="text" id="kycAddress" class="auth-input" placeholder="Home area or address" required>
+            <input type="text" id="kycKinName" class="auth-input" placeholder="Next of kin name" required>
+            <input type="tel" id="kycKinPhone" class="auth-input" placeholder="Next of kin phone" required>
+            <label class="field-label" for="kycPhoto">NRC photo</label>
+            <input type="file" id="kycPhoto" accept="image/*" class="auth-input file-input">
+            <button type="submit" class="enter-btn">Save identity details</button>
+            <p id="kycMessage" class="message-text"></p>
+          </form>
+          <button type="button" class="toggle-mode" id="statementBtn" style="margin-top: 12px;">Download my statement</button>
         </div>
       </div>
 
@@ -282,6 +294,8 @@
 
     function formatDateDisplay(dateValue) {
       if (!dateValue) return '';
+      const match = String(dateValue).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (match && String(dateValue).length <= 10) return `${match[3]}/${match[2]}/${match[1]}`;
       const date = new Date(dateValue);
       if (Number.isNaN(date.getTime())) return dateValue;
       return date.toLocaleDateString('en-GB');
@@ -352,6 +366,74 @@
       });
     });
     updateLoanEstimateDisplay();
+
+    async function openProtectedPdf(url) {
+      const token = localStorage.getItem('deviceToken');
+      const response = await fetch(url, { headers: { 'x-device-token': token } });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Could not open the document.');
+      }
+      const blob = await response.blob();
+      const href = URL.createObjectURL(blob);
+      window.open(href, '_blank');
+    }
+
+    document.getElementById('loanDetailPanel').addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-pdf]');
+      if (!button) return;
+      try {
+        await openProtectedPdf(button.dataset.pdf);
+      } catch (err) {
+        document.getElementById('loanRequestMessage').textContent = err.message;
+      }
+    });
+
+    document.getElementById('statementBtn').addEventListener('click', async () => {
+      try {
+        await openProtectedPdf('/account/statement');
+      } catch (err) {
+        document.getElementById('kycMessage').textContent = err.message;
+      }
+    });
+
+    document.getElementById('kycForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const message = document.getElementById('kycMessage');
+      message.textContent = '';
+      const body = new FormData();
+      body.append('address', document.getElementById('kycAddress').value.trim());
+      body.append('nextOfKinName', document.getElementById('kycKinName').value.trim());
+      body.append('nextOfKinPhone', document.getElementById('kycKinPhone').value.trim());
+      const photo = document.getElementById('kycPhoto').files[0];
+      if (photo) body.append('nrcPhoto', photo);
+      try {
+        const response = await fetch('/account/kyc', {
+          method: 'POST',
+          headers: { 'x-device-token': localStorage.getItem('deviceToken') },
+          body
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Could not save identity details.');
+        message.textContent = data.message || 'Saved.';
+      } catch (err) {
+        message.textContent = err.message;
+      }
+    });
+
+    fetch('/account/profile', { headers: { 'x-device-token': localStorage.getItem('deviceToken') } })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => {
+        if (!data?.profile) return;
+        document.getElementById('kycAddress').value = data.profile.address || '';
+        document.getElementById('kycKinName').value = data.profile.nextOfKinName || '';
+        document.getElementById('kycKinPhone').value = data.profile.nextOfKinPhone || '';
+        const about = document.getElementById('aboutUserDetails');
+        if (about) {
+          about.innerHTML = `<p><strong>Borrowing limit:</strong> ${formatKwacha(data.creditLimit)}</p><p><strong>Identity:</strong> ${data.kycComplete ? 'On file' : 'Still needed before a new loan'}</p>`;
+        }
+      })
+      .catch(() => {});
 
     document.getElementById('loan-list').addEventListener('click', event => {
       const card = event.target.closest('[data-loan-id]');
@@ -555,7 +637,16 @@
       const active = owedLoans.length;
       const closed = loans.filter(loan => ['paid', 'declined'].includes(loanStatusOf(loan))).length;
 
+      const nextDue = owedLoans
+        .map(loan => String(loan.dueDate || '').slice(0, 10))
+        .filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date))
+        .sort()[0];
+      const lateBalance = owedLoans
+        .filter(loan => ['grace', 'defaulted'].includes(loanStatusOf(loan)))
+        .reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
+      const dailyLate = lateBalance * 0.018;
       container.innerHTML = `
+        <p class="message-text" style="text-align:left;grid-column:1/-1;">You owe ${formatKwacha(totalOutstanding)}${nextDue ? `, next due ${formatDateDisplay(nextDue)}` : ''}. ${lateBalance > 0 ? `Each late day adds ${formatKwacha(dailyLate)}.` : 'Each late day adds 1.8% of the balance from the first day in grace or default.'}</p>
         <div class="summary-inline-card">
           <h3>Total requested</h3>
           <p>${loans.length}</p>
@@ -699,11 +790,15 @@
             <p><strong>Total after interest:</strong> ${escapeHtml(formatKwacha(loan.totalRepayment || loan.amount || 0))}</p>
             <p><strong>Amount paid:</strong> ${escapeHtml(formatKwacha(loan.paidTotal || 0))}</p>
             <p><strong>Outstanding:</strong> ${escapeHtml(formatKwacha(loan.outstanding || 0))}</p>
-            <p><strong>Due date:</strong> ${escapeHtml(formatDateDisplay(loan.dueDate))}</p>
+            <p><strong>Due date:</strong> ${loan.dueDateIsEstimate ? 'Set when the shop approves, plus the weeks you chose' : escapeHtml(formatDateDisplay(loan.dueDate))}</p>
             <p><strong>Urgency:</strong> ${escapeHtml(formatStatusLabel(loan.urgency || 'standard'))}</p>
             <p><strong>Collateral:</strong> ${escapeHtml(collateralText)}</p>
             <p><strong>Requested:</strong> ${escapeHtml(formatDateDisplay(loan.createdAt))}</p>
             <p class="loan-detail-full"><strong>Decision reason:</strong> ${escapeHtml(decisionText)}</p>
+          </div>
+          <div class="button-row" style="margin-top: 12px;">
+            <button type="button" class="toggle-mode" data-pdf="/loans/${escapeHtml(loan.id)}/receipt">Receipt</button>
+            <button type="button" class="toggle-mode" data-pdf="/loans/${escapeHtml(loan.id)}/agreement">Agreement</button>
           </div>
           <div class="loan-payment-history">
             <h4>Payment history</h4>

@@ -5,6 +5,7 @@ const emailService = require('./email');
 const { logError, logBreakage } = require('./logger');
 const { getLoansData, deriveLoanStatus } = require('../controllers/loanController');
 const { calendarToday } = require('./calendar');
+const { sendSms, sendWhatsApp } = require('./messaging');
 
 // ─── Automated borrower notifications (Task 7 — email channel) ───────────────
 // Daily check at 23:58 (driven by scheduler.js), for each active loan:
@@ -108,6 +109,20 @@ async function sendTemplatedMessage({ loan, messageKey, days, day, context = 'sc
     record.status = 'failed';
     record.error = err.message;
     logError(`BORROWER NOTIFICATION FAILED (${messageKey}, loan #${loan.id}): ${err.message}`);
+  }
+
+  if (record.status === 'sent') {
+    try {
+      const users = dataStore.readJson(dataStore.paths.users, [], Array.isArray);
+      const person = users.find(user => String(user.email || '').trim().toLowerCase() === to);
+      if (person?.phone) {
+        await sendSms({ to: person.phone, text: body });
+        await sendWhatsApp({ to: person.phone, text: body });
+        record.channel = 'email+sms+whatsapp';
+      }
+    } catch (err) {
+      logError(`PHONE MESSAGE SKIPPED | loan ${loan.id} | ${err.message}`);
+    }
   }
 
   record.sentAt = new Date().toISOString();
