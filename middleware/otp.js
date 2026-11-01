@@ -2,10 +2,31 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const crypto = require('crypto');
 const { sendMail } = require('./email');
+const dataStore = require('./dataStore');
 
-// HEART: in-memory OTP store, scoped by email and purpose so different flows do not collide
+// HEART: OTP store, scoped by email and purpose so different flows do not collide.
+// Codes are written to disk so a restart does not throw away a code that was
+// just emailed. The file is not part of the business backup.
 const OTP_NAMESPACE = '__global_otp__';
+const OTP_FILE = path.join(dataStore.DATA_DIR, 'otp-store.json');
 const otpStore = {};
+
+function loadOtpStore() {
+  const saved = dataStore.readJson(OTP_FILE, {}, (value) => value && typeof value === 'object' && !Array.isArray(value));
+  Object.keys(otpStore).forEach((key) => { delete otpStore[key]; });
+  Object.assign(otpStore, saved || {});
+}
+
+function saveOtpStore() {
+  try {
+    dataStore.writeJson(OTP_FILE, otpStore);
+  } catch (err) {
+    // A failed save must not block login; the in-memory code still works
+    // until the process stops.
+  }
+}
+
+loadOtpStore();
 
 function normalizeEmailAddress(targetEmail = null) {
   if (typeof targetEmail !== 'string') return null;
@@ -43,11 +64,15 @@ function buildOtpKey(targetEmail = null, purpose = null) {
 // LEGS: cleanup expired entries so active codes stay unique and current
 function cleanupExpiredOtps() {
   const now = Date.now();
+  let removed = 0;
   Object.keys(otpStore).forEach((key) => {
-    if (otpStore[key].expiry <= now) {
+    if (!otpStore[key] || otpStore[key].expiry <= now) {
       delete otpStore[key];
+      removed += 1;
     }
   });
+  if (removed) saveOtpStore();
+  return removed;
 }
 
 // ARMS: reuse the currently active OTP for a given email/purpose unless a fresh resend is explicitly requested
@@ -71,6 +96,7 @@ function generateOTP(key, forceNew = false) {
     expiry: Date.now() + 300000,
     createdAt: new Date().toISOString()
   };
+  saveOtpStore();
 
   return otp;
 }
@@ -92,6 +118,7 @@ async function sendOTP(purpose = 'Account Verification', targetEmail = null, for
   });
   if (!result.ok) {
     delete otpStore[key];
+    saveOtpStore();
     throw new Error(result.reason || 'OTP email configuration is incomplete.');
   }
 
@@ -104,6 +131,7 @@ function verifyOTP(input, targetEmail = null, purpose = null) {
 
   if (!record || Date.now() > record.expiry) {
     delete otpStore[key];
+    saveOtpStore();
     return { valid: false, message: 'OTP expired or not generated.' };
   }
 
@@ -112,6 +140,7 @@ function verifyOTP(input, targetEmail = null, purpose = null) {
   }
 
   delete otpStore[key];
+  saveOtpStore();
   return { valid: true };
 }
 module.exports = { sendOTP, verifyOTP, generateOTP, buildOtpKey, cleanupExpiredOtps };

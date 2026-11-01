@@ -40,24 +40,24 @@ test('grace accrual pins the base on first pass, then adds 1.8%/day idempotently
     outstanding: 1200,
     dueDate: '2026-10-05'
   };
-  // Past due -> grace by the clock. First pass pins the window: no charge today.
+  // The first grace day is charged (1 x 1200 x 1.8% = 21.60).
   applyGraceAccrual(loan, '2026-10-08');
   assert.equal(loan.graceAccrualBase, 1200);
-  assert.equal(loan.graceAccrued, 0);
+  assert.equal(loan.graceAccrued, 21.6);
 
-  // Two days later: 2 x 1200 x 1.8% = 43.20.
+  // Two days later includes the start day: 3 x 1200 x 1.8% = 64.80.
   applyGraceAccrual(loan, '2026-10-10');
-  assert.equal(loan.graceAccrued, 43.2);
-  assert.equal(loan.interestAmount, 243.2);
-  assert.equal(loan.totalRepayment, 1243.2);
+  assert.equal(loan.graceAccrued, 64.8);
+  assert.equal(loan.interestAmount, 264.8);
+  assert.equal(loan.totalRepayment, 1264.8);
 
   // Same day again — idempotent, no double charge.
   applyGraceAccrual(loan, '2026-10-10');
-  assert.equal(loan.graceAccrued, 43.2);
+  assert.equal(loan.graceAccrued, 64.8);
 
   // The accrued penalty rides on the ledger balance.
   rebuildPaymentLedger(loan);
-  assert.equal(loan.outstanding, 1243.2);
+  assert.equal(loan.outstanding, 1264.8);
 });
 
 test('grace penalty is capped at 50% of the original principal', () => {

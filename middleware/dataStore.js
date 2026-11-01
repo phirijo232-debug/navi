@@ -12,9 +12,8 @@ const db = require('./db');
 //             read, truncate, or overwrite the live user/loan/feedback files
 //             again (this is what wiped users.json before).
 
+const { CORE_DATA_FILES, KNOWN_DATA_FILES, BUSINESS_DATA_FILES } = require('./dataFiles');
 const LIVE_DATA_DIR = path.join(__dirname, '..', 'data');
-const CORE_DATA_FILES = ['users.json', 'loans.json', 'feedback.json'];
-const KNOWN_DATA_FILES = [...CORE_DATA_FILES, 'dailyReportState.json', 'notifications.json'];
 
 function isTestEnvironment() {
   return Boolean(process.env.NODE_TEST_CONTEXT) ||           // node --test runner
@@ -189,7 +188,7 @@ function ensureDataIntegrity() {
   // HEART boot reconcile (JSON wins): copy any JSON file newer than its kv row
   // into SQLite so a crash between the two writes can never serve stale data.
   try {
-    const mirrorFiles = [...CORE_DATA_FILES, 'invites.json', 'notifications.json', 'dailyReportState.json']
+    const mirrorFiles = BUSINESS_DATA_FILES
       .map(name => ({ key: name, file: path.join(DATA_DIR, name) }));
     db.reconcileFromJson(readJson, mirrorFiles);
   } catch (err) {

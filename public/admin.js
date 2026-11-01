@@ -630,6 +630,7 @@ function renderLoanDetails(loan) {
       `).join('')
     : '<li>No status history.</li>';
   const payments = Array.isArray(loan.payments) ? loan.payments : [];
+  const canDecide = localStorage.getItem('userRole') === 'store_admin';
   const fileUrl = (name) => {
     const token = localStorage.getItem('deviceToken') || '';
     return `/uploads/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}`;
@@ -637,6 +638,8 @@ function renderLoanDetails(loan) {
   const paymentHistory = payments.length ? payments.map(payment => `
     <li>
       ${formatCurrency(payment.amount)} · ${escapeHtml(payment.mode || 'payment')} · ${escapeHtml(formatDate(payment.date))}
+      ${Number(payment.fee) > 0 ? `<div>Fee: ${formatCurrency(payment.fee)}</div>` : ''}
+      ${payment.reversed ? `<div>Undone ${escapeHtml(formatDate(payment.reversedAt))} — ${escapeHtml(payment.reversalReason || '')}</div>` : (canDecide ? `<button type="button" class="toggle-mode" data-reverse-payment="${escapeHtml(payment.paymentReceiptId || '')}" data-loan-id="${escapeHtml(loan.id)}">Undo this payment</button>` : '')}
       ${payment.note ? `<div>${escapeHtml(payment.note)}</div>` : ''}
       ${payment.screenshot ? `<a class="proof-link" href="${fileUrl(payment.screenshot)}" target="_blank" rel="noopener">View proof of payment</a>` : '<span>No proof attached</span>'}
     </li>
@@ -647,7 +650,6 @@ function renderLoanDetails(loan) {
   const outstanding = Number(loan.outstanding || 0);
   // Payments: admin or store_admin (both may record money). Decisions: the
   // assigned store_admin only — mirrors the backend's franchise-scoping gate.
-  const canDecide = localStorage.getItem('userRole') === 'store_admin';
   const canRecordPayment = canManageStore && outstanding > 0 &&
     ['active', 'grace', 'defaulted'].includes(status);
   const canReview = canDecide &&
@@ -680,7 +682,10 @@ function renderLoanDetails(loan) {
         <p><strong>Created by:</strong> ${creator ? escapeHtml(creator) : 'Not recorded'}</p>
         <p><strong>Requested:</strong> ${escapeHtml(formatDate(loan.createdAt))}</p>
         <p><strong>Borrowed (approved):</strong> ${loan.approvedAt || loan.borrowedDate ? escapeHtml(formatDate(loan.approvedAt || loan.borrowedDate)) : 'Not yet approved'}</p>
-        ${loan.graceUntil ? `<p><strong>Grace agreed until:</strong> ${escapeHtml(formatDate(loan.graceUntil))} · 1.8%/day · Accrued penalty: ${formatCurrency(loan.graceAccrued || 0)}</p>` : ''}
+        ${Number(loan.graceAccrued || 0) > 0 || loan.graceUntil ? `<p><strong>Late penalty:</strong> ${formatCurrency(loan.graceAccrued || 0)} accrued at 1.8% per day from the first late day${loan.graceUntil ? `, grace agreed until ${escapeHtml(formatDate(loan.graceUntil))}` : ''}.</p>` : ''}
+        ${loan.dueDateIsEstimate ? `<p><strong>Due date:</strong> estimate until approval. The contract date is the approval day plus ${escapeHtml(loan.tenureWeeks || '')} weeks.</p>` : ''}
+        ${loan.collateralLocation ? `<p><strong>Collateral kept at:</strong> ${escapeHtml(loan.collateralLocation)}</p>` : ''}
+        ${loan.collateralSaleAmount !== undefined && loan.collateralSaleAmount !== null && status === 'liquidated' ? `<p><strong>Collateral sale:</strong> ${formatCurrency(loan.collateralSaleAmount)} raised. Still owed: ${formatCurrency(loan.collateralShortfall || loan.outstanding || 0)}.</p>` : ''}
         ${loan.verifiedOverdueAt ? `<p><strong>Overdue verified:</strong> ${escapeHtml(formatDate(loan.verifiedOverdueAt))} by ${escapeHtml(loan.verifiedOverdueBy || 'admin')}</p>` : ''}
       </div>
       ${proofLinks ? `<div>${proofLinks}</div>` : ''}
@@ -694,19 +699,23 @@ function renderLoanDetails(loan) {
         <div class="loan-fields" style="margin-top: 14px;">
           <section>
             <strong>Lifecycle (admin)</strong>
+            ${canReview ? '' : `<input type="text" class="modal-input" data-decision-reason="${escapeHtml(loan.id)}" maxlength="300" placeholder="Reason (required to sell collateral)" style="margin-top: 10px;">`}
             <div class="button-row" style="margin-top: 10px; flex-wrap: wrap;">
               <input type="date" class="modal-input" data-grace-date="${escapeHtml(loan.id)}" style="max-width: 210px;" aria-label="Agreed grace until" ${loan.graceUntil ? `value="${escapeHtml(loan.graceUntil)}"` : ''}>
+              <input type="number" class="modal-input" data-sale-amount="${escapeHtml(loan.id)}" min="0" step="0.01" placeholder="Sale amount (K)" style="max-width: 180px;" aria-label="Amount the collateral raised">
+              <input type="text" class="modal-input" data-collateral-location="${escapeHtml(loan.id)}" maxlength="120" placeholder="Where the collateral is kept" style="max-width: 240px;" value="${escapeHtml(loan.collateralLocation || '')}">
               <button class="toggle-mode" type="button" data-loan-action="enter_grace" data-loan-id="${escapeHtml(loan.id)}">Enter grace (1.8%/day)</button>
               ${status !== 'defaulted' ? `<button class="toggle-mode" type="button" data-loan-action="verify_overdue" data-loan-id="${escapeHtml(loan.id)}">Verify overdue</button>` : ''}
               ${status !== 'liquidated' ? `<button class="toggle-mode" type="button" data-loan-action="liquidate" data-loan-id="${escapeHtml(loan.id)}">Liquidate collateral</button>` : ''}
             </div>
-            <p class="message-text" style="text-align:left;">Grace needs an agreed end date. Liquidation needs a reason in the decision box above. Once the balance hits zero the loan becomes Paid automatically.</p>
+            <p class="message-text" style="text-align:left;">Grace needs an agreed end date. The first late day is charged at 1.8%. Liquidation needs a reason and the amount the pledge raised (use 0 if it raised nothing). The balance left after the sale stays owed. Paying early does not reduce the interest.</p>
           </section>
         </div>` : ''}
       ${canRecordPayment ? `
         <form class="payment-form panel" data-payment-form="${escapeHtml(loan.id)}" style="padding: 14px; margin-top: 14px;">
           <h3>Record payment</h3>
-          <input type="number" name="amount" class="modal-input" min="0.01" max="${outstanding}" step="0.01" placeholder="Amount" required>
+          <input type="number" name="amount" class="modal-input" min="0.01" max="${outstanding}" step="0.01" placeholder="Amount paid toward the loan" required>
+          <input type="number" name="fee" class="modal-input" min="0" step="0.01" placeholder="Fee collected (optional)" style="margin-top: 10px;">
           <select name="mode" class="modal-input" style="margin-top: 10px;">
             <option value="cash">Cash</option>
             <option value="airtel">Airtel Money</option>
@@ -910,11 +919,15 @@ async function submitPayment(event, form) {
   }
 }
 
-async function updateLoanStatus(loanId, action, reason, graceUntil) {
+async function updateLoanStatus(loanId, action, reason, graceUntil, saleAmount, collateralLocation) {
   try {
     const cleanReason = String(reason || '').trim();
     if (action === 'liquidate' && !cleanReason) {
       document.getElementById('detailFeedback').textContent = 'Liquidation requires a reason — confirm what happened to the collateral.';
+      return;
+    }
+    if (action === 'liquidate' && (saleAmount === undefined || saleAmount === null || String(saleAmount).trim() === '')) {
+      document.getElementById('detailFeedback').textContent = 'Enter the amount the collateral raised. Use 0 if it raised nothing.';
       return;
     }
     if (action === 'enter_grace' && !graceUntil) {
@@ -924,7 +937,13 @@ async function updateLoanStatus(loanId, action, reason, graceUntil) {
     const response = await fetch(`/loans/${loanId}/action`, {
       method: 'POST',
       headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ action, reason: cleanReason, graceUntil: graceUntil || undefined })
+      body: JSON.stringify({
+      action,
+      reason: cleanReason,
+      graceUntil: graceUntil || undefined,
+      saleAmount: saleAmount === undefined || saleAmount === '' ? undefined : Number(saleAmount),
+      collateralLocation: collateralLocation || undefined
+    })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Could not update loan status.');
@@ -933,6 +952,24 @@ async function updateLoanStatus(loanId, action, reason, graceUntil) {
     await fetchNewRequests();
   } catch (err) {
     document.getElementById('detailFeedback').textContent = err.message || 'Could not update loan status.';
+  }
+}
+
+async function undoPayment(loanId, paymentReceiptId) {
+  const reason = window.prompt('Why is this payment being undone?');
+  if (!reason || !reason.trim()) return;
+  try {
+    const response = await fetch('/loans/payment/reverse', {
+      method: 'POST',
+      headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ id: Number(loanId), paymentReceiptId, reason: reason.trim() })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not undo the payment.');
+    document.getElementById('detailFeedback').textContent = data.message || 'Payment undone.';
+    if (selectedUserId !== null) await viewUserDetails(selectedUserId);
+  } catch (err) {
+    document.getElementById('detailFeedback').textContent = err.message || 'Could not undo the payment.';
   }
 }
 
@@ -1723,11 +1760,25 @@ document.getElementById('modalBody').addEventListener('click', event => {
     return;
   }
 
+  const reverseButton = event.target.closest('[data-reverse-payment]');
+  if (reverseButton) {
+    undoPayment(reverseButton.dataset.loanId, reverseButton.dataset.reversePayment);
+    return;
+  }
   const actionButton = event.target.closest('[data-loan-action]');
   if (actionButton) {
     const reasonInput = document.querySelector(`[data-decision-reason="${actionButton.dataset.loanId}"]`);
     const graceInput = document.querySelector(`[data-grace-date="${actionButton.dataset.loanId}"]`);
-    updateLoanStatus(actionButton.dataset.loanId, actionButton.dataset.loanAction, reasonInput?.value, graceInput?.value);
+    const saleInput = document.querySelector(`[data-sale-amount="${actionButton.dataset.loanId}"]`);
+    const locationInput = document.querySelector(`[data-collateral-location="${actionButton.dataset.loanId}"]`);
+    updateLoanStatus(
+      actionButton.dataset.loanId,
+      actionButton.dataset.loanAction,
+      reasonInput?.value,
+      graceInput?.value,
+      saleInput?.value,
+      locationInput?.value
+    );
   }
 });
 document.getElementById('modalBody').addEventListener('change', event => {

@@ -7,7 +7,7 @@ const {
   upload, getLoans, requestLoan, getLoanById,
   updateLoanStatus, getAllLoans, recordPayment,
   notifyAllOverdue, searchByReceiptId, sendLoanNotification, notifyUser,
-  createAdminLoan
+  createAdminLoan, reversePayment
 } = require('../controllers/loanController');
 const {
   requestSignup, confirmSignup, resendOTP,
@@ -80,6 +80,7 @@ router.post('/loans/request', upload.fields([
 ]), requestLoan);
 router.post('/loans/:id/action', updateLoanStatus);
 router.post('/loans/:id/notify-overdue', sendLoanNotification);
+router.post('/loans/payment/reverse', reversePayment);
 router.post('/loans/payment', upload.fields([
   { name: 'screenshot', maxCount: 1 }
 ]), recordPayment);

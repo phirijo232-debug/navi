@@ -40,6 +40,32 @@ const USERS_FILE = dataStore.paths.users;
 const pendingSignups = {};
 const pendingLogins = {};
 const pendingResets = {};
+const PENDING_AUTH_FILE = path.join(dataStore.DATA_DIR, 'pending-auth.json');
+
+function savePendingAuth() {
+  try {
+    dataStore.writeJson(PENDING_AUTH_FILE, {
+      signups: pendingSignups,
+      logins: pendingLogins,
+      resets: pendingResets
+    });
+  } catch {
+    // The in-memory copy still works until the process stops.
+  }
+}
+
+function loadPendingAuth() {
+  const saved = dataStore.readJson(
+    PENDING_AUTH_FILE,
+    { signups: {}, logins: {}, resets: {} },
+    (value) => value && typeof value === 'object' && !Array.isArray(value)
+  );
+  Object.assign(pendingSignups, saved.signups || {});
+  Object.assign(pendingLogins, saved.logins || {});
+  Object.assign(pendingResets, saved.resets || {});
+}
+
+loadPendingAuth();
 // KIDNEYS: pending-auth entries older than this are dead weight (OTP windows
 // are 5 minutes) — the hourly sweep drops them so the maps never grow forever.
 const PENDING_AUTH_TTL_MS = 15 * 60 * 1000;
@@ -118,6 +144,7 @@ function sweepExpiredAuth(now = Date.now()) {
     // Device pruning is best-effort; pending-auth sweep already succeeded.
   }
 
+  if (deadSignups || deadLogins || deadResets) savePendingAuth();
   return { deadSignups, deadLogins, deadResets, staleDevices };
 }
 
@@ -314,6 +341,7 @@ async function requestSignup(req, res) {
 
     pendingSignups[email] = { username, email, password, phone: normalizedPhone, nrc: nrc ? String(nrc).trim() : null, inviteToken, createdAt: Date.now() };
     await otpService.sendOTP('Account Signup Verification', email, false);
+    savePendingAuth();
     res.json({ message: 'OTP sent to your email. Please verify to complete signup.' + emailService.previewNotice() });
 
   } catch (err) {
@@ -363,6 +391,7 @@ async function confirmSignup(req, res) {
     users.push(newUser);
     saveUsers(users);
     delete pendingSignups[email];
+    savePendingAuth();
 
     const welcome = emailService.buildWelcomeMessage(newUser.email, 'Pryme Vertex');
     await emailService.sendCustomerEmail({
@@ -453,6 +482,7 @@ async function requestLogin(req, res) {
       storeId: user.storeId || config.DEFAULT_STORE_ID,
       createdAt: Date.now()
     };
+    savePendingAuth();
     res.json({
       message: 'OTP sent. Please verify to complete login.' + emailService.previewNotice(),
       otpSentTo: otpEmail,
@@ -517,6 +547,7 @@ async function confirmLogin(req, res) {
 
     saveUsers(users);
     delete pendingLogins[email];
+    savePendingAuth();
 
     res.json({
       message: 'Login successful.',
@@ -560,6 +591,7 @@ async function requestPasswordReset(req, res) {
       expiresAt: Date.now() + 5 * 60 * 1000,
       createdAt: Date.now()
     };
+    savePendingAuth();
     return res.json({
       message: 'OTP sent for password reset.' + emailService.previewNotice(),
       otpSentTo: otpEmail,
@@ -585,6 +617,7 @@ async function confirmPasswordReset(req, res) {
 
     if (pending.expiresAt <= Date.now()) {
       delete pendingResets[email];
+      savePendingAuth();
       return res.status(400).json({ error: 'Password reset request expired. Request a new OTP.' });
     }
 
@@ -600,6 +633,7 @@ async function confirmPasswordReset(req, res) {
     const userIndex = users.findIndex(user => String(user.email || '').trim().toLowerCase() === email);
     if (userIndex < 0) {
       delete pendingResets[email];
+      savePendingAuth();
       return res.status(400).json({ error: 'Unable to locate your account.' });
     }
 
@@ -614,6 +648,7 @@ async function confirmPasswordReset(req, res) {
     saveUsers(users);
 
     delete pendingResets[email];
+    savePendingAuth();
     res.json({ message: 'Password reset successfully. You can now login.' });
 
   } catch (err) {

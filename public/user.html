@@ -139,11 +139,8 @@
 
             <div class="request-field-grid two-up">
               <div class="timeframe-field">
-                <label class="field-label" for="loanDueDate">Timeframe</label>
-                <div class="timeframe-toggle" role="group" aria-label="Choose timeframe mode">
-                  <button type="button" class="timeframe-mode-btn active" data-mode="weeks">Weeks</button>
-                  <button type="button" class="timeframe-mode-btn" data-mode="date">Custom date</button>
-                </div>
+                <label class="field-label" for="loanTenureWeeks">Timeframe</label>
+                <p class="message-text" style="text-align:left;margin:0;">The due date is the day the shop approves the loan, plus the weeks you choose. A date you type is not the contract date.</p>
               </div>
               <select id="loanUrgency" class="auth-input">
                 <option value="low">Low urgency</option>
@@ -154,7 +151,7 @@
             </div>
 
             <div class="request-field-grid two-up compact-row">
-              <input type="date" id="loanDueDate" class="auth-input" disabled>
+              <input type="date" id="loanDueDate" class="auth-input" hidden disabled>
               <select id="loanTenureWeeks" class="auth-input">
                 <option value="1">1 week</option>
                 <option value="2" selected>2 weeks</option>
@@ -201,14 +198,15 @@
               <div><span>Interest</span> <strong id="loanInterestDisplay">K 0.00</strong></div>
               <div><span>Total</span> <strong id="loanTotalDisplay">K 0.00</strong></div>
               <div><span>Approval target</span> <strong id="loanApprovalDisplay">48h</strong></div>
+              <p id="loanDueRule" class="message-text" style="text-align:left;margin:8px 0 0;">Due date is set on approval. Interest stays the full amount even if you pay early. From the first late day, 1.8% of the balance is added per day.</p>
             </div>
 
             <details class="terms-box" aria-live="polite">
               <summary>Read more</summary>
               <ul>
                 <li>I confirm the loan purpose and amount requested are true and necessary for my stated need.</li>
-                <li>I understand the approved amount, interest rate, total repayment, and repayment due date are based on my selected timeframe and urgency.</li>
-                <li>I agree to repay the full approved amount on or before the agreed due date, and I accept that unpaid balances may be recorded as outstanding.</li>
+                <li>I understand the interest rate and total repayment follow the weeks I choose. The due date is the approval day plus those weeks, not a date I pick, and not extra days for how long approval took.</li>
+                <li>I agree to repay the full amount, including the full interest, on or before the due date. Paying early does not reduce the interest. Unpaid balances may be recorded as outstanding, and 1.8% of the balance is added on each day the loan is in grace or default, including the first day.</li>
                 <li>I understand that all submitted information, supporting documents, and collateral details are provided honestly and may be reviewed by the platform or admin team.</li>
                 <li>I accept that approval is subject to review and that the platform may request additional information before processing.</li>
                 <li>I agree that this request is for a desktop-only service and that I will not misrepresent my identity, documents, or repayment ability.</li>
@@ -550,10 +548,11 @@
       const container = document.getElementById('overviewSummary');
       if (!container) return;
 
+      const owedLoans = loans.filter(loan => ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan)));
       const totalRequested = loans.reduce((sum, loan) => sum + (Number(loan.amount) || 0), 0);
-      const totalOutstanding = loans.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
+      const totalOutstanding = owedLoans.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
       const pending = loans.filter(loan => loanStatusOf(loan) === 'pending').length;
-      const active = loans.filter(loan => ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan))).length;
+      const active = owedLoans.length;
       const closed = loans.filter(loan => ['paid', 'declined'].includes(loanStatusOf(loan))).length;
 
       container.innerHTML = `
@@ -564,7 +563,7 @@
         </div>
         <div class="summary-inline-card">
           <h3>Outstanding</h3>
-          <p>${pending + active}</p>
+          <p>${active}</p>
           <span>${formatKwacha(totalOutstanding)}</span>
         </div>
         <div class="summary-inline-card">
