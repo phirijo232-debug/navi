@@ -257,7 +257,6 @@
 
     const username = localStorage.getItem('username') || 'User';
     const userEmail = localStorage.getItem('userEmail');
-    const userRole = localStorage.getItem('userRole') || 'user';
     const isNewSignup = localStorage.getItem('newSignup') === 'true';
     const justCreated = isNewSignup; // naming clarity for first-time flow
 
@@ -893,35 +892,6 @@
       if (m) m.classList.remove('active');
     }
 
-    async function submitLoanDecision(action, loanId) {
-      const reasonField = document.getElementById('adminDecisionReason');
-      const reason = (reasonField?.value || '').trim();
-      const token = localStorage.getItem('deviceToken');
-      if (!token) return window.location.href = 'login.html';
-
-      try {
-        const res = await fetch(`/loans/${loanId}/action`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-device-token': token
-          },
-          body: JSON.stringify({ action, reason })
-        });
-        const data = await res.json();
-        if (!res.ok || data.error) {
-          document.getElementById('loanRequestMessage').textContent = data.error || 'Unable to update loan status.';
-          return;
-        }
-
-        document.getElementById('loanRequestMessage').textContent = `Loan marked as ${formatStatusLabel(action)}.`;
-        closeLoanModal();
-        await loadLoans(currentHistoryFilter);
-      } catch (err) {
-        document.getElementById('loanRequestMessage').textContent = 'Unable to update loan status.';
-      }
-    }
-
     async function openLoanDetails(id) {
       const token = localStorage.getItem('deviceToken');
       if (!token) return window.location.href = 'login.html';
@@ -932,11 +902,6 @@
         if (res.status === 403) return handleInvalidDeviceToken();
         const data = await res.json();
         const loan = data.loan;
-        const adminBox = document.getElementById('adminDecisionBox');
-        // Loan DECISIONS are store_admin-only (backend returns 403 for role
-        // 'admin' per tested franchise-scoping policy) — match that gate here so
-        // the buttons we show are exactly the ones the API will accept.
-        const hasAdminAccess = userRole === 'store_admin';
         const collateralText = loan.collateralDescription || loan.collateralFront || loan.collateralBack || 'No collateral provided';
 
         renderLoanDetailPanel(loan);
@@ -950,28 +915,17 @@
         document.getElementById('modalLoanTotal').textContent = formatKwacha(loan.totalRepayment || loan.amount || 0);
         document.getElementById('modalLoanOutstanding').textContent = formatKwacha(loan.outstanding || 0);
         document.getElementById('modalLoanDue').textContent = formatDateDisplay(loan.dueDate);
-        document.getElementById('modalLoanStatus').textContent = formatStatusLabel(loan.status);
+        document.getElementById('modalLoanStatus').textContent = formatStatusLabel(loan.businessStatus || loan.status);
         document.getElementById('modalLoanRequested').textContent = formatDateDisplay(loan.createdAt);
         document.getElementById('modalLoanUrgency').textContent = formatStatusLabel(loan.urgency || 'standard');
         document.getElementById('modalLoanCollateral').textContent = collateralText;
         document.getElementById('modalLoanDecision').textContent = loan.adminReason || 'No decision reason provided yet.';
-        document.getElementById('adminDecisionReason').value = loan.adminReason || '';
-
-        adminBox.hidden = !hasAdminAccess;
         document.getElementById('loanModal').classList.add('active');
       } catch (err) {
         console.warn('Could not load loan details', err);
       }
     }
 
-    document.querySelectorAll('.decision-btn').forEach(button => {
-      button.addEventListener('click', () => {
-        const loanId = document.getElementById('modalLoanProduct').dataset.loanId;
-        const action = button.dataset.action;
-        if (!loanId) return;
-        submitLoanDecision(action, Number(loanId));
-      });
-    });
   </script>
   <!-- Loan Details Modal -->
   <div id="loanModal" class="modal">
@@ -993,15 +947,6 @@
         <p><strong>Decision reason:</strong> <span id="modalLoanDecision">-</span></p>
       </div>
 
-      <div id="adminDecisionBox" class="admin-decision-box" hidden>
-        <label for="adminDecisionReason">Provide decision reason</label>
-        <textarea id="adminDecisionReason" rows="3" placeholder="Add admin notes for approval, in-progress, or decline."></textarea>
-        <div class="admin-decision-actions">
-          <button type="button" class="decision-btn" data-action="in_progress">In Progress</button>
-          <button type="button" class="decision-btn" data-action="approve">Approve</button>
-          <button type="button" class="decision-btn decline" data-action="decline">Decline</button>
-        </div>
-      </div>
     </div>
   </div>
 </body>

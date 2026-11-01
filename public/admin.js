@@ -184,7 +184,7 @@ async function fetchUsers() {
 
     allUsers = await response.json();
     applyUserFilterAndSort();
-    await Promise.all([fetchStoreReport(), fetchStoreFeedback(), fetchNewRequests()]);
+    await Promise.all([fetchStoreReport(), fetchStoreFeedback(), fetchNewRequests(), fetchExpenses()]);
   } catch (err) {
     console.error(err);
     setAuthMessage('Access denied or session expired. Please login again.', true);
@@ -292,6 +292,10 @@ async function fetchStoreReport() {
     const values = [
       ['Cash collected', formatCurrency(summary.cashCollected)],
       ['Gross interest booked', formatCurrency(summary.grossInterestBooked)],
+      ['Collected interest', formatCurrency(summary.interestCollected)],
+      ['Collected fees', formatCurrency(summary.feesCollected)],
+      ['Operating expenses', formatCurrency(summary.operatingExpenses)],
+      ['Net profit', formatCurrency(summary.netProfit)],
       ['Outstanding', formatCurrency(summary.totalOutstanding)],
       ['Pending payments', String(summary.pendingPayments)],
       ['Partial payments', String(summary.partialPayments)],
@@ -305,6 +309,115 @@ async function fetchStoreReport() {
     document.getElementById('storeReportNote').textContent = data.note || '';
   } catch (err) {
     metrics.innerHTML = `<p>${escapeHtml(err.message || 'Unable to load BMF reports.')}</p>`;
+  }
+}
+
+let expenseRows = [];
+
+function setExpenseMessage(text, isError = false) {
+  const el = document.getElementById('expenseMessage');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = isError ? 'var(--error)' : 'var(--text)';
+}
+
+function resetExpenseForm() {
+  const form = document.getElementById('expenseForm');
+  if (form) form.reset();
+  document.getElementById('expenseId').value = '';
+  document.getElementById('expenseSaveBtn').textContent = 'Record expense';
+  document.getElementById('expenseCancelBtn').hidden = true;
+}
+
+async function fetchExpenses() {
+  const list = document.getElementById('expenseList');
+  if (!list) return;
+  try {
+    const response = await fetch('/admin/expenses', { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to load expenses.');
+    expenseRows = Array.isArray(data.expenses) ? data.expenses : [];
+    renderExpenses();
+  } catch (err) {
+    list.innerHTML = `<p>${escapeHtml(err.message || 'Unable to load expenses.')}</p>`;
+  }
+}
+
+function renderExpenses() {
+  const list = document.getElementById('expenseList');
+  if (!list) return;
+  if (!expenseRows.length) {
+    list.innerHTML = '<p>No operating expenses recorded for this store.</p>';
+    return;
+  }
+  list.innerHTML = expenseRows.map(item => `
+    <div class="request-row">
+      <div>
+        <strong>${escapeHtml(formatDate(item.date))} · ${escapeHtml(item.category)}</strong>
+        <p>${formatCurrency(item.amount)}${item.note ? ` · ${escapeHtml(item.note)}` : ''}</p>
+        <p class="user-meta">Recorded by ${escapeHtml(item.recordedBy || 'admin')}</p>
+      </div>
+      <div class="button-row">
+        <button type="button" class="toggle-mode" data-expense-edit="${escapeHtml(item.id)}">Edit</button>
+        <button type="button" class="toggle-mode" data-expense-delete="${escapeHtml(item.id)}">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function beginExpenseEdit(id) {
+  const item = expenseRows.find(row => String(row.id) === String(id));
+  if (!item) return;
+  document.getElementById('expenseId').value = item.id;
+  document.getElementById('expenseDate').value = String(item.date || '').slice(0, 10);
+  document.getElementById('expenseCategory').value = item.category;
+  document.getElementById('expenseAmount').value = item.amount;
+  document.getElementById('expenseNote').value = item.note || '';
+  document.getElementById('expenseSaveBtn').textContent = 'Save expense';
+  document.getElementById('expenseCancelBtn').hidden = false;
+}
+
+async function submitExpense(event) {
+  event.preventDefault();
+  const id = document.getElementById('expenseId').value;
+  const payload = {
+    date: document.getElementById('expenseDate').value,
+    category: document.getElementById('expenseCategory').value,
+    amount: document.getElementById('expenseAmount').value,
+    note: document.getElementById('expenseNote').value.trim()
+  };
+  try {
+    const response = await fetch(id ? `/admin/expenses/${id}` : '/admin/expenses', {
+      method: id ? 'PATCH' : 'POST',
+      headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to save the expense.');
+    setExpenseMessage(data.message || 'Expense saved.');
+    resetExpenseForm();
+    await fetchExpenses();
+    await fetchStoreReport();
+  } catch (err) {
+    setExpenseMessage(err.message || 'Unable to save the expense.', true);
+  }
+}
+
+async function deleteExpense(id) {
+  if (!window.confirm('Delete this expense?')) return;
+  try {
+    const response = await fetch(`/admin/expenses/${id}`, {
+      method: 'DELETE',
+      headers: getStoreHeaders()
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to delete the expense.');
+    setExpenseMessage(data.message || 'Expense deleted.');
+    resetExpenseForm();
+    await fetchExpenses();
+    await fetchStoreReport();
+  } catch (err) {
+    setExpenseMessage(err.message || 'Unable to delete the expense.', true);
   }
 }
 
@@ -1652,6 +1765,17 @@ function applyUserFilterAndSort() {
 }
 document.getElementById('userSearch').addEventListener('input', applyUserFilterAndSort);
 document.getElementById('userSort')?.addEventListener('change', applyUserFilterAndSort);
+document.getElementById('expenseForm')?.addEventListener('submit', submitExpense);
+document.getElementById('expenseCancelBtn')?.addEventListener('click', () => {
+  resetExpenseForm();
+  setExpenseMessage('');
+});
+document.getElementById('expenseList')?.addEventListener('click', event => {
+  const edit = event.target.closest('[data-expense-edit]');
+  const remove = event.target.closest('[data-expense-delete]');
+  if (edit) beginExpenseEdit(edit.dataset.expenseEdit);
+  if (remove) deleteExpense(remove.dataset.expenseDelete);
+});
 document.getElementById('refreshRequestsBtn').addEventListener('click', fetchNewRequests);
 document.getElementById('newRequestsList').addEventListener('click', event => {
   const requestButton = event.target.closest('[data-request-user]');

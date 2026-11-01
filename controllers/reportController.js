@@ -7,8 +7,9 @@ const { logError, logBreakage } = require('../middleware/logger');
 const dataStore = require('../middleware/dataStore');
 const { getFeedbackData } = require('./feedbackController');
 const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole } = require('../middleware/storeScope');
-const { getEnrichedLoans, summarizeStore, searchLoansByReceipt, normalizeStatus } = require('./loanController');
+const { getEnrichedLoans, summarizeStore, searchLoansByReceipt, normalizeStatus, rebuildPaymentLedger } = require('./loanController');
 const { buildTrackingSheet, persistTracking } = require('./reportTracking');
+const { getExpensesData } = require('./expenseController');
 
 const USERS_FILE = dataStore.paths.users;
 const LOANS_FILE = dataStore.paths.loans;
@@ -89,6 +90,16 @@ function readPeriod(req) {
   return { from, to };
 }
 
+function expensesForReport(scope, from, to) {
+  return getExpensesData().filter(item => {
+    if (!(scope === 'all' || getRecordStoreId(item) === scope)) return false;
+    const day = String(item.date || '').slice(0, 10);
+    if (from && day < from) return false;
+    if (to && day > to) return false;
+    return true;
+  });
+}
+
 function getReportData(scope = config.DEFAULT_STORE_ID, from = '', to = '') {
   const users = readArray(USERS_FILE);
   const allLoans = applyPeriodFilter(readArray(LOANS_FILE), from, to);
@@ -123,12 +134,23 @@ function getReportData(scope = config.DEFAULT_STORE_ID, from = '', to = '') {
   const totalOutstanding = outstandingLoans.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
   const grossInterestBooked = activeLoans.reduce((sum, loan) => sum + (Number(loan.interestAmount) || 0), 0);
   const principalIssued = activeLoans.reduce((sum, loan) => sum + (Number(loan.amount) || 0), 0);
+  const reportExpenses = expensesForReport(scope, from, to);
+  const interestCollected = Number(loanRows.reduce((sum, loan) => {
+    const rebuilt = rebuildPaymentLedger({ ...loan, payments: (Array.isArray(loan.payments) ? loan.payments : []).map(payment => ({ ...payment })) });
+    return sum + (rebuilt.payments || []).reduce((paid, payment) => paid + (Number(payment.interestPortion) || 0), 0);
+  }, 0).toFixed(2));
+  const feesCollected = Number(loanRows.reduce((sum, loan) => {
+    const payments = Array.isArray(loan.payments) ? loan.payments : [];
+    return sum + payments.reduce((paid, payment) => paid + (Number(payment.fee ?? payment.feeAmount) || 0), 0);
+  }, 0).toFixed(2));
+  const operatingExpenses = Number(reportExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toFixed(2));
+  const netProfit = Number((interestCollected + feesCollected - operatingExpenses).toFixed(2));
 
   return {
     scope,
     generatedAt: new Date().toISOString(),
     period: { from: from || null, to: to || null },
-    note: 'Gross interest booked is contractual interest on non-declined loans. Principal reflects approved loan records because disbursement dates are not tracked. Net profit is not calculated because operating expenses are not recorded. On-time loyalty requires settlement on or before the due date.',
+    note: 'Gross interest booked is contractual interest on non-declined loans. Principal reflects approved loan records because disbursement dates are not tracked. Net profit is collected interest and fees minus operating expenses. On-time loyalty requires settlement on or before the due date.',
     summary: {
       customerAccounts: scopedUsers.filter(user => user.role === 'user').length,
       totalLoans: loanRows.length,
@@ -140,6 +162,10 @@ function getReportData(scope = config.DEFAULT_STORE_ID, from = '', to = '') {
       cashCollected: Number(cashCollected.toFixed(2)),
       totalOutstanding: Number(totalOutstanding.toFixed(2)),
       grossInterestBooked: Number(grossInterestBooked.toFixed(2)),
+      interestCollected,
+      feesCollected,
+      operatingExpenses,
+      netProfit,
       approvedLoanPrincipal: Number(principalIssued.toFixed(2)),
       feedback: {
         total: feedback.length,
@@ -162,7 +188,8 @@ function getReportData(scope = config.DEFAULT_STORE_ID, from = '', to = '') {
     settledLoans,
     loyalCustomers,
     loyalSettlementLoans,
-    feedback
+    feedback,
+    expenses: reportExpenses
   };
 }
 
@@ -822,6 +849,14 @@ async function buildExcelReport(data) {
     { header: 'Settled at', key: 'settledAt', width: 28 },
     { header: 'Due date', key: 'dueDate', width: 18 }
   ], data.loyalSettlementLoans);
+  addSheet(workbook, 'Expenses', [
+    { header: 'Date', key: 'date', width: 16 },
+    { header: 'Category', key: 'category', width: 22 },
+    { header: 'Amount', key: 'amount', width: 16 },
+    { header: 'Note', key: 'note', width: 48 },
+    { header: 'Recorded by', key: 'recordedBy', width: 32 },
+    { header: 'Store', key: 'storeId', width: 16 }
+  ], data.expenses || []);
   addSheet(workbook, 'Feedback', [
     { header: 'Category', key: 'category', width: 18 },
     { header: 'Status', key: 'status', width: 18 },
@@ -902,6 +937,10 @@ function buildDailyReportText(data) {
     `Loan records: ${summary.totalLoans}`,
     `Cash collected: K${summary.cashCollected.toFixed(2)}`,
     `Gross interest booked: K${summary.grossInterestBooked.toFixed(2)}`,
+    `Collected interest: K${Number(summary.interestCollected || 0).toFixed(2)}`,
+    `Collected fees: K${Number(summary.feesCollected || 0).toFixed(2)}`,
+    `Operating expenses: K${Number(summary.operatingExpenses || 0).toFixed(2)}`,
+    `Net profit: K${Number(summary.netProfit || 0).toFixed(2)}`,
     `Principal approved: K${summary.approvedLoanPrincipal.toFixed(2)}`,
     `Outstanding: K${summary.totalOutstanding.toFixed(2)}`,
     `Pending payments: ${summary.pendingPayments}`,

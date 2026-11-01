@@ -1059,7 +1059,7 @@ async function sendLoanNotification(req, res) {
       return res.status(502).json({ error: result?.reason || 'Notification email could not be delivered.' });
     }
 
-    res.json({ message: 'Notification sent successfully.' });
+    res.json({ message: 'Notification sent successfully.' + (result?.delivered === 'preview' ? emailService.previewNotice() : '') });
   } catch (err) {
     logBreakage('loanController.js', 'sendLoanNotification', err, 'NOTIFICATION SEND ERROR');
     res.status(500).json({ error: 'Could not send notification.' });
@@ -1172,7 +1172,7 @@ async function notifyAllOverdue(req, res) {
 
     return res.status(failed ? 207 : 200).json({
       message: loansByEmail.size
-        ? `Overdue notices sent to ${sent} customer${sent === 1 ? '' : 's'}${failed ? `; ${failed} failed` : ''}.`
+        ? `Overdue notices sent to ${sent} customer${sent === 1 ? '' : 's'}${failed ? `; ${failed} failed` : ''}.` + (emailService.getLastDelivery().mode === 'preview' ? emailService.previewNotice() : '')
         : 'No customers currently have overdue loan balances.',
       sent,
       failed,

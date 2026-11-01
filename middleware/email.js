@@ -1,23 +1,127 @@
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const nodemailer = require('nodemailer');
 
 let _transporter = null;
+let _transporterKey = '';
+let lastDelivery = { mode: 'none' };
+let previewLogFile = '';
+
+function smtpUser() {
+  return String(process.env.SMTP_USER || process.env.GMAIL_USER || '').trim();
+}
+
+function smtpPass() {
+  return String(process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || '').replace(/\s/g, '');
+}
+
+function smtpConfigured() {
+  return Boolean(smtpUser() && smtpPass());
+}
+
+function mailMode() {
+  const requested = String(process.env.MAIL_MODE || 'auto').trim().toLowerCase();
+  if (requested === 'smtp' || requested === 'preview') return requested;
+  return smtpConfigured() ? 'smtp' : 'preview';
+}
+
+function fromAddress() {
+  return String(process.env.MAIL_FROM || smtpUser() || '').trim();
+}
+
+function previewFile() {
+  if (previewLogFile) return previewLogFile;
+  let dir;
+  if (process.env.NAVI_LOGS_DIR) {
+    dir = path.resolve(process.env.NAVI_LOGS_DIR);
+  } else if (process.env.NODE_TEST_CONTEXT || process.argv.some(arg => arg.includes('mocha'))) {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'navi-mail-preview-'));
+  } else {
+    dir = path.resolve(__dirname, '../logs');
+  }
+  fs.mkdirSync(dir, { recursive: true });
+  previewLogFile = path.join(dir, 'mail-preview.log');
+  return previewLogFile;
+}
 
 function getTransporter() {
-  if (!_transporter) {
+  const key = [process.env.SMTP_HOST || 'smtp.gmail.com', process.env.SMTP_PORT || '465', smtpUser()].join('|');
+  if (!_transporter || _transporterKey !== key) {
+    const secure = String(process.env.SMTP_SECURE || 'true').toLowerCase() !== 'false';
     _transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT || 465),
+      secure,
       family: 4,
       auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, '')
+        user: smtpUser(),
+        pass: smtpPass()
       }
     });
+    _transporterKey = key;
   }
   return _transporter;
+}
+
+function getLastDelivery() {
+  return lastDelivery;
+}
+
+function previewNotice() {
+  return lastDelivery.mode === 'preview'
+    ? ' Outgoing email is not configured, so this message was saved to the server mail log instead of being sent.'
+    : '';
+}
+
+function recordPreview({ to, subject, text }) {
+  const file = previewFile();
+  const entry = {
+    at: new Date().toISOString(),
+    from: fromAddress() || '(not set)',
+    to,
+    subject,
+    text
+  };
+  fs.appendFileSync(file, JSON.stringify(entry) + '\n');
+  lastDelivery = { mode: 'preview', file };
+  return { ok: true, delivered: 'preview', file };
+}
+
+async function sendMail({ to, subject, text, attachments }) {
+  const recipients = (Array.isArray(to) ? to : String(to || '').split(','))
+    .map(item => String(item || '').trim())
+    .filter(Boolean);
+  if (!recipients.length || !subject || !text) {
+    lastDelivery = { mode: 'none' };
+    return { ok: false, skipped: true, delivered: 'none', reason: 'Missing email recipients or content.' };
+  }
+
+  const mode = mailMode();
+  if (mode === 'preview' || (mode === 'auto' && !smtpConfigured())) {
+    return recordPreview({ to: recipients, subject, text });
+  }
+  if (!smtpConfigured() || !fromAddress()) {
+    lastDelivery = { mode: 'none' };
+    return { ok: false, skipped: true, delivered: 'none', reason: 'Email credentials are not configured.' };
+  }
+
+  try {
+    const info = await getTransporter().sendMail({
+      from: fromAddress(),
+      to: recipients.length === 1 ? recipients[0] : recipients,
+      subject,
+      text,
+      ...(Array.isArray(attachments) && attachments.length ? { attachments } : {})
+    });
+    lastDelivery = { mode: 'smtp', messageId: info.messageId };
+    return { ok: true, delivered: 'smtp', messageId: info.messageId };
+  } catch (error) {
+    lastDelivery = { mode: 'none' };
+    console.error('Email send failed:', error.message);
+    return { ok: false, skipped: false, delivered: 'none', reason: error.message };
+  }
 }
 
 function getGreetingByTime(now = new Date()) {
@@ -156,39 +260,8 @@ function buildLoanStatusNotification(action, product, reason, email, loanData = 
   };
 }
 
-async function sendCustomerEmail({ to, subject, text, attachments }) {
-  const recipients = Array.isArray(to)
-    ? to
-    : typeof to === 'string'
-      ? to.split(',')
-      : [];
-
-  const normalizedRecipients = recipients
-    .map(item => String(item || '').trim())
-    .filter(Boolean);
-
-  if (!normalizedRecipients.length || !subject || !text) {
-    return { ok: false, skipped: true, reason: 'Missing email recipients or content.' };
-  }
-
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-    return { ok: false, skipped: true, reason: 'Email credentials are not configured.' };
-  }
-
-  try {
-    const transporter = getTransporter();
-    const info = await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: normalizedRecipients.length === 1 ? normalizedRecipients[0] : normalizedRecipients,
-      subject,
-      text,
-      ...(Array.isArray(attachments) && attachments.length ? { attachments } : {})
-    });
-    return { ok: true, messageId: info.messageId };
-  } catch (error) {
-    console.error('Customer email send failed:', error.message);
-    return { ok: false, skipped: false, reason: error.message };
-  }
+async function sendCustomerEmail(message) {
+  return sendMail(message);
 }
 
 module.exports = {
@@ -198,5 +271,9 @@ module.exports = {
   buildLoanSummaryText,
   getNotificationRecipients,
   buildLoanStatusNotification,
+  sendMail,
+  getLastDelivery,
+  previewNotice,
+  previewFile,
   sendCustomerEmail
 };

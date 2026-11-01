@@ -314,7 +314,7 @@ async function requestSignup(req, res) {
 
     pendingSignups[email] = { username, email, password, phone: normalizedPhone, nrc: nrc ? String(nrc).trim() : null, inviteToken, createdAt: Date.now() };
     await otpService.sendOTP('Account Signup Verification', email, false);
-    res.json({ message: 'OTP sent to your email. Please verify to complete signup.' });
+    res.json({ message: 'OTP sent to your email. Please verify to complete signup.' + emailService.previewNotice() });
 
   } catch (err) {
     logBreakage('authController.js', 'requestSignup', err, 'SIGNUP CIRCUIT TRIPPED');
@@ -389,7 +389,7 @@ async function resendOTP(req, res) {
     }
 
     await otpService.sendOTP('Account Signup Verification', email, true);
-    res.json({ message: `OTP resent to ${email}` });
+    res.json({ message: `OTP resent to ${email}.` + emailService.previewNotice() });
 
   } catch (err) {
     logBreakage('authController.js', 'resendOTP', err, 'RESEND OTP CIRCUIT TRIPPED');
@@ -454,7 +454,7 @@ async function requestLogin(req, res) {
       createdAt: Date.now()
     };
     res.json({
-      message: 'OTP sent. Please verify to complete login.',
+      message: 'OTP sent. Please verify to complete login.' + emailService.previewNotice(),
       otpSentTo: otpEmail,
       otpChannel: 'account'
     });
@@ -561,7 +561,7 @@ async function requestPasswordReset(req, res) {
       createdAt: Date.now()
     };
     return res.json({
-      message: 'OTP sent for password reset.',
+      message: 'OTP sent for password reset.' + emailService.previewNotice(),
       otpSentTo: otpEmail,
       otpChannel: 'account'
     });
@@ -772,7 +772,7 @@ async function sendAdminAnnouncement(req, res) {
     const failed = results.length - sent;
 
     return res.status(failed ? 207 : 200).json({
-      message: `Announcement sent to ${sent} customer${sent === 1 ? '' : 's'}${failed ? `; ${failed} failed` : ''}.`,
+      message: `Announcement sent to ${sent} customer${sent === 1 ? '' : 's'}${failed ? `; ${failed} failed` : ''}.` + (results.some(result => result?.delivered === 'preview') ? emailService.previewNotice() : ''),
       sent,
       failed,
       total: recipients.length

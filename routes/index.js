@@ -32,6 +32,9 @@ const {
   getPaymentsReportExport, getTrackingAnalytics, exportTrackingSheet,
   getTrackingSheet, getUserTracking
 } = require('../controllers/reportController');
+const {
+  listExpenses, createExpense, updateExpense, deleteExpense
+} = require('../controllers/expenseController');
 
 const { healthRateLimiter } = require('../middleware/security');
 
@@ -99,6 +102,10 @@ router.post('/admin/announcements', sendAdminAnnouncement);
 router.post('/admin/backup', createBackup);
 router.get('/admin/backups', listBackups);
 router.post('/admin/restore', restoreBackup);
+router.get('/admin/expenses', listExpenses);
+router.post('/admin/expenses', createExpense);
+router.patch('/admin/expenses/:id', updateExpense);
+router.delete('/admin/expenses/:id', deleteExpense);
 router.get('/hr/employees', listEmployees);
 router.patch('/hr/employees/:id', editEmployee);
 router.post('/hr/employees/:id/restrictions', setEmployeeRestriction);

@@ -20,7 +20,7 @@
       z-index: 1;
       max-width: 1200px;
       margin: 0 auto;
-      padding: 32px 18px 60px;
+      padding: 32px 140px 60px 76px;
     }
     .panel {
       background: var(--surface);
@@ -470,6 +470,48 @@
         </div>
         <div id="storeReportMetrics" class="report-metrics"><p>Loading report summary...</p></div>
         <p id="storeReportNote" class="message-text"></p>
+      </section>
+
+      <section class="panel store-section" aria-labelledby="expenseTitle">
+        <div class="admin-topbar">
+          <div>
+            <h2 id="expenseTitle">Operating expenses</h2>
+            <p>Rent, salaries, transport, and other costs for this store. Net profit subtracts these from collected interest and fees.</p>
+          </div>
+        </div>
+        <form id="expenseForm" class="auth-form" style="margin-top: 8px;">
+          <input type="hidden" id="expenseId">
+          <div class="loan-fields">
+            <div>
+              <label for="expenseDate">Date</label>
+              <input type="date" id="expenseDate" class="modal-input" required>
+            </div>
+            <div>
+              <label for="expenseCategory">Category</label>
+              <select id="expenseCategory" class="modal-input" required>
+                <option value="Rent">Rent</option>
+                <option value="Salaries">Salaries</option>
+                <option value="Transport">Transport</option>
+                <option value="Airtime">Airtime</option>
+                <option value="Utilities">Utilities</option>
+                <option value="Supplies">Supplies</option>
+                <option value="Bank fees">Bank fees</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="expenseAmount">Amount (K)</label>
+              <input type="number" id="expenseAmount" class="modal-input" min="0.01" step="0.01" required>
+            </div>
+          </div>
+          <input type="text" id="expenseNote" class="modal-input" maxlength="500" placeholder="Note (optional)">
+          <div class="button-row">
+            <button type="submit" class="enter-btn" id="expenseSaveBtn" style="max-width: 220px;">Record expense</button>
+            <button type="button" class="toggle-mode" id="expenseCancelBtn" style="max-width: 180px;" hidden>Cancel edit</button>
+          </div>
+        </form>
+        <p id="expenseMessage" class="message-text"></p>
+        <div id="expenseList"><p>Loading expenses...</p></div>
       </section>
 
       <section class="panel store-section" aria-labelledby="storeFeedbackTitle">

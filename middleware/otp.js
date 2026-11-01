@@ -1,19 +1,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
-
-// HEAD: transporter configuration
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  family: 4,
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, '')
-  }
-});
+const { sendMail } = require('./email');
 
 // HEART: in-memory OTP store, scoped by email and purpose so different flows do not collide
 const OTP_NAMESPACE = '__global_otp__';
@@ -91,25 +79,23 @@ async function sendOTP(purpose = 'Account Verification', targetEmail = null, for
   const normalizedEmail = normalizeEmailAddress(targetEmail);
   const key = buildOtpKey(normalizedEmail, purpose);
   const otp = generateOTP(key, forceNew);
-  const recipient = normalizeEmailAddress(recipientOverride) || normalizedEmail || process.env.GMAIL_USER;
+  const recipient = normalizeEmailAddress(recipientOverride) || normalizedEmail || process.env.MAIL_FROM || process.env.SMTP_USER || process.env.GMAIL_USER;
 
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD || !recipient) {
+  if (!recipient) {
     throw new Error('OTP email configuration is incomplete.');
   }
 
-  try {
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: recipient,
-      subject: `BURAZA MICRO FINANCE (BMF) OTP for ${purpose}`,
-      text: `Your OTP code is: ${otp}\n\nThis code is for: ${purpose}\nExpires in 5 minutes.\n\nBMF values your security and privacy.\n\nIMPORTANT: This email may land in your Spam or Promotions folder. Please move it to your Primary inbox and mark it as "Not Spam" so future codes arrive on time.\n\nIf you did not request this, ignore this email.`
-    });
-
-    return otp;
-  } catch (error) {
+  const result = await sendMail({
+    to: recipient,
+    subject: `BURAZA MICRO FINANCE (BMF) OTP for ${purpose}`,
+    text: `Your OTP code is: ${otp}\n\nThis code is for: ${purpose}\nExpires in 5 minutes.\n\nBMF values your security and privacy.\n\nIMPORTANT: This email may land in your Spam or Promotions folder. Please move it to your Primary inbox and mark it as "Not Spam" so future codes arrive on time.\n\nIf you did not request this, ignore this email.`
+  });
+  if (!result.ok) {
     delete otpStore[key];
-    throw error;
+    throw new Error(result.reason || 'OTP email configuration is incomplete.');
   }
+
+  return otp;
 }
 
 function verifyOTP(input, targetEmail = null, purpose = null) {
