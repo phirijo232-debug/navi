@@ -82,9 +82,28 @@ function showStoreSelection() {
 }
 
 // Mirror of config.STORES on the server. Keep in sync when a subsidiary is added.
-const BMF_STORES = [
+let BMF_STORES = [
   { id: 'buraza', name: 'Buraza Micro Finance', code: 'BMF' }
 ];
+
+async function refreshStores() {
+  try {
+    const response = await fetch('/stores');
+    const data = await response.json();
+    if (Array.isArray(data.stores) && data.stores.length) BMF_STORES = data.stores;
+  } catch {
+    // Buraza stays available if the list cannot be loaded.
+  }
+  const grid = document.querySelector('.store-grid');
+  if (!grid) return;
+  grid.innerHTML = BMF_STORES.map(store => `
+    <button type="button" class="panel store-card" data-store="${store.id}">
+      <h2>${store.name}</h2>
+      <p>Loans and customer accounts</p>
+      <span class="store-status">Active · ${store.code || store.id}</span>
+    </button>
+  `).join('');
+}
 
 function getStoreName(storeId) {
   const store = BMF_STORES.find(s => s.id === storeId);
@@ -160,6 +179,12 @@ function applyRolePermissions() {
   document.querySelectorAll('[data-cashier-hide]').forEach(element => {
     element.hidden = role === 'cashier';
   });
+  document.querySelectorAll('[data-franchise-only]').forEach(element => {
+    element.hidden = !isFranchiseLevel;
+  });
+  document.querySelectorAll('[data-main-admin]').forEach(element => {
+    element.hidden = role !== 'admin';
+  });
   document.getElementById('notifyOverdueBtn').hidden = !canManageStore;
   // HR (employee management) is only for the main admin and Franchise Employee Admin.
   const hrMenu = document.getElementById('adminMenuHr');
@@ -187,7 +212,7 @@ async function fetchUsers() {
 
     allUsers = await response.json();
     applyUserFilterAndSort();
-    await Promise.all([fetchStoreReport(), fetchMorningList(), fetchStoreFeedback(), fetchNewRequests(), fetchExpenses()]);
+    await Promise.all([fetchStoreReport(), fetchMorningList(), fetchGoLive(), fetchStoreFeedback(), fetchNewRequests(), fetchExpenses()]);
   } catch (err) {
     console.error(err);
     setAuthMessage('Access denied or session expired. Please login again.', true);
@@ -326,6 +351,35 @@ document.getElementById('tillForm')?.addEventListener('submit', async (event) =>
   const diff = data.entry?.difference || {};
   message.textContent = `Saved. Difference — cash ${formatCurrency(diff.cash || 0)}, Airtel ${formatCurrency(diff.airtel || 0)}, MTN ${formatCurrency(diff.mtn || 0)}.`;
 });
+
+document.getElementById('addStoreForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const message = document.getElementById('addStoreMessage');
+  const response = await fetch('/admin/stores', {
+    method: 'POST',
+    headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      id: document.getElementById('newStoreId').value.trim(),
+      name: document.getElementById('newStoreName').value.trim(),
+      code: document.getElementById('newStoreCode').value.trim()
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  message.textContent = data.error || data.message || 'Saved.';
+  if (response.ok) refreshStores();
+});
+
+async function fetchGoLive() {
+  const box = document.getElementById('goLiveList');
+  if (!box || localStorage.getItem('userRole') !== 'admin') return;
+  const response = await fetch('/admin/go-live', { headers: getStoreHeaders() });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    box.innerHTML = `<p>${escapeHtml(data.error || 'Checklist unavailable.')}</p>`;
+    return;
+  }
+  box.innerHTML = `<ul>${(data.items || []).map(item => `<li>${item.ok ? 'Ready' : 'Not yet'} — ${escapeHtml(item.label)}</li>`).join('')}</ul>`;
+}
 
 document.getElementById('codePreviewForm')?.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -689,8 +743,7 @@ function renderLoanDetails(loan) {
   const payments = Array.isArray(loan.payments) ? loan.payments : [];
   const canDecide = localStorage.getItem('userRole') === 'store_admin';
   const fileUrl = (name) => {
-    const token = localStorage.getItem('deviceToken') || '';
-    return `/uploads/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}`;
+    return `/uploads/${encodeURIComponent(name)}`;
   };
   const paymentHistory = payments.length ? payments.map(payment => `
     <li>
@@ -781,7 +834,8 @@ function renderLoanDetails(loan) {
             <option value="bank">Bank Transfer</option>
             <option value="other">Other</option>
           </select>
-          <input type="text" name="note" class="modal-input" maxlength="240" placeholder="Reference note" style="margin-top: 10px;">
+          <input type="text" name="providerReference" class="modal-input" maxlength="80" placeholder="Airtel or MTN transaction reference" style="margin-top: 10px;">
+          <input type="text" name="note" class="modal-input" maxlength="240" placeholder="Note" style="margin-top: 10px;">
           <label>Proof of payment<input type="file" name="screenshot" accept="image/*" class="modal-input" style="margin-top: 8px;"></label>
           <button type="submit" class="enter-btn" style="margin-top: 10px;">Post payment</button>
         </form>` : ''}
@@ -1728,9 +1782,11 @@ document.querySelectorAll('[data-close-modal]').forEach(button => {
     if (modalId === 'editEmployeeModal') closeEditEmployeeModal();
   });
 });
-document.querySelectorAll('[data-store]').forEach(button => {
-  button.addEventListener('click', () => enterStore(button.dataset.store));
+document.querySelector('.store-grid')?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-store]');
+  if (button) enterStore(button.dataset.store);
 });
+refreshStores();
 document.getElementById('adminLoginForm').addEventListener('submit', handleAdminLogin);
 document.getElementById('adminOtpForm').addEventListener('submit', handleAdminOtp);
 document.getElementById('showPasswordReset').addEventListener('click', showPasswordResetRequest);
@@ -2019,3 +2075,15 @@ window.closeCreateUserModal = closeCreateUserModal;
 window.closeAnnouncementModal = closeAnnouncementModal;
 window.viewUserDetails = viewUserDetails;
 window.sendOverdueNotice = sendOverdueNotice;
+
+document.addEventListener('click', async (event) => {
+  const link = event.target.closest('a.proof-link, a.attachment-btn');
+  if (!link || !link.getAttribute('href')?.startsWith('/uploads/')) return;
+  event.preventDefault();
+  const response = await fetch(link.getAttribute('href'), {
+    headers: { 'x-device-token': localStorage.getItem('deviceToken') || '' }
+  });
+  if (!response.ok) return;
+  const blob = await response.blob();
+  window.open(URL.createObjectURL(blob), '_blank');
+});
