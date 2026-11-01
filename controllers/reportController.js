@@ -6,8 +6,8 @@ const config = require('../config');
 const { logError, logBreakage } = require('../middleware/logger');
 const dataStore = require('../middleware/dataStore');
 const { getFeedbackData } = require('./feedbackController');
-const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole } = require('../middleware/storeScope');
-const { getEnrichedLoans, summarizeStore, searchLoansByReceipt, normalizeStatus, rebuildPaymentLedger } = require('./loanController');
+const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole, isStaffRole } = require('../middleware/storeScope');
+const { getEnrichedLoans, summarizeStore, searchLoansByReceipt, normalizeStatus, rebuildPaymentLedger, deriveLoanStatus } = require('./loanController');
 const { calendarToday } = require('../middleware/calendar');
 const { buildTrackingSheet, persistTracking } = require('./reportTracking');
 const { getExpensesData } = require('./expenseController');
@@ -150,6 +150,19 @@ function getReportData(scope = config.DEFAULT_STORE_ID, from = '', to = '') {
   }, 0).toFixed(2));
   const operatingExpenses = Number(reportExpenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toFixed(2));
   const netProfit = Number((interestCollected + feesCollected - operatingExpenses).toFixed(2));
+  const collectionsByMode = { cash: 0, airtel: 0, mtn: 0, bank: 0, other: 0 };
+  loanRows.forEach(loan => {
+    (loan.payments || []).forEach(payment => {
+      if (payment.reversed) return;
+      const mode = String(payment.mode || '').toLowerCase();
+      const bucket = mode.includes('airtel') ? 'airtel'
+        : mode.includes('mtn') || mode.includes('momo') ? 'mtn'
+        : mode.includes('bank') ? 'bank'
+        : mode.includes('cash') ? 'cash'
+        : 'other';
+      collectionsByMode[bucket] = Number((collectionsByMode[bucket] + (Number(payment.amount) || 0)).toFixed(2));
+    });
+  });
 
   return {
     scope,
@@ -171,6 +184,7 @@ function getReportData(scope = config.DEFAULT_STORE_ID, from = '', to = '') {
       feesCollected,
       operatingExpenses,
       netProfit,
+      collectionsByMode,
       approvedLoanPrincipal: Number(principalIssued.toFixed(2)),
       feedback: {
         total: feedback.length,
@@ -199,7 +213,7 @@ function getReportData(scope = config.DEFAULT_STORE_ID, from = '', to = '') {
 }
 
 function isAuthorized(req, scope) {
-  if (!isAdminRole(req.authUser?.role)) return false;
+  if (!isStaffRole(req.authUser?.role)) return false;
   if (scope === 'all' && req.authUser.role !== 'admin') return false;
   return canAccessStore(req, scope === 'all' ? config.DEFAULT_STORE_ID : scope);
 }
@@ -1186,6 +1200,45 @@ function getTrackingSheet(req, res) {
   }
 }
 
+function getMorningList(req, res) {
+  try {
+    const scope = analyticsScope(req);
+    if (!isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required for this report scope.' });
+    const today = calendarToday();
+    const users = readArray(USERS_FILE);
+    const byEmail = new Map(users.map(user => [String(user.email || '').toLowerCase(), user]));
+    const rows = getEnrichedLoans(today)
+      .filter(loan => (scope === 'all' || getRecordStoreId(loan) === scope))
+      .filter(loan => ['grace', 'defaulted'].includes(loan.businessStatus || deriveLoanStatus(loan, today)))
+      .map(loan => {
+        const due = String(loan.dueDate || '').slice(0, 10);
+        const daysLate = /^\d{4}-\d{2}-\d{2}$/.test(due)
+          ? Math.max(0, Math.round((new Date(`${today}T00:00:00Z`) - new Date(`${due}T00:00:00Z`)) / 86400000))
+          : 0;
+        const payments = (loan.payments || []).filter(payment => !payment.reversed);
+        const last = payments[payments.length - 1];
+        const person = byEmail.get(String(loan.email || '').toLowerCase());
+        return {
+          loanId: loan.id,
+          receiptNumber: loan.receiptNumber,
+          customer: person?.username || loan.email,
+          phone: person?.phone || '',
+          product: loan.product,
+          status: loan.businessStatus || deriveLoanStatus(loan, today),
+          daysLate,
+          penalty: Number(loan.graceAccrued || 0),
+          outstanding: Number(loan.outstanding || 0),
+          lastPayment: last ? { amount: last.amount, date: last.paymentDate || last.date, mode: last.mode } : null
+        };
+      })
+      .sort((a, b) => b.daysLate - a.daysLate);
+    return res.json({ scope, today, rows });
+  } catch (err) {
+    logError(`MORNING LIST FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'The morning list is temporarily unavailable.' });
+  }
+}
+
 module.exports = {
   categorizeLoan,
   getReportData,
@@ -1195,6 +1248,7 @@ module.exports = {
   getAnalyticsReport,
   getProfitAnalytics,
   getDefaulterAnalytics,
+  getMorningList,
   getOverdueAnalytics,
   getPaidAnalytics,
   getUserReport,
