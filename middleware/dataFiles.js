@@ -11,7 +11,8 @@ const BUSINESS_DATA_FILES = [
   'dailyReportState.json',
   'invites.json',
   'expenses.json',
-  'tillCounts.json'
+  'tillCounts.json',
+  'stores.json'
 ];
 
 const EPHEMERAL_DATA_FILES = ['otp-store.json', 'pending-auth.json'];

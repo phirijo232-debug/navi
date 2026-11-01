@@ -379,7 +379,7 @@
         </button>
         <button type="button" class="panel store-card" disabled>
           <h2>Other stores</h2>
-          <p>Additional subsidiaries can be added here later.</p>
+          <p>Loading the store list.</p>
           <span class="store-status">Not configured</span>
         </button>
       </div>
@@ -487,6 +487,18 @@
           <button type="submit" class="toggle-mode">Show code if mail is not sending</button>
         </form>
         <p id="codePreviewMessage" class="message-text"></p>
+        <form id="addStoreForm" class="auth-form" data-franchise-only hidden>
+          <h3>Add a store</h3>
+          <input type="text" id="newStoreId" class="auth-input" placeholder="Store id, e.g. kitwe" required>
+          <input type="text" id="newStoreName" class="auth-input" placeholder="Store name" required>
+          <input type="text" id="newStoreCode" class="auth-input" placeholder="Short code" required>
+          <button type="submit" class="toggle-mode">Add store</button>
+          <p id="addStoreMessage" class="message-text"></p>
+        </form>
+        <div id="goLivePanel" data-main-admin hidden>
+          <h3>Go-live checklist</h3>
+          <div id="goLiveList"><p>Loading checklist...</p></div>
+        </div>
         <p id="storeReportNote" class="message-text"></p>
       </section>
 

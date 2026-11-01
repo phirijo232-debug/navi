@@ -7,6 +7,7 @@ const config = require('../config');
 const dataStore = require('../middleware/dataStore');
 const { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, isAdminRole, isStaffRole } = require('../middleware/storeScope');
 const { calendarToday, contractDueDate, approvalSchedule } = require('../middleware/calendar');
+const { listStores } = require('../middleware/stores');
 
 const LOANS_FILE = dataStore.paths.loans;
 const USERS_FILE = dataStore.paths.users;
@@ -607,7 +608,7 @@ async function requestLoan(req, res) {
     const authEmail = req.authUser?.email;
     const storeId = req.authUser?.storeId || config.DEFAULT_STORE_ID;
 
-    if (!config.STORES.some(store => store.id === storeId && store.active)) {
+    if (!listStores().some(store => store.id === storeId && store.active)) {
       return res.status(403).json({ error: 'Loan requests are not enabled for this store.' });
     }
 
@@ -1100,6 +1101,19 @@ function recordPayment(req, res) {
     if (!Number.isFinite(feeAmount) || feeAmount < 0) {
       return res.status(400).json({ error: 'A fee must be zero or more. Leave it blank if there is no fee.' });
     }
+    const providerReference = String(req.body.providerReference || req.body.reference || '').trim();
+    const normalizedMode = normalizePaymentMode(mode);
+    if (['Airtel Money', 'MTN MoMo'].includes(normalizedMode) && !providerReference) {
+      return res.status(400).json({ error: 'Airtel and MTN payments need the transaction reference from the phone.' });
+    }
+    if (providerReference) {
+      const duplicate = loans.some(loan => (loan.payments || []).some(payment =>
+        !payment.reversed && String(payment.providerReference || '').trim().toLowerCase() === providerReference.toLowerCase()
+      ));
+      if (duplicate) {
+        return res.status(400).json({ error: 'That mobile-money reference is already on a payment.' });
+      }
+    }
 
     if (!loans[index].payments) loans[index].payments = [];
 
@@ -1115,8 +1129,9 @@ function recordPayment(req, res) {
       paymentDate: recordedAt,
       balanceBefore,
       balanceAfter: Number(Math.max(0, balanceBefore - paymentAmount).toFixed(2)),
-      mode: normalizePaymentMode(mode),
+      mode: normalizedMode,
       fee: Number(feeAmount.toFixed(2)),
+      providerReference: providerReference || null,
       note: note || null,
       description: note || null,
       screenshot,

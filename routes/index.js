@@ -37,11 +37,13 @@ const {
 } = require('../controllers/expenseController');
 const { loanReceipt, loanAgreement, customerStatement } = require('../controllers/documentController');
 const { listTill, saveTill } = require('../controllers/tillController');
+const { listPublicStores, createStore, goLiveChecklist } = require('../controllers/opsController');
 
 const { healthRateLimiter } = require('../middleware/security');
 
 router.get('/', (req, res) => res.send('Navi Server is running!'));
 
+router.get('/stores', listPublicStores);
 router.get('/status', getStatus);
 // IMMUNE: public tier returns {status, uptime} only; the admin tier (memory, db,
 // heartbeat) activates only with a valid admin x-device-token in the same call.
@@ -83,6 +85,8 @@ router.get('/account/profile', getMyProfile);
 router.post('/account/kyc', upload.single('nrcPhoto'), saveCustomerKyc);
 router.post('/admin/credit-limit', setCreditLimit);
 router.get('/admin/login-code', previewLoginCode);
+router.get('/admin/go-live', goLiveChecklist);
+router.post('/admin/stores', createStore);
 router.get('/admin/till', listTill);
 router.post('/admin/till', saveTill);
 router.get('/loans/:id', getLoanById);

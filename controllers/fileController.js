@@ -1,8 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { getLoansData } = require('./loanController');
+const dataStore = require('../middleware/dataStore');
 const { findUserByDeviceToken } = require('../middleware/security');
-const { canAccessRecord, isAdminRole } = require('../middleware/storeScope');
+const { canAccessRecord, isStaffRole } = require('../middleware/storeScope');
 const { logError } = require('../middleware/logger');
 
 const UPLOAD_DIR = path.join(__dirname, '../public/uploads');
@@ -23,9 +25,19 @@ function safeFilename(raw) {
 // Resolve the requester: prefer the deviceAuth-populated req.authUser, else fall
 // back to a header token or a scoped ?token= (needed because <a> navigation
 // cannot attach an x-device-token header).
+function signatureValid(filename, exp, sig) {
+  const key = process.env.UPLOAD_SIGNING_KEY;
+  if (!key || !exp || !sig) return false;
+  if (Number(exp) < Date.now()) return false;
+  const expected = crypto.createHmac('sha256', key).update(`${filename}.${exp}`).digest('hex');
+  const given = String(sig);
+  if (given.length !== expected.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(given));
+}
+
 function resolveAuthUser(req) {
   if (req.authUser && req.authUser.email) return req.authUser;
-  const token = req.headers['x-device-token'] || req.query?.token;
+  const token = req.headers['x-device-token'];
   return findUserByDeviceToken(token);
 }
 
@@ -34,7 +46,13 @@ function resolveAuthUser(req) {
 function canViewFile(user, filename) {
   if (!user) return false;
   const requester = String(user.email || '').trim().toLowerCase();
-  const admin = isAdminRole(user.role);
+  const admin = isStaffRole(user.role);
+  const users = dataStore.readJson(dataStore.paths.users, [], Array.isArray);
+  const ownsNrc = users.some(account => account.nrcPhoto === filename && (
+    String(account.email || '').trim().toLowerCase() === requester ||
+    (admin && canAccessRecord({ authUser: user, headers: {} }, account))
+  ));
+  if (ownsNrc) return true;
   return getLoansData().some(loan => {
     const referenced = loan.collateralFront === filename
       || loan.collateralBack === filename
@@ -55,6 +73,11 @@ function serveFile(req, res) {
     if (!abs.startsWith(UPLOAD_DIR + path.sep) || !fs.existsSync(abs)) {
       return res.status(404).send('Not found.');
     }
+    if (signatureValid(filename, req.query?.exp, req.query?.sig)) {
+      res.set('Cache-Control', 'private, no-store');
+      res.set('Referrer-Policy', 'no-referrer');
+      return res.sendFile(abs);
+    }
     const user = resolveAuthUser(req);
     if (!canViewFile(user, filename)) {
       logError(`FILE ACCESS DENIED: ${filename} for ${user?.email || 'unknown'} from ${req.ip}`);
@@ -64,9 +87,6 @@ function serveFile(req, res) {
     // don't leak the URL via Referer. (Full fix = signed URLs before public deploy.)
     res.set('Cache-Control', 'private, no-store');
     res.set('Referrer-Policy', 'no-referrer');
-    if (req.query?.token) {
-      logError(`FILE ACCESS VIA URL TOKEN: ${filename} for ${user?.email || 'unknown'} from ${req.ip} (LAN-only mitigation; replace ?token= with signed URLs before public deploy)`);
-    }
     return res.sendFile(abs);
   } catch (err) {
     logError(`FILE SERVE FAILED: ${err.message}`);
