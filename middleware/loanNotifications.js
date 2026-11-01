@@ -4,6 +4,8 @@ const dataStore = require('./dataStore');
 const emailService = require('./email');
 const { logError, logBreakage } = require('./logger');
 const { getLoansData, deriveLoanStatus } = require('../controllers/loanController');
+const { calendarToday } = require('./calendar');
+const { sendSms, sendWhatsApp } = require('./messaging');
 
 // ─── Automated borrower notifications (Task 7 — email channel) ───────────────
 // Daily check at 23:58 (driven by scheduler.js), for each active loan:
@@ -62,7 +64,7 @@ async function sendTemplatedMessage({ loan, messageKey, days, day, context = 'sc
     return { ok: false, skipped: true, reason: `Unknown message template: ${messageKey}` };
   }
 
-  const dedupeDay = day || new Date().toISOString().slice(0, 10);
+  const dedupeDay = day || calendarToday();
   const dedupeKey = buildDedupeKey({ loanId: loan.id, day: dedupeDay });
   const log = getNotificationLog();
   if (log.some(entry => entry.dedupeKey === dedupeKey && entry.status !== 'failed')) {
@@ -109,6 +111,20 @@ async function sendTemplatedMessage({ loan, messageKey, days, day, context = 'sc
     logError(`BORROWER NOTIFICATION FAILED (${messageKey}, loan #${loan.id}): ${err.message}`);
   }
 
+  if (record.status === 'sent') {
+    try {
+      const users = dataStore.readJson(dataStore.paths.users, [], Array.isArray);
+      const person = users.find(user => String(user.email || '').trim().toLowerCase() === to);
+      if (person?.phone) {
+        await sendSms({ to: person.phone, text: body });
+        await sendWhatsApp({ to: person.phone, text: body });
+        record.channel = 'email+sms+whatsapp';
+      }
+    } catch (err) {
+      logError(`PHONE MESSAGE SKIPPED | loan ${loan.id} | ${err.message}`);
+    }
+  }
+
   record.sentAt = new Date().toISOString();
   saveNotificationLog([...log.filter(entry => entry.dedupeKey !== dedupeKey), record]);
 
@@ -121,14 +137,14 @@ async function sendTemplatedMessage({ loan, messageKey, days, day, context = 'sc
 }
 
 /** Task 7 pass: countdown 3 → 2 → 1 → 0 → overdue for every active loan. */
-async function runDueDatePass(today = new Date().toISOString().slice(0, 10)) {
+async function runDueDatePass(today = calendarToday()) {
   const summary = { date: today, sent: 0, reminders: 0, overdue: 0, skipped: 0, failed: 0 };
 
   for (const loan of getLoansData()) {
     const outstanding = Number(loan.outstanding || 0);
     if (outstanding <= 0 || !loan.email) continue;
     const businessStatus = deriveLoanStatus(loan, today);
-    if (['paid', 'declined', 'liquidated'].includes(businessStatus)) continue;
+    if (['paid', 'declined', 'liquidated', 'pending'].includes(businessStatus)) continue;
 
     const dueDate = String(loan.dueDate || '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) continue;

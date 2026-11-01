@@ -12,15 +12,9 @@ const { isAdminRole } = require('../middleware/storeScope');
 // dataStore.writeJson (atomic + refreshes .bak) and finishes with
 // ensureDataIntegrity() so the restored store is verified immediately.
 
+const { BUSINESS_DATA_FILES } = require('../middleware/dataFiles');
 const BACKUPS_DIR = path.join(dataStore.DATA_DIR, 'backups');
-const BACKUP_FILES = [
-  'users.json',
-  'loans.json',
-  'feedback.json',
-  'notifications.json',
-  'dailyReportState.json',
-  'invites.json'
-];
+const BACKUP_FILES = BUSINESS_DATA_FILES;
 const BACKUP_ID_PATTERN = /^backup-\d{8}-\d{6}(-\d+)?$/;
 const BACKUP_NAME_PATTERN = /^backup-\d{8}-\d{6}(-\d+)?\.json$/;
 

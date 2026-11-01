@@ -140,8 +140,12 @@
           localStorage.setItem('userEmail', pendingEmail);
           localStorage.setItem('userRole', data.role);
           localStorage.setItem('deviceToken', data.deviceToken);
+          if (data.storeId) localStorage.setItem('userStoreId', data.storeId);
           const preferredMode = localStorage.getItem('mode') || 'dark';
-          const nextPage = data.role === 'admin' ? 'dashboard.html' : 'user.html';
+          const staffRoles = ['store_admin', 'franchise_admin', 'cashier'];
+          const nextPage = data.role === 'admin'
+            ? 'dashboard.html'
+            : (staffRoles.includes(data.role) ? 'admin.html' : 'user.html');
           localStorage.setItem('lastAppPage', nextPage);
           applyTheme(preferredMode);
           localStorage.setItem('justLoggedIn', 'true');

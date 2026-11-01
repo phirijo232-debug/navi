@@ -25,6 +25,10 @@
       <input type="email" id="email" placeholder="Email" required class="auth-input">
       <input type="tel" id="phone" placeholder="e.g. 0977123456" required class="auth-input" inputmode="tel" autocomplete="tel">
       <input type="text" id="nrc" placeholder="NRC e.g. 123456/78/1" required class="auth-input" inputmode="numeric" autocomplete="off">
+      <input type="text" id="address" placeholder="Home area or address" required class="auth-input">
+      <input type="text" id="nextOfKinName" placeholder="Next of kin name" required class="auth-input">
+      <input type="tel" id="nextOfKinPhone" placeholder="Next of kin phone e.g. 0977123456" required class="auth-input">
+      <p class="message-text">After you sign in, add a photo of your NRC before you request a loan.</p>
       <div class="input-wrap">
         <input type="password" id="password" placeholder="Password" required class="auth-input">
         <svg id="togglePass1" class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -118,6 +122,9 @@
       const email = document.getElementById('email').value;
       const phone = document.getElementById('phone').value;
       const nrc = document.getElementById('nrc').value.trim();
+      const address = document.getElementById('address').value.trim();
+      const nextOfKinName = document.getElementById('nextOfKinName').value.trim();
+      const nextOfKinPhone = document.getElementById('nextOfKinPhone').value.trim();
       const password = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirmPassword').value;
       const nrcRegex = new RegExp('^\\d{6}/\\d{2}/\\d$');
@@ -144,7 +151,7 @@
       const res = await fetch('/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, phone, nrc, password, confirmPassword, inviteToken })
+        body: JSON.stringify({ username, email, phone, nrc, address, nextOfKinName, nextOfKinPhone, password, confirmPassword, inviteToken })
       });
       const data = await res.json();
 

@@ -2,18 +2,27 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const fs = require('fs');
 const os = require('os');
-const nodemailer = require('nodemailer');
+const { sendMail } = require('./email');
 const config = require('../config');
 
-const emailTransporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, '')
+// Tests replace sendMail on this object. Production delegates to the shared
+// mailer, which uses SMTP when configured and a local preview log otherwise.
+const emailTransporter = {
+  sendMail(message) {
+    return sendMail({
+      to: message.to,
+      subject: message.subject,
+      text: message.text || message.body,
+      attachments: message.attachments
+    });
   }
-});
+};
+
+function alertDelivered(result) {
+  if (!result) return false;
+  if (result.ok === false) return false;
+  return result.ok === true || Boolean(result.messageId) || (Array.isArray(result.accepted) && result.accepted.length > 0);
+}
 
 const alertCooldowns = new Map();
 const ALERT_COOLDOWN_MS = 15 * 60 * 1000;
@@ -62,7 +71,9 @@ const PENDING_REPLAY_COOLDOWN_MS = 5 * 60 * 1000;
 let lastPendingReplay = 0;
 
 async function replayPendingAlerts(maxEntries = 20) {
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return;
+  if (String(process.env.MAIL_MODE || 'auto').toLowerCase() === 'preview') return;
+  if (!process.env.SMTP_USER && !process.env.GMAIL_USER) return;
+  if (!process.env.SMTP_PASS && !process.env.GMAIL_APP_PASSWORD) return;
   const recipient = resolveAlertRecipient();
   if (!recipient) return;
 
@@ -95,12 +106,12 @@ async function replayPendingAlerts(maxEntries = 20) {
       continue; // malformed line — drop it rather than retry forever
     }
     try {
-      await emailTransporter.sendMail({
-        from: process.env.GMAIL_USER,
+      const replay = await emailTransporter.sendMail({
         to: recipient,
         subject: entry.subject,
         text: entry.body
       });
+      if (!alertDelivered(replay)) throw new Error(replay?.reason || 'Alert replay failed');
     } catch (err) {
       console.error('Pending alert replay failed:', err.message);
       transportDown = true;
@@ -130,9 +141,6 @@ function resolveAlertRecipient() {
 }
 
 async function sendErrorAlert(subject, body) {
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-    return;
-  }
   const recipient = resolveAlertRecipient();
   if (!recipient) {
     return;
@@ -152,15 +160,13 @@ async function sendErrorAlert(subject, body) {
   alertCooldowns.set(key, now + ALERT_COOLDOWN_MS);
 
   try {
-    await emailTransporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: recipient,
-      subject,
-      text: body
-    });
-    // A fresh alert just went out, so the transport is healthy again — drain any
-    // breakage alerts queued while it was down (e.g. during an SMTP outage).
-    replayPendingAlerts().catch(() => {});
+    const result = await emailTransporter.sendMail({ to: recipient, subject, text: body });
+    if (!alertDelivered(result)) throw new Error(result?.reason || 'Error alert failed');
+    if (result.delivered === 'smtp' || result.accepted) {
+      // A fresh alert just went out, so the transport is healthy again — drain any
+      // breakage alerts queued while it was down (e.g. during an SMTP outage).
+      replayPendingAlerts().catch(() => {});
+    }
   } catch (err) {
     console.error('Error alert failed:', err.message);
     persistPendingAlert(subject, body);
