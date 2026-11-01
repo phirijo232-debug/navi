@@ -8,7 +8,7 @@ const otpService = require('../middleware/otp');
 const emailService = require('../middleware/email');
 const config = require('../config');
 const { normalizeZambianPhone, isValidZambianMobile } = require('../middleware/phoneNumber');
-const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole, isFranchiseAdmin } = require('../middleware/storeScope');
+const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole, isStaffRole, isFranchiseAdmin } = require('../middleware/storeScope');
 
 const NRC_PATTERN = /^\d{6}\/\d{2}\/\d$/;
 
@@ -28,6 +28,9 @@ function resolveAssignedRole(requestedRole, actorRole) {
   }
   if (requestedRole === 'store_admin') {
     return actorRole === 'admin' || actorRole === 'franchise_admin' ? 'store_admin' : 'user';
+  }
+  if (requestedRole === 'cashier') {
+    return actorRole === 'admin' || actorRole === 'franchise_admin' || actorRole === 'store_admin' ? 'cashier' : 'user';
   }
   return 'user';
 }
@@ -763,7 +766,7 @@ async function createAdminUser(req, res) {
 
 function getAllUsers(req, res) {
   try {
-    if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'Admin access required.' });
+    if (!isStaffRole(req.authUser?.role)) return res.status(403).json({ error: 'Admin access required.' });
 
     const storeId = getRequestedStoreId(req);
     if (!canAccessStore(req, storeId)) return res.status(403).json({ error: 'Access to this store is not allowed.' });
@@ -1067,6 +1070,28 @@ function verifyStoreSwitch(req, res) {
   }
 }
 
+function previewLoginCode(req, res) {
+  try {
+    if (req.authUser?.role !== 'store_admin') {
+      return res.status(403).json({ error: 'Only the store admin can read a code on this screen.' });
+    }
+    const mode = String(process.env.MAIL_MODE || 'auto').toLowerCase();
+    const smtpReady = Boolean(process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD);
+    const preview = mode === 'preview' || (mode !== 'smtp' && !smtpReady);
+    if (!preview) {
+      return res.status(403).json({ error: 'Codes are being emailed. This screen only shows them when mail is not really sending.' });
+    }
+    const email = String(req.query.email || '').trim();
+    const purpose = String(req.query.purpose || 'Login Verification');
+    const peeked = otpService.peekOTP(email, purpose);
+    if (!peeked) return res.status(404).json({ error: 'No active code for that person.' });
+    return res.json({ email, purpose, code: peeked.code, expiresAt: peeked.expiresAt });
+  } catch (err) {
+    logError(`LOGIN CODE PREVIEW FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'The code could not be shown.' });
+  }
+}
+
 function getMyProfile(req, res) {
   try {
     const email = String(req.authUser?.email || '').trim().toLowerCase();
@@ -1157,4 +1182,4 @@ function setCreditLimit(req, res) {
   }
 }
 
-module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError, sweepExpiredAuth, cleanupExpiredInvites, getMyProfile, saveCustomerKyc, setCreditLimit };
+module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError, sweepExpiredAuth, cleanupExpiredInvites, getMyProfile, saveCustomerKyc, setCreditLimit, previewLoginCode };

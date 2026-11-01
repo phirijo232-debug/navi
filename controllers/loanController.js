@@ -5,7 +5,7 @@ const { logError, logBreakage } = require('../middleware/logger');
 const emailService = require('../middleware/email');
 const config = require('../config');
 const dataStore = require('../middleware/dataStore');
-const { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, isAdminRole } = require('../middleware/storeScope');
+const { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, isAdminRole, isStaffRole } = require('../middleware/storeScope');
 const { calendarToday, contractDueDate, approvalSchedule } = require('../middleware/calendar');
 
 const LOANS_FILE = dataStore.paths.loans;
@@ -991,6 +991,10 @@ async function updateLoanStatus(req, res) {
       loan.status = 'liquidated';
       loan.liquidatedAt = new Date().toISOString();
       loan.adminReason = reason;
+    } else if (['mark_disbursed', 'disburse', 'handed_over'].includes(normalizedAction) && isAdmin) {
+      loan.disbursedAt = new Date().toISOString();
+      loan.disbursedBy = req.authUser?.email || 'admin';
+      loan.adminReason = reason || 'Money handed to the customer.';
     } else if (action === 'grade' && isAdmin) {
       loan.collateralGrade = collateralGrade;
       loan.collateralVerified = collateralVerified === 'true';
@@ -1018,17 +1022,18 @@ async function updateLoanStatus(req, res) {
 
     const adminRecipients = emailService.getNotificationRecipients(loan.email).filter(recipient => recipient.toLowerCase() !== String(loan.email).trim().toLowerCase());
     if (adminRecipients.length) {
-      const reportLines = getLoansData()
-        .map(item => {
-          const history = Array.isArray(item.statusHistory) && item.statusHistory.length ? item.statusHistory[item.statusHistory.length - 1].status : item.status || 'pending';
-          return `- Loan #${item.id}: ${item.email} | ${item.product || 'Loan'} | ${formatCurrency(item.amount || 0)} | status: ${history} | reason: ${item.adminReason || 'No reason provided'} | updated: ${item.updatedAt || item.createdAt || 'unknown'}`;
-        })
-        .join('\n');
-
       await emailService.sendCustomerEmail({
         to: adminRecipients,
-        subject: `Loan audit report — ${new Date().toISOString().slice(0, 10)}`,
-        text: `Loan audit report for Pryme Vertex\n\n${reportLines || 'No loan activity recorded.'}`
+        subject: `Loan update — ${loan.receiptNumber || loan.id}`,
+        text: [
+          'One loan was updated.',
+          `${loan.product || 'Loan'} ${loan.receiptNumber || loan.id}`,
+          `Customer: ${loan.email}`,
+          `Status: ${loan.status}`,
+          `Balance: ${formatCurrency(loan.outstanding)}`,
+          `Due: ${loan.dueDate || 'not set'}`,
+          `Note: ${decisionText}`
+        ].join('\n')
       });
     }
 
@@ -1041,7 +1046,7 @@ async function updateLoanStatus(req, res) {
 
 function getAllLoans(req, res) {
   try {
-    const isAdmin = isAdminRole(req.authUser?.role);
+    const isAdmin = isStaffRole(req.authUser?.role);
     if (!isAdmin) return res.status(403).json({ error: 'Admin access required.' });
 
     const storeId = getRequestedStoreId(req);
@@ -1079,7 +1084,7 @@ function getAllLoans(req, res) {
 function recordPayment(req, res) {
   try {
     const { id, amount, mode, note, fee } = req.body;
-    if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'BMF store admin access required.' });
+    if (!isStaffRole(req.authUser?.role)) return res.status(403).json({ error: 'BMF store admin access required.' });
 
     const screenshot = req.files?.screenshot?.[0]?.filename || null;
     const loans = getLoansData();

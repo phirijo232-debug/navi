@@ -142,7 +142,7 @@ function ensureAdminAccess() {
   const token = getDeviceToken();
   const role = localStorage.getItem('userRole');
   const userStoreId = localStorage.getItem('userStoreId') || 'buraza';
-  const isStoreOperator = (role === 'store_admin' || role === 'franchise_admin') && userStoreId === 'buraza';
+  const isStoreOperator = (role === 'store_admin' || role === 'franchise_admin' || role === 'cashier') && userStoreId === 'buraza';
   if (!token || (role !== 'admin' && !isStoreOperator)) {
     showAuthScreen();
     return false;
@@ -157,6 +157,9 @@ function applyRolePermissions() {
   // Announcements are store-operator only (the backend refuses role 'admin'
   // with 403 — tested policy), so hide the button from the main admin too.
   document.getElementById('announcementBtn').hidden = !(role === 'store_admin' || role === 'franchise_admin');
+  document.querySelectorAll('[data-cashier-hide]').forEach(element => {
+    element.hidden = role === 'cashier';
+  });
   document.getElementById('notifyOverdueBtn').hidden = !canManageStore;
   // HR (employee management) is only for the main admin and Franchise Employee Admin.
   const hrMenu = document.getElementById('adminMenuHr');
@@ -184,7 +187,7 @@ async function fetchUsers() {
 
     allUsers = await response.json();
     applyUserFilterAndSort();
-    await Promise.all([fetchStoreReport(), fetchStoreFeedback(), fetchNewRequests(), fetchExpenses()]);
+    await Promise.all([fetchStoreReport(), fetchMorningList(), fetchStoreFeedback(), fetchNewRequests(), fetchExpenses()]);
   } catch (err) {
     console.error(err);
     setAuthMessage('Access denied or session expired. Please login again.', true);
@@ -282,6 +285,57 @@ async function notifySelectedUser() {
   }
 }
 
+async function fetchMorningList() {
+  const box = document.getElementById('morningList');
+  if (!box) return;
+  try {
+    const response = await fetch('/reports/buraza/morning', { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to load the morning list.');
+    const rows = data.rows || [];
+    box.innerHTML = rows.length ? `<ul class="loan-list">${rows.map(row => `
+      <li class="loan-card">
+        <strong>${escapeHtml(row.customer || '')}</strong> · ${escapeHtml(row.phone || 'no phone')}
+        <div>${escapeHtml(row.product || '')} · ${escapeHtml(row.status)} · ${row.daysLate} day(s) late · penalty ${formatCurrency(row.penalty)} · owed ${formatCurrency(row.outstanding)}</div>
+        <div>Last payment: ${row.lastPayment ? `${formatCurrency(row.lastPayment.amount)} on ${escapeHtml(formatDate(row.lastPayment.date))}` : 'none'}</div>
+      </li>`).join('')}</ul>` : '<p>No loans are in grace or default today.</p>';
+  } catch (err) {
+    box.innerHTML = `<p>${escapeHtml(err.message)}</p>`;
+  }
+}
+
+document.getElementById('tillForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const message = document.getElementById('tillMessage');
+  const response = await fetch('/admin/till', {
+    method: 'POST',
+    headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      date: document.getElementById('tillDate').value,
+      cash: Number(document.getElementById('tillCash').value),
+      airtel: Number(document.getElementById('tillAirtel').value),
+      mtn: Number(document.getElementById('tillMtn').value),
+      note: document.getElementById('tillNote').value
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    message.textContent = data.error || 'Could not save the count.';
+    return;
+  }
+  const diff = data.entry?.difference || {};
+  message.textContent = `Saved. Difference — cash ${formatCurrency(diff.cash || 0)}, Airtel ${formatCurrency(diff.airtel || 0)}, MTN ${formatCurrency(diff.mtn || 0)}.`;
+});
+
+document.getElementById('codePreviewForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const message = document.getElementById('codePreviewMessage');
+  const email = document.getElementById('codePreviewEmail').value.trim();
+  const response = await fetch(`/admin/login-code?email=${encodeURIComponent(email)}`, { headers: getStoreHeaders() });
+  const data = await response.json().catch(() => ({}));
+  message.textContent = response.ok ? `Code for ${email}: ${data.code}` : (data.error || 'No code to show.');
+});
+
 async function fetchStoreReport() {
   const metrics = document.getElementById('storeReportMetrics');
   try {
@@ -291,6 +345,9 @@ async function fetchStoreReport() {
     const summary = data.summary;
     const values = [
       ['Cash collected', formatCurrency(summary.cashCollected)],
+      ['Of which cash', formatCurrency(summary.collectionsByMode?.cash || 0)],
+      ['Of which Airtel', formatCurrency(summary.collectionsByMode?.airtel || 0)],
+      ['Of which MTN', formatCurrency(summary.collectionsByMode?.mtn || 0)],
       ['Gross interest booked', formatCurrency(summary.grossInterestBooked)],
       ['Collected interest', formatCurrency(summary.interestCollected)],
       ['Collected fees', formatCurrency(summary.feesCollected)],
@@ -359,7 +416,7 @@ function renderExpenses() {
       </div>
       <div class="button-row">
         <button type="button" class="toggle-mode" data-expense-edit="${escapeHtml(item.id)}">Edit</button>
-        <button type="button" class="toggle-mode" data-expense-delete="${escapeHtml(item.id)}">Delete</button>
+        ${localStorage.getItem('userRole') === 'cashier' ? '' : `<button type="button" class="toggle-mode" data-expense-delete="${escapeHtml(item.id)}">Delete</button>`}
       </div>
     </div>
   `).join('');
@@ -650,7 +707,7 @@ function renderLoanDetails(loan) {
   const outstanding = Number(loan.outstanding || 0);
   // Payments: admin or store_admin (both may record money). Decisions: the
   // assigned store_admin only — mirrors the backend's franchise-scoping gate.
-  const canRecordPayment = canManageStore && outstanding > 0 &&
+  const canRecordPayment = ['admin', 'franchise_admin', 'store_admin', 'cashier'].includes(localStorage.getItem('userRole')) && outstanding > 0 &&
     ['active', 'grace', 'defaulted'].includes(status);
   const canReview = canDecide &&
     ['pending', 'active'].includes(status);
@@ -707,6 +764,7 @@ function renderLoanDetails(loan) {
               <button class="toggle-mode" type="button" data-loan-action="enter_grace" data-loan-id="${escapeHtml(loan.id)}">Enter grace (1.8%/day)</button>
               ${status !== 'defaulted' ? `<button class="toggle-mode" type="button" data-loan-action="verify_overdue" data-loan-id="${escapeHtml(loan.id)}">Verify overdue</button>` : ''}
               ${status !== 'liquidated' ? `<button class="toggle-mode" type="button" data-loan-action="liquidate" data-loan-id="${escapeHtml(loan.id)}">Liquidate collateral</button>` : ''}
+              ${!loan.disbursedAt ? `<button class="toggle-mode" type="button" data-loan-action="mark_disbursed" data-loan-id="${escapeHtml(loan.id)}">Money handed over</button>` : `<p>Money handed over ${escapeHtml(formatDate(loan.disbursedAt))}.</p>`}
             </div>
             <p class="message-text" style="text-align:left;">Grace needs an agreed end date. The first late day is charged at 1.8%. Liquidation needs a reason and the amount the pledge raised (use 0 if it raised nothing). The balance left after the sale stays owed. Paying early does not reduce the interest.</p>
           </section>

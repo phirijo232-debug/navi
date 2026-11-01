@@ -14,7 +14,7 @@ const {
   requestLogin, confirmLogin,
   requestPasswordReset, confirmPasswordReset,
   createInvite, createAdminUser, validateInvite,
-  getAllUsers, sendAdminAnnouncement,   listInvites, getMyProfile, saveCustomerKyc, setCreditLimit,
+  getAllUsers, sendAdminAnnouncement,   listInvites, getMyProfile, saveCustomerKyc, setCreditLimit, previewLoginCode,
   listEmployees, editEmployee, setEmployeeRestriction,
   requestStoreSwitch, verifyStoreSwitch
 } = require('../controllers/authController');
@@ -27,7 +27,7 @@ const {
 const {
   getReportSummary, exportReport, getSingleUserReport,
   getAllUsersReport, getAnalyticsReport, getProfitAnalytics,
-  getDefaulterAnalytics, getOverdueAnalytics, getPaidAnalytics,
+  getDefaulterAnalytics, getMorningList, getOverdueAnalytics, getPaidAnalytics,
   getUserReport, searchReports, getPaymentsLedger,
   getPaymentsReportExport, getTrackingAnalytics, exportTrackingSheet,
   getTrackingSheet, getUserTracking
@@ -36,6 +36,7 @@ const {
   listExpenses, createExpense, updateExpense, deleteExpense
 } = require('../controllers/expenseController');
 const { loanReceipt, loanAgreement, customerStatement } = require('../controllers/documentController');
+const { listTill, saveTill } = require('../controllers/tillController');
 
 const { healthRateLimiter } = require('../middleware/security');
 
@@ -60,6 +61,7 @@ router.get('/reports/:scope/summary', getReportSummary);
 router.get('/reports/:scope/export', exportReport);
 router.get('/reports/:scope/profits', getProfitAnalytics);
 router.get('/reports/:scope/defaulters', getDefaulterAnalytics);
+router.get('/reports/:scope/morning', getMorningList);
 router.get('/reports/:scope/overdue', getOverdueAnalytics);
 router.get('/reports/:scope/paid', getPaidAnalytics);
 router.get('/reports/:scope/tracking', getTrackingSheet);
@@ -80,6 +82,9 @@ router.get('/account/statement', customerStatement);
 router.get('/account/profile', getMyProfile);
 router.post('/account/kyc', upload.single('nrcPhoto'), saveCustomerKyc);
 router.post('/admin/credit-limit', setCreditLimit);
+router.get('/admin/login-code', previewLoginCode);
+router.get('/admin/till', listTill);
+router.post('/admin/till', saveTill);
 router.get('/loans/:id', getLoanById);
 router.post('/loans/request', upload.fields([
   { name: 'collateralFront', maxCount: 1 },

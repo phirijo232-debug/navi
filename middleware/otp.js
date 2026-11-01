@@ -143,4 +143,12 @@ function verifyOTP(input, targetEmail = null, purpose = null) {
   saveOtpStore();
   return { valid: true };
 }
-module.exports = { sendOTP, verifyOTP, generateOTP, buildOtpKey, cleanupExpiredOtps };
+function peekOTP(targetEmail, purpose) {
+  cleanupExpiredOtps();
+  const key = buildOtpKey(targetEmail, purpose);
+  const record = otpStore[key];
+  if (!record || Date.now() > record.expiry) return null;
+  return { code: record.code, expiresAt: record.expiry, purpose };
+}
+
+module.exports = { sendOTP, verifyOTP, generateOTP, buildOtpKey, cleanupExpiredOtps, peekOTP };
