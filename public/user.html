@@ -125,6 +125,18 @@
         <div class="board-card">
           <h2>About You</h2>
           <div id="aboutUserDetails" class="about-user-grid"></div>
+          <form id="kycForm" class="auth-form" enctype="multipart/form-data" style="margin-top: 16px;">
+            <h3>Identity</h3>
+            <p class="message-text" style="text-align:left;">A loan request needs your home area, a next of kin, and a photo of your NRC.</p>
+            <input type="text" id="kycAddress" class="auth-input" placeholder="Home area or address" required>
+            <input type="text" id="kycKinName" class="auth-input" placeholder="Next of kin name" required>
+            <input type="tel" id="kycKinPhone" class="auth-input" placeholder="Next of kin phone" required>
+            <label class="field-label" for="kycPhoto">NRC photo</label>
+            <input type="file" id="kycPhoto" accept="image/*" class="auth-input file-input">
+            <button type="submit" class="enter-btn">Save identity details</button>
+            <p id="kycMessage" class="message-text"></p>
+          </form>
+          <button type="button" class="toggle-mode" id="statementBtn" style="margin-top: 12px;">Download my statement</button>
         </div>
       </div>
 
@@ -139,11 +151,8 @@
 
             <div class="request-field-grid two-up">
               <div class="timeframe-field">
-                <label class="field-label" for="loanDueDate">Timeframe</label>
-                <div class="timeframe-toggle" role="group" aria-label="Choose timeframe mode">
-                  <button type="button" class="timeframe-mode-btn active" data-mode="weeks">Weeks</button>
-                  <button type="button" class="timeframe-mode-btn" data-mode="date">Custom date</button>
-                </div>
+                <label class="field-label" for="loanTenureWeeks">Timeframe</label>
+                <p class="message-text" style="text-align:left;margin:0;">The due date is the day the shop approves the loan, plus the weeks you choose. A date you type is not the contract date.</p>
               </div>
               <select id="loanUrgency" class="auth-input">
                 <option value="low">Low urgency</option>
@@ -154,7 +163,7 @@
             </div>
 
             <div class="request-field-grid two-up compact-row">
-              <input type="date" id="loanDueDate" class="auth-input" disabled>
+              <input type="date" id="loanDueDate" class="auth-input" hidden disabled>
               <select id="loanTenureWeeks" class="auth-input">
                 <option value="1">1 week</option>
                 <option value="2" selected>2 weeks</option>
@@ -201,14 +210,15 @@
               <div><span>Interest</span> <strong id="loanInterestDisplay">K 0.00</strong></div>
               <div><span>Total</span> <strong id="loanTotalDisplay">K 0.00</strong></div>
               <div><span>Approval target</span> <strong id="loanApprovalDisplay">48h</strong></div>
+              <p id="loanDueRule" class="message-text" style="text-align:left;margin:8px 0 0;">Due date is set on approval. Interest stays the full amount even if you pay early. From the first late day, 1.8% of the balance is added per day.</p>
             </div>
 
             <details class="terms-box" aria-live="polite">
               <summary>Read more</summary>
               <ul>
                 <li>I confirm the loan purpose and amount requested are true and necessary for my stated need.</li>
-                <li>I understand the approved amount, interest rate, total repayment, and repayment due date are based on my selected timeframe and urgency.</li>
-                <li>I agree to repay the full approved amount on or before the agreed due date, and I accept that unpaid balances may be recorded as outstanding.</li>
+                <li>I understand the interest rate and total repayment follow the weeks I choose. The due date is the approval day plus those weeks, not a date I pick, and not extra days for how long approval took.</li>
+                <li>I agree to repay the full amount, including the full interest, on or before the due date. Paying early does not reduce the interest. Unpaid balances may be recorded as outstanding, and 1.8% of the balance is added on each day the loan is in grace or default, including the first day.</li>
                 <li>I understand that all submitted information, supporting documents, and collateral details are provided honestly and may be reviewed by the platform or admin team.</li>
                 <li>I accept that approval is subject to review and that the platform may request additional information before processing.</li>
                 <li>I agree that this request is for a desktop-only service and that I will not misrepresent my identity, documents, or repayment ability.</li>
@@ -257,7 +267,6 @@
 
     const username = localStorage.getItem('username') || 'User';
     const userEmail = localStorage.getItem('userEmail');
-    const userRole = localStorage.getItem('userRole') || 'user';
     const isNewSignup = localStorage.getItem('newSignup') === 'true';
     const justCreated = isNewSignup; // naming clarity for first-time flow
 
@@ -285,6 +294,8 @@
 
     function formatDateDisplay(dateValue) {
       if (!dateValue) return '';
+      const match = String(dateValue).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (match && String(dateValue).length <= 10) return `${match[3]}/${match[2]}/${match[1]}`;
       const date = new Date(dateValue);
       if (Number.isNaN(date.getTime())) return dateValue;
       return date.toLocaleDateString('en-GB');
@@ -355,6 +366,74 @@
       });
     });
     updateLoanEstimateDisplay();
+
+    async function openProtectedPdf(url) {
+      const token = localStorage.getItem('deviceToken');
+      const response = await fetch(url, { headers: { 'x-device-token': token } });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Could not open the document.');
+      }
+      const blob = await response.blob();
+      const href = URL.createObjectURL(blob);
+      window.open(href, '_blank');
+    }
+
+    document.getElementById('loanDetailPanel').addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-pdf]');
+      if (!button) return;
+      try {
+        await openProtectedPdf(button.dataset.pdf);
+      } catch (err) {
+        document.getElementById('loanRequestMessage').textContent = err.message;
+      }
+    });
+
+    document.getElementById('statementBtn').addEventListener('click', async () => {
+      try {
+        await openProtectedPdf('/account/statement');
+      } catch (err) {
+        document.getElementById('kycMessage').textContent = err.message;
+      }
+    });
+
+    document.getElementById('kycForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const message = document.getElementById('kycMessage');
+      message.textContent = '';
+      const body = new FormData();
+      body.append('address', document.getElementById('kycAddress').value.trim());
+      body.append('nextOfKinName', document.getElementById('kycKinName').value.trim());
+      body.append('nextOfKinPhone', document.getElementById('kycKinPhone').value.trim());
+      const photo = document.getElementById('kycPhoto').files[0];
+      if (photo) body.append('nrcPhoto', photo);
+      try {
+        const response = await fetch('/account/kyc', {
+          method: 'POST',
+          headers: { 'x-device-token': localStorage.getItem('deviceToken') },
+          body
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Could not save identity details.');
+        message.textContent = data.message || 'Saved.';
+      } catch (err) {
+        message.textContent = err.message;
+      }
+    });
+
+    fetch('/account/profile', { headers: { 'x-device-token': localStorage.getItem('deviceToken') } })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => {
+        if (!data?.profile) return;
+        document.getElementById('kycAddress').value = data.profile.address || '';
+        document.getElementById('kycKinName').value = data.profile.nextOfKinName || '';
+        document.getElementById('kycKinPhone').value = data.profile.nextOfKinPhone || '';
+        const about = document.getElementById('aboutUserDetails');
+        if (about) {
+          about.innerHTML = `<p><strong>Borrowing limit:</strong> ${formatKwacha(data.creditLimit)}</p><p><strong>Identity:</strong> ${data.kycComplete ? 'On file' : 'Still needed before a new loan'}</p>`;
+        }
+      })
+      .catch(() => {});
 
     document.getElementById('loan-list').addEventListener('click', event => {
       const card = event.target.closest('[data-loan-id]');
@@ -551,13 +630,23 @@
       const container = document.getElementById('overviewSummary');
       if (!container) return;
 
+      const owedLoans = loans.filter(loan => ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan)));
       const totalRequested = loans.reduce((sum, loan) => sum + (Number(loan.amount) || 0), 0);
-      const totalOutstanding = loans.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
+      const totalOutstanding = owedLoans.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
       const pending = loans.filter(loan => loanStatusOf(loan) === 'pending').length;
-      const active = loans.filter(loan => ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan))).length;
+      const active = owedLoans.length;
       const closed = loans.filter(loan => ['paid', 'declined'].includes(loanStatusOf(loan))).length;
 
+      const nextDue = owedLoans
+        .map(loan => String(loan.dueDate || '').slice(0, 10))
+        .filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date))
+        .sort()[0];
+      const lateBalance = owedLoans
+        .filter(loan => ['grace', 'defaulted'].includes(loanStatusOf(loan)))
+        .reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
+      const dailyLate = lateBalance * 0.018;
       container.innerHTML = `
+        <p class="message-text" style="text-align:left;grid-column:1/-1;">You owe ${formatKwacha(totalOutstanding)}${nextDue ? `, next due ${formatDateDisplay(nextDue)}` : ''}. ${lateBalance > 0 ? `Each late day adds ${formatKwacha(dailyLate)}.` : 'Each late day adds 1.8% of the balance from the first day in grace or default.'}</p>
         <div class="summary-inline-card">
           <h3>Total requested</h3>
           <p>${loans.length}</p>
@@ -565,7 +654,7 @@
         </div>
         <div class="summary-inline-card">
           <h3>Outstanding</h3>
-          <p>${pending + active}</p>
+          <p>${active}</p>
           <span>${formatKwacha(totalOutstanding)}</span>
         </div>
         <div class="summary-inline-card">
@@ -701,11 +790,15 @@
             <p><strong>Total after interest:</strong> ${escapeHtml(formatKwacha(loan.totalRepayment || loan.amount || 0))}</p>
             <p><strong>Amount paid:</strong> ${escapeHtml(formatKwacha(loan.paidTotal || 0))}</p>
             <p><strong>Outstanding:</strong> ${escapeHtml(formatKwacha(loan.outstanding || 0))}</p>
-            <p><strong>Due date:</strong> ${escapeHtml(formatDateDisplay(loan.dueDate))}</p>
+            <p><strong>Due date:</strong> ${loan.dueDateIsEstimate ? 'Set when the shop approves, plus the weeks you chose' : escapeHtml(formatDateDisplay(loan.dueDate))}</p>
             <p><strong>Urgency:</strong> ${escapeHtml(formatStatusLabel(loan.urgency || 'standard'))}</p>
             <p><strong>Collateral:</strong> ${escapeHtml(collateralText)}</p>
             <p><strong>Requested:</strong> ${escapeHtml(formatDateDisplay(loan.createdAt))}</p>
             <p class="loan-detail-full"><strong>Decision reason:</strong> ${escapeHtml(decisionText)}</p>
+          </div>
+          <div class="button-row" style="margin-top: 12px;">
+            <button type="button" class="toggle-mode" data-pdf="/loans/${escapeHtml(loan.id)}/receipt">Receipt</button>
+            <button type="button" class="toggle-mode" data-pdf="/loans/${escapeHtml(loan.id)}/agreement">Agreement</button>
           </div>
           <div class="loan-payment-history">
             <h4>Payment history</h4>
@@ -893,35 +986,6 @@
       if (m) m.classList.remove('active');
     }
 
-    async function submitLoanDecision(action, loanId) {
-      const reasonField = document.getElementById('adminDecisionReason');
-      const reason = (reasonField?.value || '').trim();
-      const token = localStorage.getItem('deviceToken');
-      if (!token) return window.location.href = 'login.html';
-
-      try {
-        const res = await fetch(`/loans/${loanId}/action`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-device-token': token
-          },
-          body: JSON.stringify({ action, reason })
-        });
-        const data = await res.json();
-        if (!res.ok || data.error) {
-          document.getElementById('loanRequestMessage').textContent = data.error || 'Unable to update loan status.';
-          return;
-        }
-
-        document.getElementById('loanRequestMessage').textContent = `Loan marked as ${formatStatusLabel(action)}.`;
-        closeLoanModal();
-        await loadLoans(currentHistoryFilter);
-      } catch (err) {
-        document.getElementById('loanRequestMessage').textContent = 'Unable to update loan status.';
-      }
-    }
-
     async function openLoanDetails(id) {
       const token = localStorage.getItem('deviceToken');
       if (!token) return window.location.href = 'login.html';
@@ -932,11 +996,6 @@
         if (res.status === 403) return handleInvalidDeviceToken();
         const data = await res.json();
         const loan = data.loan;
-        const adminBox = document.getElementById('adminDecisionBox');
-        // Loan DECISIONS are store_admin-only (backend returns 403 for role
-        // 'admin' per tested franchise-scoping policy) — match that gate here so
-        // the buttons we show are exactly the ones the API will accept.
-        const hasAdminAccess = userRole === 'store_admin';
         const collateralText = loan.collateralDescription || loan.collateralFront || loan.collateralBack || 'No collateral provided';
 
         renderLoanDetailPanel(loan);
@@ -950,28 +1009,17 @@
         document.getElementById('modalLoanTotal').textContent = formatKwacha(loan.totalRepayment || loan.amount || 0);
         document.getElementById('modalLoanOutstanding').textContent = formatKwacha(loan.outstanding || 0);
         document.getElementById('modalLoanDue').textContent = formatDateDisplay(loan.dueDate);
-        document.getElementById('modalLoanStatus').textContent = formatStatusLabel(loan.status);
+        document.getElementById('modalLoanStatus').textContent = formatStatusLabel(loan.businessStatus || loan.status);
         document.getElementById('modalLoanRequested').textContent = formatDateDisplay(loan.createdAt);
         document.getElementById('modalLoanUrgency').textContent = formatStatusLabel(loan.urgency || 'standard');
         document.getElementById('modalLoanCollateral').textContent = collateralText;
         document.getElementById('modalLoanDecision').textContent = loan.adminReason || 'No decision reason provided yet.';
-        document.getElementById('adminDecisionReason').value = loan.adminReason || '';
-
-        adminBox.hidden = !hasAdminAccess;
         document.getElementById('loanModal').classList.add('active');
       } catch (err) {
         console.warn('Could not load loan details', err);
       }
     }
 
-    document.querySelectorAll('.decision-btn').forEach(button => {
-      button.addEventListener('click', () => {
-        const loanId = document.getElementById('modalLoanProduct').dataset.loanId;
-        const action = button.dataset.action;
-        if (!loanId) return;
-        submitLoanDecision(action, Number(loanId));
-      });
-    });
   </script>
   <!-- Loan Details Modal -->
   <div id="loanModal" class="modal">
@@ -993,15 +1041,6 @@
         <p><strong>Decision reason:</strong> <span id="modalLoanDecision">-</span></p>
       </div>
 
-      <div id="adminDecisionBox" class="admin-decision-box" hidden>
-        <label for="adminDecisionReason">Provide decision reason</label>
-        <textarea id="adminDecisionReason" rows="3" placeholder="Add admin notes for approval, in-progress, or decline."></textarea>
-        <div class="admin-decision-actions">
-          <button type="button" class="decision-btn" data-action="in_progress">In Progress</button>
-          <button type="button" class="decision-btn" data-action="approve">Approve</button>
-          <button type="button" class="decision-btn decline" data-action="decline">Decline</button>
-        </div>
-      </div>
     </div>
   </div>
 </body>

@@ -142,10 +142,7 @@ function renderAdminReviewDetail(loan) {
 
   const frontName = loan.collateralFront ? loan.collateralFront.replace(/^[^\-]+-/, '') : '';
   const backName = loan.collateralBack ? loan.collateralBack.replace(/^[^\-]+-/, '') : '';
-  const fileUrl = (name) => {
-    const token = localStorage.getItem('deviceToken') || '';
-    return `/uploads/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}`;
-  };
+  const fileUrl = (name) => `/uploads/${encodeURIComponent(name)}`;
   const frontLink = loan.collateralFront ? `<a href="${fileUrl(loan.collateralFront)}" target="_blank" rel="noreferrer" class="attachment-btn">View front image</a>` : '<span class="attachment-empty">No front image</span>';
   const backLink = loan.collateralBack ? `<a href="${fileUrl(loan.collateralBack)}" target="_blank" rel="noreferrer" class="attachment-btn">View back image</a>` : '<span class="attachment-empty">No back image</span>';
   const statusKey = getLoanStatusKey(loan);
@@ -430,6 +427,10 @@ async function fetchFranchiseReport() {
       ['Principal approved', formatKwacha(summary.approvedLoanPrincipal)],
       ['Cash collected', formatKwacha(summary.cashCollected)],
       ['Gross interest booked', formatKwacha(summary.grossInterestBooked)],
+      ['Collected interest', formatKwacha(summary.interestCollected)],
+      ['Collected fees', formatKwacha(summary.feesCollected)],
+      ['Operating expenses', formatKwacha(summary.operatingExpenses)],
+      ['Net profit', formatKwacha(summary.netProfit)],
       ['Outstanding balances', formatKwacha(summary.totalOutstanding)],
       ['Pending payments', summary.pendingPayments],
       ['Partial payments', summary.partialPayments],
@@ -475,3 +476,14 @@ fetchData();
 setInterval(fetchData, 5000);
 fetchFranchiseReport();
 setInterval(fetchFranchiseReport, 5 * 60 * 1000);
+
+document.addEventListener('click', async (event) => {
+  const link = event.target.closest('a.attachment-btn');
+  if (!link || !String(link.getAttribute('href') || '').startsWith('/uploads/')) return;
+  event.preventDefault();
+  const response = await fetch(link.getAttribute('href'), {
+    headers: { 'x-device-token': localStorage.getItem('deviceToken') || '' }
+  });
+  if (!response.ok) return;
+  window.open(URL.createObjectURL(await response.blob()), '_blank');
+});

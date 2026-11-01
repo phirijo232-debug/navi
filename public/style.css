@@ -161,7 +161,7 @@ body.light .log-list li {
   align-items: center;
   justify-content: center;
   gap: 20px;
-  padding: 30px 16px;
+  padding: 88px 16px 30px;
   text-align: center;
   max-width: 1000px;
   margin: 0 auto;
@@ -262,6 +262,8 @@ body.light .log-list li {
 }
 
 .toggle-mode:hover { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 14%, var(--surface)); }
+
+[hidden] { display: none !important; }
 
 .animated-text {
   display: inline-block;
@@ -529,7 +531,7 @@ body.light select.search-box option {
   z-index: 1;
   width: 100%;
   min-height: 100vh;
-  padding: 30px;
+  padding: 30px 140px 30px 76px;
   overflow-y: auto;
 }
 
@@ -615,9 +617,9 @@ body.light .panel {
   }
 
   .dash-header {
-    justify-content: center;
-    text-align: center;
-    flex-direction: column;
+    justify-content: flex-start;
+    text-align: left;
+    flex-direction: row;
     align-items: center;
   }
 
@@ -654,7 +656,7 @@ body.light .panel {
   }
 
   .landing {
-    padding: 24px 16px;
+    padding: 88px 16px 24px;
     justify-content: flex-start;
     min-height: 100vh;
   }
@@ -680,7 +682,7 @@ body.light .panel {
   }
 
   .dashboard {
-    padding: 24px 12px 20px;
+    padding: 24px 120px 20px 76px;
   }
 
   .stat {

@@ -82,9 +82,28 @@ function showStoreSelection() {
 }
 
 // Mirror of config.STORES on the server. Keep in sync when a subsidiary is added.
-const BMF_STORES = [
+let BMF_STORES = [
   { id: 'buraza', name: 'Buraza Micro Finance', code: 'BMF' }
 ];
+
+async function refreshStores() {
+  try {
+    const response = await fetch('/stores');
+    const data = await response.json();
+    if (Array.isArray(data.stores) && data.stores.length) BMF_STORES = data.stores;
+  } catch {
+    // Buraza stays available if the list cannot be loaded.
+  }
+  const grid = document.querySelector('.store-grid');
+  if (!grid) return;
+  grid.innerHTML = BMF_STORES.map(store => `
+    <button type="button" class="panel store-card" data-store="${store.id}">
+      <h2>${store.name}</h2>
+      <p>Loans and customer accounts</p>
+      <span class="store-status">Active · ${store.code || store.id}</span>
+    </button>
+  `).join('');
+}
 
 function getStoreName(storeId) {
   const store = BMF_STORES.find(s => s.id === storeId);
@@ -142,7 +161,7 @@ function ensureAdminAccess() {
   const token = getDeviceToken();
   const role = localStorage.getItem('userRole');
   const userStoreId = localStorage.getItem('userStoreId') || 'buraza';
-  const isStoreOperator = (role === 'store_admin' || role === 'franchise_admin') && userStoreId === 'buraza';
+  const isStoreOperator = (role === 'store_admin' || role === 'franchise_admin' || role === 'cashier') && userStoreId === 'buraza';
   if (!token || (role !== 'admin' && !isStoreOperator)) {
     showAuthScreen();
     return false;
@@ -157,6 +176,15 @@ function applyRolePermissions() {
   // Announcements are store-operator only (the backend refuses role 'admin'
   // with 403 — tested policy), so hide the button from the main admin too.
   document.getElementById('announcementBtn').hidden = !(role === 'store_admin' || role === 'franchise_admin');
+  document.querySelectorAll('[data-cashier-hide]').forEach(element => {
+    element.hidden = role === 'cashier';
+  });
+  document.querySelectorAll('[data-franchise-only]').forEach(element => {
+    element.hidden = !isFranchiseLevel;
+  });
+  document.querySelectorAll('[data-main-admin]').forEach(element => {
+    element.hidden = role !== 'admin';
+  });
   document.getElementById('notifyOverdueBtn').hidden = !canManageStore;
   // HR (employee management) is only for the main admin and Franchise Employee Admin.
   const hrMenu = document.getElementById('adminMenuHr');
@@ -184,7 +212,7 @@ async function fetchUsers() {
 
     allUsers = await response.json();
     applyUserFilterAndSort();
-    await Promise.all([fetchStoreReport(), fetchStoreFeedback(), fetchNewRequests()]);
+    await Promise.all([fetchStoreReport(), fetchMorningList(), fetchGoLive(), fetchStoreFeedback(), fetchNewRequests(), fetchExpenses()]);
   } catch (err) {
     console.error(err);
     setAuthMessage('Access denied or session expired. Please login again.', true);
@@ -282,6 +310,86 @@ async function notifySelectedUser() {
   }
 }
 
+async function fetchMorningList() {
+  const box = document.getElementById('morningList');
+  if (!box) return;
+  try {
+    const response = await fetch('/reports/buraza/morning', { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to load the morning list.');
+    const rows = data.rows || [];
+    box.innerHTML = rows.length ? `<ul class="loan-list">${rows.map(row => `
+      <li class="loan-card">
+        <strong>${escapeHtml(row.customer || '')}</strong> · ${escapeHtml(row.phone || 'no phone')}
+        <div>${escapeHtml(row.product || '')} · ${escapeHtml(row.status)} · ${row.daysLate} day(s) late · penalty ${formatCurrency(row.penalty)} · owed ${formatCurrency(row.outstanding)}</div>
+        <div>Last payment: ${row.lastPayment ? `${formatCurrency(row.lastPayment.amount)} on ${escapeHtml(formatDate(row.lastPayment.date))}` : 'none'}</div>
+      </li>`).join('')}</ul>` : '<p>No loans are in grace or default today.</p>';
+  } catch (err) {
+    box.innerHTML = `<p>${escapeHtml(err.message)}</p>`;
+  }
+}
+
+document.getElementById('tillForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const message = document.getElementById('tillMessage');
+  const response = await fetch('/admin/till', {
+    method: 'POST',
+    headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      date: document.getElementById('tillDate').value,
+      cash: Number(document.getElementById('tillCash').value),
+      airtel: Number(document.getElementById('tillAirtel').value),
+      mtn: Number(document.getElementById('tillMtn').value),
+      note: document.getElementById('tillNote').value
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    message.textContent = data.error || 'Could not save the count.';
+    return;
+  }
+  const diff = data.entry?.difference || {};
+  message.textContent = `Saved. Difference — cash ${formatCurrency(diff.cash || 0)}, Airtel ${formatCurrency(diff.airtel || 0)}, MTN ${formatCurrency(diff.mtn || 0)}.`;
+});
+
+document.getElementById('addStoreForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const message = document.getElementById('addStoreMessage');
+  const response = await fetch('/admin/stores', {
+    method: 'POST',
+    headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      id: document.getElementById('newStoreId').value.trim(),
+      name: document.getElementById('newStoreName').value.trim(),
+      code: document.getElementById('newStoreCode').value.trim()
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  message.textContent = data.error || data.message || 'Saved.';
+  if (response.ok) refreshStores();
+});
+
+async function fetchGoLive() {
+  const box = document.getElementById('goLiveList');
+  if (!box || localStorage.getItem('userRole') !== 'admin') return;
+  const response = await fetch('/admin/go-live', { headers: getStoreHeaders() });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    box.innerHTML = `<p>${escapeHtml(data.error || 'Checklist unavailable.')}</p>`;
+    return;
+  }
+  box.innerHTML = `<ul>${(data.items || []).map(item => `<li>${item.ok ? 'Ready' : 'Not yet'} — ${escapeHtml(item.label)}</li>`).join('')}</ul>`;
+}
+
+document.getElementById('codePreviewForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const message = document.getElementById('codePreviewMessage');
+  const email = document.getElementById('codePreviewEmail').value.trim();
+  const response = await fetch(`/admin/login-code?email=${encodeURIComponent(email)}`, { headers: getStoreHeaders() });
+  const data = await response.json().catch(() => ({}));
+  message.textContent = response.ok ? `Code for ${email}: ${data.code}` : (data.error || 'No code to show.');
+});
+
 async function fetchStoreReport() {
   const metrics = document.getElementById('storeReportMetrics');
   try {
@@ -291,7 +399,14 @@ async function fetchStoreReport() {
     const summary = data.summary;
     const values = [
       ['Cash collected', formatCurrency(summary.cashCollected)],
+      ['Of which cash', formatCurrency(summary.collectionsByMode?.cash || 0)],
+      ['Of which Airtel', formatCurrency(summary.collectionsByMode?.airtel || 0)],
+      ['Of which MTN', formatCurrency(summary.collectionsByMode?.mtn || 0)],
       ['Gross interest booked', formatCurrency(summary.grossInterestBooked)],
+      ['Collected interest', formatCurrency(summary.interestCollected)],
+      ['Collected fees', formatCurrency(summary.feesCollected)],
+      ['Operating expenses', formatCurrency(summary.operatingExpenses)],
+      ['Net profit', formatCurrency(summary.netProfit)],
       ['Outstanding', formatCurrency(summary.totalOutstanding)],
       ['Pending payments', String(summary.pendingPayments)],
       ['Partial payments', String(summary.partialPayments)],
@@ -305,6 +420,115 @@ async function fetchStoreReport() {
     document.getElementById('storeReportNote').textContent = data.note || '';
   } catch (err) {
     metrics.innerHTML = `<p>${escapeHtml(err.message || 'Unable to load BMF reports.')}</p>`;
+  }
+}
+
+let expenseRows = [];
+
+function setExpenseMessage(text, isError = false) {
+  const el = document.getElementById('expenseMessage');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = isError ? 'var(--error)' : 'var(--text)';
+}
+
+function resetExpenseForm() {
+  const form = document.getElementById('expenseForm');
+  if (form) form.reset();
+  document.getElementById('expenseId').value = '';
+  document.getElementById('expenseSaveBtn').textContent = 'Record expense';
+  document.getElementById('expenseCancelBtn').hidden = true;
+}
+
+async function fetchExpenses() {
+  const list = document.getElementById('expenseList');
+  if (!list) return;
+  try {
+    const response = await fetch('/admin/expenses', { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to load expenses.');
+    expenseRows = Array.isArray(data.expenses) ? data.expenses : [];
+    renderExpenses();
+  } catch (err) {
+    list.innerHTML = `<p>${escapeHtml(err.message || 'Unable to load expenses.')}</p>`;
+  }
+}
+
+function renderExpenses() {
+  const list = document.getElementById('expenseList');
+  if (!list) return;
+  if (!expenseRows.length) {
+    list.innerHTML = '<p>No operating expenses recorded for this store.</p>';
+    return;
+  }
+  list.innerHTML = expenseRows.map(item => `
+    <div class="request-row">
+      <div>
+        <strong>${escapeHtml(formatDate(item.date))} · ${escapeHtml(item.category)}</strong>
+        <p>${formatCurrency(item.amount)}${item.note ? ` · ${escapeHtml(item.note)}` : ''}</p>
+        <p class="user-meta">Recorded by ${escapeHtml(item.recordedBy || 'admin')}</p>
+      </div>
+      <div class="button-row">
+        <button type="button" class="toggle-mode" data-expense-edit="${escapeHtml(item.id)}">Edit</button>
+        ${localStorage.getItem('userRole') === 'cashier' ? '' : `<button type="button" class="toggle-mode" data-expense-delete="${escapeHtml(item.id)}">Delete</button>`}
+      </div>
+    </div>
+  `).join('');
+}
+
+function beginExpenseEdit(id) {
+  const item = expenseRows.find(row => String(row.id) === String(id));
+  if (!item) return;
+  document.getElementById('expenseId').value = item.id;
+  document.getElementById('expenseDate').value = String(item.date || '').slice(0, 10);
+  document.getElementById('expenseCategory').value = item.category;
+  document.getElementById('expenseAmount').value = item.amount;
+  document.getElementById('expenseNote').value = item.note || '';
+  document.getElementById('expenseSaveBtn').textContent = 'Save expense';
+  document.getElementById('expenseCancelBtn').hidden = false;
+}
+
+async function submitExpense(event) {
+  event.preventDefault();
+  const id = document.getElementById('expenseId').value;
+  const payload = {
+    date: document.getElementById('expenseDate').value,
+    category: document.getElementById('expenseCategory').value,
+    amount: document.getElementById('expenseAmount').value,
+    note: document.getElementById('expenseNote').value.trim()
+  };
+  try {
+    const response = await fetch(id ? `/admin/expenses/${id}` : '/admin/expenses', {
+      method: id ? 'PATCH' : 'POST',
+      headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to save the expense.');
+    setExpenseMessage(data.message || 'Expense saved.');
+    resetExpenseForm();
+    await fetchExpenses();
+    await fetchStoreReport();
+  } catch (err) {
+    setExpenseMessage(err.message || 'Unable to save the expense.', true);
+  }
+}
+
+async function deleteExpense(id) {
+  if (!window.confirm('Delete this expense?')) return;
+  try {
+    const response = await fetch(`/admin/expenses/${id}`, {
+      method: 'DELETE',
+      headers: getStoreHeaders()
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to delete the expense.');
+    setExpenseMessage(data.message || 'Expense deleted.');
+    resetExpenseForm();
+    await fetchExpenses();
+    await fetchStoreReport();
+  } catch (err) {
+    setExpenseMessage(err.message || 'Unable to delete the expense.', true);
   }
 }
 
@@ -517,13 +741,15 @@ function renderLoanDetails(loan) {
       `).join('')
     : '<li>No status history.</li>';
   const payments = Array.isArray(loan.payments) ? loan.payments : [];
+  const canDecide = localStorage.getItem('userRole') === 'store_admin';
   const fileUrl = (name) => {
-    const token = localStorage.getItem('deviceToken') || '';
-    return `/uploads/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}`;
+    return `/uploads/${encodeURIComponent(name)}`;
   };
   const paymentHistory = payments.length ? payments.map(payment => `
     <li>
       ${formatCurrency(payment.amount)} · ${escapeHtml(payment.mode || 'payment')} · ${escapeHtml(formatDate(payment.date))}
+      ${Number(payment.fee) > 0 ? `<div>Fee: ${formatCurrency(payment.fee)}</div>` : ''}
+      ${payment.reversed ? `<div>Undone ${escapeHtml(formatDate(payment.reversedAt))} — ${escapeHtml(payment.reversalReason || '')}</div>` : (canDecide ? `<button type="button" class="toggle-mode" data-reverse-payment="${escapeHtml(payment.paymentReceiptId || '')}" data-loan-id="${escapeHtml(loan.id)}">Undo this payment</button>` : '')}
       ${payment.note ? `<div>${escapeHtml(payment.note)}</div>` : ''}
       ${payment.screenshot ? `<a class="proof-link" href="${fileUrl(payment.screenshot)}" target="_blank" rel="noopener">View proof of payment</a>` : '<span>No proof attached</span>'}
     </li>
@@ -534,8 +760,7 @@ function renderLoanDetails(loan) {
   const outstanding = Number(loan.outstanding || 0);
   // Payments: admin or store_admin (both may record money). Decisions: the
   // assigned store_admin only — mirrors the backend's franchise-scoping gate.
-  const canDecide = localStorage.getItem('userRole') === 'store_admin';
-  const canRecordPayment = canManageStore && outstanding > 0 &&
+  const canRecordPayment = ['admin', 'franchise_admin', 'store_admin', 'cashier'].includes(localStorage.getItem('userRole')) && outstanding > 0 &&
     ['active', 'grace', 'defaulted'].includes(status);
   const canReview = canDecide &&
     ['pending', 'active'].includes(status);
@@ -567,7 +792,10 @@ function renderLoanDetails(loan) {
         <p><strong>Created by:</strong> ${creator ? escapeHtml(creator) : 'Not recorded'}</p>
         <p><strong>Requested:</strong> ${escapeHtml(formatDate(loan.createdAt))}</p>
         <p><strong>Borrowed (approved):</strong> ${loan.approvedAt || loan.borrowedDate ? escapeHtml(formatDate(loan.approvedAt || loan.borrowedDate)) : 'Not yet approved'}</p>
-        ${loan.graceUntil ? `<p><strong>Grace agreed until:</strong> ${escapeHtml(formatDate(loan.graceUntil))} · 1.8%/day · Accrued penalty: ${formatCurrency(loan.graceAccrued || 0)}</p>` : ''}
+        ${Number(loan.graceAccrued || 0) > 0 || loan.graceUntil ? `<p><strong>Late penalty:</strong> ${formatCurrency(loan.graceAccrued || 0)} accrued at 1.8% per day from the first late day${loan.graceUntil ? `, grace agreed until ${escapeHtml(formatDate(loan.graceUntil))}` : ''}.</p>` : ''}
+        ${loan.dueDateIsEstimate ? `<p><strong>Due date:</strong> estimate until approval. The contract date is the approval day plus ${escapeHtml(loan.tenureWeeks || '')} weeks.</p>` : ''}
+        ${loan.collateralLocation ? `<p><strong>Collateral kept at:</strong> ${escapeHtml(loan.collateralLocation)}</p>` : ''}
+        ${loan.collateralSaleAmount !== undefined && loan.collateralSaleAmount !== null && status === 'liquidated' ? `<p><strong>Collateral sale:</strong> ${formatCurrency(loan.collateralSaleAmount)} raised. Still owed: ${formatCurrency(loan.collateralShortfall || loan.outstanding || 0)}.</p>` : ''}
         ${loan.verifiedOverdueAt ? `<p><strong>Overdue verified:</strong> ${escapeHtml(formatDate(loan.verifiedOverdueAt))} by ${escapeHtml(loan.verifiedOverdueBy || 'admin')}</p>` : ''}
       </div>
       ${proofLinks ? `<div>${proofLinks}</div>` : ''}
@@ -581,19 +809,24 @@ function renderLoanDetails(loan) {
         <div class="loan-fields" style="margin-top: 14px;">
           <section>
             <strong>Lifecycle (admin)</strong>
+            ${canReview ? '' : `<input type="text" class="modal-input" data-decision-reason="${escapeHtml(loan.id)}" maxlength="300" placeholder="Reason (required to sell collateral)" style="margin-top: 10px;">`}
             <div class="button-row" style="margin-top: 10px; flex-wrap: wrap;">
               <input type="date" class="modal-input" data-grace-date="${escapeHtml(loan.id)}" style="max-width: 210px;" aria-label="Agreed grace until" ${loan.graceUntil ? `value="${escapeHtml(loan.graceUntil)}"` : ''}>
+              <input type="number" class="modal-input" data-sale-amount="${escapeHtml(loan.id)}" min="0" step="0.01" placeholder="Sale amount (K)" style="max-width: 180px;" aria-label="Amount the collateral raised">
+              <input type="text" class="modal-input" data-collateral-location="${escapeHtml(loan.id)}" maxlength="120" placeholder="Where the collateral is kept" style="max-width: 240px;" value="${escapeHtml(loan.collateralLocation || '')}">
               <button class="toggle-mode" type="button" data-loan-action="enter_grace" data-loan-id="${escapeHtml(loan.id)}">Enter grace (1.8%/day)</button>
               ${status !== 'defaulted' ? `<button class="toggle-mode" type="button" data-loan-action="verify_overdue" data-loan-id="${escapeHtml(loan.id)}">Verify overdue</button>` : ''}
               ${status !== 'liquidated' ? `<button class="toggle-mode" type="button" data-loan-action="liquidate" data-loan-id="${escapeHtml(loan.id)}">Liquidate collateral</button>` : ''}
+              ${!loan.disbursedAt ? `<button class="toggle-mode" type="button" data-loan-action="mark_disbursed" data-loan-id="${escapeHtml(loan.id)}">Money handed over</button>` : `<p>Money handed over ${escapeHtml(formatDate(loan.disbursedAt))}.</p>`}
             </div>
-            <p class="message-text" style="text-align:left;">Grace needs an agreed end date. Liquidation needs a reason in the decision box above. Once the balance hits zero the loan becomes Paid automatically.</p>
+            <p class="message-text" style="text-align:left;">Grace needs an agreed end date. The first late day is charged at 1.8%. Liquidation needs a reason and the amount the pledge raised (use 0 if it raised nothing). The balance left after the sale stays owed. Paying early does not reduce the interest.</p>
           </section>
         </div>` : ''}
       ${canRecordPayment ? `
         <form class="payment-form panel" data-payment-form="${escapeHtml(loan.id)}" style="padding: 14px; margin-top: 14px;">
           <h3>Record payment</h3>
-          <input type="number" name="amount" class="modal-input" min="0.01" max="${outstanding}" step="0.01" placeholder="Amount" required>
+          <input type="number" name="amount" class="modal-input" min="0.01" max="${outstanding}" step="0.01" placeholder="Amount paid toward the loan" required>
+          <input type="number" name="fee" class="modal-input" min="0" step="0.01" placeholder="Fee collected (optional)" style="margin-top: 10px;">
           <select name="mode" class="modal-input" style="margin-top: 10px;">
             <option value="cash">Cash</option>
             <option value="airtel">Airtel Money</option>
@@ -601,7 +834,8 @@ function renderLoanDetails(loan) {
             <option value="bank">Bank Transfer</option>
             <option value="other">Other</option>
           </select>
-          <input type="text" name="note" class="modal-input" maxlength="240" placeholder="Reference note" style="margin-top: 10px;">
+          <input type="text" name="providerReference" class="modal-input" maxlength="80" placeholder="Airtel or MTN transaction reference" style="margin-top: 10px;">
+          <input type="text" name="note" class="modal-input" maxlength="240" placeholder="Note" style="margin-top: 10px;">
           <label>Proof of payment<input type="file" name="screenshot" accept="image/*" class="modal-input" style="margin-top: 8px;"></label>
           <button type="submit" class="enter-btn" style="margin-top: 10px;">Post payment</button>
         </form>` : ''}
@@ -705,6 +939,13 @@ function renderSelectedUser() {
     <p><strong>Email:</strong> ${escapeHtml(selectedUser.email)}</p>
     <p><strong>Phone:</strong> ${escapeHtml(selectedUser.phone || 'N/A')}</p>
     <p><strong>Role:</strong> ${escapeHtml(selectedUser.role || 'user')}</p>
+    <p><strong>NRC:</strong> ${escapeHtml(selectedUser.nrc || 'N/A')} · <strong>Home:</strong> ${escapeHtml(selectedUser.address || 'Not on file')} · <strong>Next of kin:</strong> ${escapeHtml(selectedUser.nextOfKinName || 'Not on file')} ${escapeHtml(selectedUser.nextOfKinPhone || '')}</p>
+    <p><strong>NRC photo:</strong> ${selectedUser.nrcPhoto ? 'On file' : 'Missing'}</p>
+    <form id="creditLimitForm" class="auth-form" style="margin: 10px 0;">
+      <input type="number" id="creditLimitInput" class="modal-input" min="0" step="0.01" value="${escapeHtml(selectedUser.creditLimit ?? '')}" placeholder="Borrowing limit (K)">
+      <label class="checkbox-row"><input type="checkbox" id="allowMultipleLoans" ${selectedUser.allowMultipleLoans ? 'checked' : ''}> Allow another loan while one is still open</label>
+      <button type="submit" class="toggle-mode">Save borrowing limit</button>
+    </form>
     ${canNotifyUser ? `
     <div class="button-row" style="margin: 10px 0;">
       <button class="toggle-mode" type="button" data-notify-user>Notify this customer</button>
@@ -733,6 +974,25 @@ function renderSelectedUser() {
       ${visibleLoans.length ? visibleLoans.map(renderLoanDetails).join('') : '<p>No loans match the selected filters.</p>'}
     </div>
   `;
+
+  document.getElementById('creditLimitForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const response = await fetch('/admin/credit-limit', {
+      method: 'POST',
+      headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        email: selectedUser.email,
+        creditLimit: Number(document.getElementById('creditLimitInput').value),
+        allowMultipleLoans: document.getElementById('allowMultipleLoans').checked
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    document.getElementById('detailFeedback').textContent = data.error || data.message || 'Saved.';
+    if (response.ok) {
+      selectedUser.creditLimit = data.creditLimit;
+      selectedUser.allowMultipleLoans = data.allowMultipleLoans;
+    }
+  });
 }
 
 async function viewUserDetails(userId) {
@@ -797,11 +1057,15 @@ async function submitPayment(event, form) {
   }
 }
 
-async function updateLoanStatus(loanId, action, reason, graceUntil) {
+async function updateLoanStatus(loanId, action, reason, graceUntil, saleAmount, collateralLocation) {
   try {
     const cleanReason = String(reason || '').trim();
     if (action === 'liquidate' && !cleanReason) {
       document.getElementById('detailFeedback').textContent = 'Liquidation requires a reason — confirm what happened to the collateral.';
+      return;
+    }
+    if (action === 'liquidate' && (saleAmount === undefined || saleAmount === null || String(saleAmount).trim() === '')) {
+      document.getElementById('detailFeedback').textContent = 'Enter the amount the collateral raised. Use 0 if it raised nothing.';
       return;
     }
     if (action === 'enter_grace' && !graceUntil) {
@@ -811,7 +1075,13 @@ async function updateLoanStatus(loanId, action, reason, graceUntil) {
     const response = await fetch(`/loans/${loanId}/action`, {
       method: 'POST',
       headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ action, reason: cleanReason, graceUntil: graceUntil || undefined })
+      body: JSON.stringify({
+      action,
+      reason: cleanReason,
+      graceUntil: graceUntil || undefined,
+      saleAmount: saleAmount === undefined || saleAmount === '' ? undefined : Number(saleAmount),
+      collateralLocation: collateralLocation || undefined
+    })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Could not update loan status.');
@@ -820,6 +1090,24 @@ async function updateLoanStatus(loanId, action, reason, graceUntil) {
     await fetchNewRequests();
   } catch (err) {
     document.getElementById('detailFeedback').textContent = err.message || 'Could not update loan status.';
+  }
+}
+
+async function undoPayment(loanId, paymentReceiptId) {
+  const reason = window.prompt('Why is this payment being undone?');
+  if (!reason || !reason.trim()) return;
+  try {
+    const response = await fetch('/loans/payment/reverse', {
+      method: 'POST',
+      headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ id: Number(loanId), paymentReceiptId, reason: reason.trim() })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not undo the payment.');
+    document.getElementById('detailFeedback').textContent = data.message || 'Payment undone.';
+    if (selectedUserId !== null) await viewUserDetails(selectedUserId);
+  } catch (err) {
+    document.getElementById('detailFeedback').textContent = err.message || 'Could not undo the payment.';
   }
 }
 
@@ -1494,9 +1782,11 @@ document.querySelectorAll('[data-close-modal]').forEach(button => {
     if (modalId === 'editEmployeeModal') closeEditEmployeeModal();
   });
 });
-document.querySelectorAll('[data-store]').forEach(button => {
-  button.addEventListener('click', () => enterStore(button.dataset.store));
+document.querySelector('.store-grid')?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-store]');
+  if (button) enterStore(button.dataset.store);
 });
+refreshStores();
 document.getElementById('adminLoginForm').addEventListener('submit', handleAdminLogin);
 document.getElementById('adminOtpForm').addEventListener('submit', handleAdminOtp);
 document.getElementById('showPasswordReset').addEventListener('click', showPasswordResetRequest);
@@ -1610,11 +1900,25 @@ document.getElementById('modalBody').addEventListener('click', event => {
     return;
   }
 
+  const reverseButton = event.target.closest('[data-reverse-payment]');
+  if (reverseButton) {
+    undoPayment(reverseButton.dataset.loanId, reverseButton.dataset.reversePayment);
+    return;
+  }
   const actionButton = event.target.closest('[data-loan-action]');
   if (actionButton) {
     const reasonInput = document.querySelector(`[data-decision-reason="${actionButton.dataset.loanId}"]`);
     const graceInput = document.querySelector(`[data-grace-date="${actionButton.dataset.loanId}"]`);
-    updateLoanStatus(actionButton.dataset.loanId, actionButton.dataset.loanAction, reasonInput?.value, graceInput?.value);
+    const saleInput = document.querySelector(`[data-sale-amount="${actionButton.dataset.loanId}"]`);
+    const locationInput = document.querySelector(`[data-collateral-location="${actionButton.dataset.loanId}"]`);
+    updateLoanStatus(
+      actionButton.dataset.loanId,
+      actionButton.dataset.loanAction,
+      reasonInput?.value,
+      graceInput?.value,
+      saleInput?.value,
+      locationInput?.value
+    );
   }
 });
 document.getElementById('modalBody').addEventListener('change', event => {
@@ -1652,6 +1956,17 @@ function applyUserFilterAndSort() {
 }
 document.getElementById('userSearch').addEventListener('input', applyUserFilterAndSort);
 document.getElementById('userSort')?.addEventListener('change', applyUserFilterAndSort);
+document.getElementById('expenseForm')?.addEventListener('submit', submitExpense);
+document.getElementById('expenseCancelBtn')?.addEventListener('click', () => {
+  resetExpenseForm();
+  setExpenseMessage('');
+});
+document.getElementById('expenseList')?.addEventListener('click', event => {
+  const edit = event.target.closest('[data-expense-edit]');
+  const remove = event.target.closest('[data-expense-delete]');
+  if (edit) beginExpenseEdit(edit.dataset.expenseEdit);
+  if (remove) deleteExpense(remove.dataset.expenseDelete);
+});
 document.getElementById('refreshRequestsBtn').addEventListener('click', fetchNewRequests);
 document.getElementById('newRequestsList').addEventListener('click', event => {
   const requestButton = event.target.closest('[data-request-user]');
@@ -1760,3 +2075,15 @@ window.closeCreateUserModal = closeCreateUserModal;
 window.closeAnnouncementModal = closeAnnouncementModal;
 window.viewUserDetails = viewUserDetails;
 window.sendOverdueNotice = sendOverdueNotice;
+
+document.addEventListener('click', async (event) => {
+  const link = event.target.closest('a.proof-link, a.attachment-btn');
+  if (!link || !link.getAttribute('href')?.startsWith('/uploads/')) return;
+  event.preventDefault();
+  const response = await fetch(link.getAttribute('href'), {
+    headers: { 'x-device-token': localStorage.getItem('deviceToken') || '' }
+  });
+  if (!response.ok) return;
+  const blob = await response.blob();
+  window.open(URL.createObjectURL(blob), '_blank');
+});
