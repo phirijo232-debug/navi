@@ -11,8 +11,8 @@
     .input-wrap { position:relative; width:100%; }
     .input-wrap input { width:100%; padding-right:36px; }
     .auth-form { display:flex; flex-direction:column; gap:12px; width:90%; max-width:320px; margin:0 auto; }
-    .auth-input { padding:12px; border-radius:4px; border:1px solid rgba(255,255,255,0.2); background:transparent; color:inherit; width:100%; font-size:16px; box-sizing:border-box; }
-    body.light .auth-input { border-color:rgba(0,0,0,0.2); color:#1a1a2e; }
+    .auth-input { padding:12px; border-radius:4px; border:1px solid var(--border); background:transparent; color:inherit; width:100%; font-size:16px; box-sizing:border-box; }
+    body.light .auth-input { border-color:var(--border); color:var(--text); }
   </style>
 </head>
 <body>
@@ -140,8 +140,12 @@
           localStorage.setItem('userEmail', pendingEmail);
           localStorage.setItem('userRole', data.role);
           localStorage.setItem('deviceToken', data.deviceToken);
+          if (data.storeId) localStorage.setItem('userStoreId', data.storeId);
           const preferredMode = localStorage.getItem('mode') || 'dark';
-          const nextPage = data.role === 'admin' ? 'dashboard.html' : 'user.html';
+          const staffRoles = ['store_admin', 'franchise_admin', 'cashier'];
+          const nextPage = data.role === 'admin'
+            ? 'dashboard.html'
+            : (staffRoles.includes(data.role) ? 'admin.html' : 'user.html');
           localStorage.setItem('lastAppPage', nextPage);
           applyTheme(preferredMode);
           localStorage.setItem('justLoggedIn', 'true');

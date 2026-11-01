@@ -19,7 +19,19 @@ module.exports = {
   },
 
   GRACE_PERIOD_DAYS: 3,
-  DEFAULT_GRACE_DAYS: 5,
+  // Extra calendar days AFTER the due date before the loan is marked defaulted.
+  // 0 matches the written rule: defaulted the day after the due date.
+  // Grace still begins GRACE_PERIOD_DAYS before the due date, including the due date.
+  DEFAULT_GRACE_DAYS: 0,
+  // 1.8% of the pinned balance, charged on the day grace or default starts.
+  GRACE_DAILY_RATE: 0.018,
+  CHARGE_GRACE_ENTRY_DAY: true,
+  // Paying early does not reduce the interest agreed for the weeks.
+  EARLY_PAYOFF_KEEPS_FULL_INTEREST: true,
+  // How much a customer may have out at once, until staff set their own limit.
+  DEFAULT_CREDIT_LIMIT: 10000,
+  // A second loan needs the shop to tick "allow another loan" on that customer.
+  MAX_OPEN_LOANS: 1,
   REMINDER_DAYS_BEFORE: 3,
 
   REPORTS: {
