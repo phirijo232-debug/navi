@@ -113,13 +113,13 @@ function enterStore(storeId) {
 function setAuthMessage(text, isError = false) {
   const el = document.getElementById('authMessage');
   el.textContent = text;
-  el.style.color = isError ? '#ff9ca9' : '#d6e7ff';
+  el.style.color = isError ? 'var(--error)' : 'var(--text)';
 }
 
 function setCreateUserMessage(text, isError = false) {
   const el = document.getElementById('createUserMessage');
   el.textContent = text;
-  el.style.color = isError ? '#ff9ca9' : '#d6e7ff';
+  el.style.color = isError ? 'var(--error)' : 'var(--text)';
 }
 
 function setLoader(active) {
@@ -1230,7 +1230,7 @@ function setHrMessage(text, isError = false) {
   const el = document.getElementById('hrMessage');
   if (!el) return;
   el.textContent = text;
-  el.style.color = isError ? '#ff9ca9' : '#d6e7ff';
+  el.style.color = isError ? 'var(--error)' : 'var(--text)';
 }
 
 async function fetchHrEmployees() {
@@ -1309,12 +1309,12 @@ async function submitEditEmployee(event) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Unable to update employee.');
     msg.textContent = data.message || 'Employee updated.';
-    msg.style.color = '#a8f0c6';
+    msg.style.color = 'var(--success)';
     await fetchHrEmployees();
     setTimeout(closeEditEmployeeModal, 800);
   } catch (err) {
     msg.textContent = err.message || 'Update failed.';
-    msg.style.color = '#ff9ca9';
+    msg.style.color = 'var(--error)';
   }
 }
 
