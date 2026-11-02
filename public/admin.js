@@ -779,6 +779,42 @@ async function notifySelectedUser() {
     document.getElementById('detailFeedback').textContent = 'Open a customer first.';
     return;
   }
+
+  // Show option prompt: overdue notice vs custom email
+  const choice = prompt(
+    `Send notification to ${selectedUser.email}\n\n1. Send automated overdue notice\n2. Write custom email\n\nEnter 1 or 2:`
+  );
+
+  if (!choice) return; // User cancelled
+
+  let subject, body;
+
+  if (choice === '1') {
+    // Automated overdue notice
+    subject = 'BMF Loan Overdue Notice';
+    body = `Hello ${selectedUser.username || ' valued customer'},
+
+Your BMF loan is now overdue. Kindly settle the outstanding balance as soon as possible to restore and continue your access to the BMF loan service.
+
+If you have already made a payment, please disregard this notice and contact our office with your payment confirmation.
+
+Best regards,
+BMF Customer Service`;
+  } else if (choice === '2') {
+    // Custom email - prompt for message content
+    const customMessage = prompt('Enter your custom email message:');
+    if (customMessage === null || customMessage.trim() === '') {
+      document.getElementById('detailFeedback').textContent = 'Custom message cancelled.';
+      return;
+    }
+    subject = 'BMF Loan Update';
+    body = customMessage;
+  } else {
+    document.getElementById('detailFeedback').textContent = 'Invalid choice. Notification cancelled.';
+    return;
+  }
+
+  // Send the notification
   const notifyButton = document.querySelector('[data-notify-user]');
   if (notifyButton) { notifyButton.disabled = true; notifyButton.textContent = 'Sending…'; }
   try {
@@ -786,7 +822,11 @@ async function notifySelectedUser() {
     const response = await fetch('/loans/notify-user', {
       method: 'POST',
       headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ email: selectedUser.email })
+      body: JSON.stringify({ 
+        email: selectedUser.email,
+        subject,
+        body
+      })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Unable to send notification.');
@@ -943,19 +983,34 @@ async function fetchApplications() {
   if (!list) return;
   list.innerHTML = '<div class="directory-empty" role="status">Loading applications…</div>';
   message.textContent = '';
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   try {
-    const response = await fetch('/api/apply', { headers: getStoreHeaders() });
+    const response = await fetch('/api/apply', { headers: getStoreHeaders(), signal: controller.signal });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Unable to load applications.');
+    if (!response.ok) {
+      const error = new Error(data.error || 'Unable to load applications.');
+      error.status = response.status;
+      throw error;
+    }
     allApplications = Array.isArray(data.applications) ? data.applications : [];
     renderApplications();
-    if (countEl) countEl.textContent = allApplications.length + ' application' + (allApplications.length !== 1 ? 's' : '') + ' awaiting review.';
+    const pendingCount = allApplications.filter(app => app.status === 'pending').length;
+    if (countEl) countEl.textContent = `${pendingCount} application${pendingCount !== 1 ? 's' : ''} awaiting review.`;
   } catch (err) {
-    const msg = err.status === 401 ? 'Your admin session expired. Please sign in again.' : err.status === 403 ? 'Your account is not allowed to view applications.' : err.message || 'Unable to load applications.';
+    const msg = controller.signal.aborted
+      ? 'Applications took too long to load. Please retry.'
+      : err.status === 401
+        ? 'Your admin session expired. Please sign in again.'
+        : err.status === 403
+          ? 'Your account is not allowed to view applications.'
+          : err.message || 'Unable to load applications.';
     list.innerHTML = `<div class="directory-empty" role="status">${escapeHtml(msg)}</div>`;
     if (countEl) countEl.textContent = '';
     if (message) message.textContent = msg;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -974,9 +1029,15 @@ function renderApplications() {
   }
   list.innerHTML = allApplications.map(app => {
     const weeklyRates = { 1: 0.10, 2: 0.16, 3: 0.24, 4: 0.32 };
-    const rate = weeklyRates[app.loanTenure] ?? 0.10;
-    const interest = app.loanAmount * rate;
-    const total = app.loanAmount + interest;
+    const amount = Number(app.amount) || 0;
+    const tenureWeeks = Number(app.tenureWeeks) || 1;
+    const rate = weeklyRates[tenureWeeks] ?? 0.10;
+    const interest = amount * rate;
+    const total = amount + interest;
+    const product = app.product || app.loanPurpose || 'Loan application';
+    const applicationId = app.applicationId || app.id || 'Application';
+    const nrcNumber = app.nrcNumber || app.nrc || '—';
+    const collateralFront = app.collateralFront || app.collateralPhoto;
     const reviewed = app.status !== 'pending' ? `
       <p><strong>Reviewed:</strong> ${escapeHtml(formatDate(app.reviewedAt))} by ${escapeHtml(app.reviewedBy || '—')}</p>
       ${app.reviewNote ? `<p><strong>Note:</strong> ${escapeHtml(app.reviewNote)}</p>` : ''}
@@ -995,16 +1056,17 @@ function renderApplications() {
     return `
       <article class="panel loan-item" style="margin-top:10px;">
         <div class="loan-header">
-          <strong style="margin-left:8px;">${escapeHtml(app.loanPurpose)} — ${escapeHtml(app.applicationId)}</strong>
+          <strong style="margin-left:8px;">${escapeHtml(product)} — ${escapeHtml(applicationId)}</strong>
           ${statusBadge(app.status)}
         </div>
         <p><strong>Applicant:</strong> ${escapeHtml(app.fullName)}</p>
-        <p><strong>Email:</strong> ${escapeHtml(app.email)} · <strong>Phone:</strong> ${escapeHtml(app.phone)} · <strong>NRC:</strong> ${escapeHtml(app.nrc)}</p>
-        <p><strong>Amount:</strong> ${formatCurrency(app.loanAmount)} · <strong>Interest:</strong> ${formatCurrency(interest)} · <strong>Total:</strong> ${formatCurrency(total)}</p>
-        <p><strong>Tenure:</strong> ${app.loanTenure} week${app.loanTenure === 1 ? '' : 's'} · <strong>Urgency:</strong> ${escapeHtml(app.urgency)} · <strong>Requested:</strong> ${escapeHtml(formatDate(app.createdAt))}</p>
+        <p><strong>Email:</strong> ${escapeHtml(app.email)} · <strong>Phone:</strong> ${escapeHtml(app.phone)} · <strong>NRC:</strong> ${escapeHtml(nrcNumber)}</p>
+        <p><strong>Amount:</strong> ${formatCurrency(amount)} · <strong>Interest:</strong> ${formatCurrency(interest)} · <strong>Total:</strong> ${formatCurrency(total)}</p>
+        <p><strong>Tenure:</strong> ${tenureWeeks} week${tenureWeeks === 1 ? '' : 's'} · <strong>Urgency:</strong> ${escapeHtml(app.urgency || 'standard')} · <strong>Requested:</strong> ${escapeHtml(formatDate(app.createdAt))}</p>
         ${app.nrcFront ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(app.nrcFront)}">View NRC front</a></p>` : ''}
         ${app.nrcBack ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(app.nrcBack)}">View NRC back</a></p>` : ''}
-        ${app.collateralPhoto ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(app.collateralPhoto)}">View collateral photo</a></p>` : ''}
+        ${collateralFront ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(collateralFront)}">View collateral front</a></p>` : ''}
+        ${app.collateralBack ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(app.collateralBack)}">View collateral back</a></p>` : ''}
         ${reviewed}
         ${actions}
       </article>
@@ -1027,7 +1089,12 @@ async function reviewApplication(appId, action) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Unable to review application.');
-    document.getElementById('applicationsMessage').textContent = data.message || 'Application reviewed.';
+    const successMessage = action === 'approve'
+      ? 'Application approved.'
+      : action === 'reject'
+        ? 'Application declined.'
+        : 'Additional information requested.';
+    document.getElementById('applicationsMessage').textContent = data.message || successMessage;
     document.getElementById('applicationsMessage').style.color = 'var(--success)';
     await fetchApplications();
   } catch (err) {

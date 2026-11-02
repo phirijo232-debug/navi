@@ -14,6 +14,7 @@ const PUBLIC_DIR = path.join(ROOT, 'public');
 
 const html = fs.readFileSync(path.join(PUBLIC_DIR, 'admin.html'), 'utf8');
 const js = fs.readFileSync(path.join(PUBLIC_DIR, 'admin.js'), 'utf8');
+const server = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
 
 test('admin.html is structurally intact (not corrupted or truncated)', () => {
   assert.ok(html.length > 15000, `admin.html is suspiciously small (${html.length} chars)`);
@@ -72,6 +73,23 @@ test('HR employee loading has a timeout and a visible timeout message', () => {
   const fetchHr = js.slice(start, end);
   assert.match(fetchHr, /setTimeout\(\(\) => controller\.abort\(\), 12000\)/);
   assert.match(fetchHr, /Employee records took too long to load/);
+});
+
+test('public Quick Screen submission stays public while application review is device-authenticated', () => {
+  const publicSubmission = server.indexOf("app.post('/api/apply', applyRouter)");
+  const deviceAuth = server.indexOf('app.use(deviceAuth)');
+  const protectedApplications = server.indexOf("app.use('/api/apply', applyRouter)", deviceAuth);
+  assert.ok(publicSubmission >= 0 && publicSubmission < deviceAuth, 'Quick Screen submissions must be mounted before deviceAuth');
+  assert.ok(protectedApplications > deviceAuth, 'application reads and reviews must be mounted after deviceAuth');
+});
+
+test('Quick Screen application cards use the application API field names', () => {
+  const start = js.indexOf('function renderApplications()');
+  const end = js.indexOf('async function reviewApplication(', start);
+  const render = js.slice(start, end);
+  for (const field of ['app.amount', 'app.tenureWeeks', 'app.product', 'app.nrcNumber', 'app.collateralFront', 'app.collateralBack']) {
+    assert.ok(render.includes(field), `application cards must render ${field}`);
+  }
 });
 
 test('all public HTML pages are non-trivial and start with a doctype', () => {

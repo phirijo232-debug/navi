@@ -173,12 +173,15 @@ app.get('/quick-screen', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'quick-screen.html'));
 });
 
-// Public loan application API (no device token required).
-app.use('/api/apply', applyRouter);
+// Public loan application submissions do not require a device token.
+app.post('/api/apply', applyRouter);
 
 app.use(deviceAuth);
 app.use(logAccess);
 app.use(trackSession);
+// Application reads and reviews are admin-only and need req.authUser from
+// deviceAuth; keep them mounted after that middleware.
+app.use('/api/apply', applyRouter);
 app.use('/', usersRouter);
 app.use('/', routes);
 
