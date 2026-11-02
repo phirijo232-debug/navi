@@ -57,10 +57,20 @@ router.get('/reports/search', searchReports);
 router.get('/reports/user/:email', getUserReport);
 router.get('/reports/analytics/tracking', getTrackingAnalytics);
 router.get('/reports/analytics/tracking/export', exportTrackingSheet);
+// /api alias matches the admin-panel report prompt and keeps the legacy /reports
+// routes working for existing clients.
+router.get('/api/reports/:type', getTypedReport);
+router.get('/api/reports/:type/export', (req, res, next) => {
+  if (config.REPORTS.REPORT_TYPES.includes(req.params.type) || config.REPORTS.REPORT_TYPES.includes(String(req.params.type).toLowerCase().replace(/_/g, '-'))) {
+    return getTypedReportExcel(req, res, next);
+  }
+  return exportReport(req, res, next);
+});
+router.get('/api/reports/:type/pdf', getTypedReportPdf);
 // Flat typed-report routes (static, must come before :scope dynamic routes)
 router.get('/reports/:type', getTypedReport);
 router.get('/reports/:type/export', (req, res, next) => {
-  if (config.REPORTS.REPORT_TYPES.includes(req.params.type)) {
+  if (config.REPORTS.REPORT_TYPES.includes(req.params.type) || config.REPORTS.REPORT_TYPES.includes(String(req.params.type).toLowerCase().replace(/_/g, '-'))) {
     return getTypedReportExcel(req, res, next);
   }
   return exportReport(req, res, next);

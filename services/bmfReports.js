@@ -73,22 +73,23 @@ function riskLevel(stats) {
 
 function filenameFor(type, opts = {}) {
   const d = String(opts.date || new Date().toISOString().slice(0, 10));
+  const plain = (prefix, suffix = '') => `${prefix}_${suffix ? `${suffix}_` : ''}${d}`;
   switch (type) {
-    case 'daily': return `BMF-Daily-Report-${d}.xlsx`;
-    case 'monthly-collections': return `BMF-Monthly-Collections-${d.slice(0, 7)}.xlsx`;
-    case 'interest-revenue': return `BMF-Interest-Revenue-${d.slice(0, 7)}.xlsx`;
-    case 'repayment-performance': return `BMF-Repayment-Performance-${d.slice(0, 7)}.xlsx`;
+    case 'daily': return `bmf_daily_cashbook_${d}.xlsx`;
+    case 'monthly-collections': return `bmf_collection_${d}.xlsx`;
+    case 'interest-revenue': return `bmf_officer_scorecard_${d}.xlsx`;
+    case 'repayment-performance': return `bmf_collection_${d}.xlsx`;
     case 'repayment-tracker': {
       const name = String(opts.borrower || 'Borrower').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'Borrower';
-      return `BMF-Report-${name}-${d}.xlsx`;
+      return `bmf_full_history_${name}_${d}.xlsx`;
     }
-    case 'all-loans': return `BMF-All-Loans-${d}.xlsx`;
-    case 'payments-today': return `BMF-Payments-${d}.xlsx`;
-    case 'overdue': return `BMF-Overdue-${d}.xlsx`;
-    case 'defaulters': return `BMF-Defaulters-${d}.xlsx`;
-    case 'borrower-statements': return `BMF-Borrower-Statements-${d}.xlsx`;
-    case 'approval-log': return `BMF-Approval-Log-${d}.xlsx`;
-    default: return `BMF-${type}-${d}.xlsx`;
+    case 'all-loans': return `bmf_all_loans_${d}.xlsx`;
+    case 'payments-today': return `bmf_daily_cashbook_${d}.xlsx`;
+    case 'overdue': return `bmf_how_risky_${d}.xlsx`;
+    case 'defaulters': return `bmf_problem_loans_${d}.xlsx`;
+    case 'borrower-statements': return `bmf_full_history_${d}.xlsx`;
+    case 'approval-log': return `bmf_daily_cashbook_${d}.xlsx`;
+    default: return `bmf_${String(type).replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}_${d}.xlsx`;
   }
 }
 

@@ -16,22 +16,46 @@ let reportFrom = '';
 let reportTo = '';
 
 const REPORT_TYPE_LABELS = {
-  daily: 'Daily',
-  'all-loans': 'All Loans',
-  'payments-today': 'Payments',
-  overdue: 'Overdue',
-  defaulters: 'Defaulters',
-  profits: 'Profit / Interest'
+  'how-risky': 'How Risky Are Our Loans?',
+  'who-owes': 'Who Owes What and How Late?',
+  'full-history': 'One Borrower\'s Full History',
+  'all-loans': 'All Loans We Gave Out This Period',
+  'schedule': 'Payment Schedule Per Loan',
+  'collection': 'How Well Is Money Being Collected?',
+  'problem-loans': 'Problem Loans & Write-Offs',
+  'daily-cashbook': 'Daily Money In and Out',
+  'officer-scorecard': 'Officer Scorecard',
+  daily: 'Daily Money In and Out',
+  overdue: 'How Risky Are Our Loans?',
+  defaulters: 'Problem Loans & Write-Offs'
 };
 
 const REPORT_ENDPOINT = {
-  daily: 'summary',
-  'all-loans': 'summary',
-  'payments-today': 'paid',
+  'how-risky': 'overdue',
+  'who-owes': 'all-loans',
+  'full-history': 'repayment-tracker',
+  'all-loans': 'all-loans',
+  'schedule': 'repayment-tracker',
+  'collection': 'monthly-collections',
+  'problem-loans': 'defaulters',
+  'daily-cashbook': 'daily',
+  'officer-scorecard': 'interest-revenue',
+  daily: 'daily',
   overdue: 'overdue',
-  defaulters: 'defaulters',
-  profits: 'profits'
+  defaulters: 'defaulters'
 };
+
+const REPORT_LIBRARY = [
+  { type: 'how-risky', title: 'How Risky Are Our Loans?', description: 'Shows which loans are overdue and by how long', source: 'overdue', filenamePrefix: 'bmf_how_risky' },
+  { type: 'who-owes', title: 'Who Owes What and How Late?', description: 'Lists every borrower\'s arrears in time buckets', source: 'all-loans', filenamePrefix: 'bmf_who_owes' },
+  { type: 'full-history', title: 'One Borrower\'s Full History', description: 'Every payment made and still owed for one loan', source: 'repayment-tracker', filenamePrefix: 'bmf_full_history', borrowerSearch: true },
+  { type: 'all-loans', title: 'All Loans We Gave Out This Period', description: 'Every loan issued in a date range', source: 'all-loans', filenamePrefix: 'bmf_all_loans' },
+  { type: 'schedule', title: 'Payment Schedule Per Loan', description: 'Instalment-by-instalment plan for one loan', source: 'repayment-tracker', filenamePrefix: 'bmf_schedule', borrowerSearch: true },
+  { type: 'collection', title: 'How Well Is Money Being Collected?', description: 'Officer performance vs CGAP target', source: 'monthly-collections', filenamePrefix: 'bmf_collection' },
+  { type: 'problem-loans', title: 'Problem Loans & Write-Offs', description: 'Every defaulted loan and net loss', source: 'defaulters', filenamePrefix: 'bmf_problem_loans' },
+  { type: 'daily-cashbook', title: 'Daily Money In and Out', description: 'Cashbook — every receipt and disbursement', source: 'daily', filenamePrefix: 'bmf_daily_cashbook' },
+  { type: 'officer-scorecard', title: 'Officer Scorecard', description: 'KPIs for each loan officer vs MIX Market targets', source: 'interest-revenue', filenamePrefix: 'bmf_officer_scorecard' }
+];
 let storeFeedback = [];
 let activeFeedbackFilter = 'all';
 let portfolioLoans = [];
@@ -66,6 +90,154 @@ function showAdminSuccess(message) {
   toast.classList.add('visible');
   clearTimeout(adminToastTimer);
   adminToastTimer = setTimeout(() => toast.classList.remove('visible'), 4200);
+}
+
+function showBmfToast(message, kind = 'success') {
+  const toast = document.getElementById('bmfToast') || (() => {
+    const el = document.createElement('div');
+    el.id = 'bmfToast';
+    el.style.position = 'fixed';
+    el.style.right = '20px';
+    el.style.bottom = '20px';
+    el.style.zIndex = '9999';
+    el.style.maxWidth = '360px';
+    el.style.padding = '12px 16px';
+    el.style.borderRadius = '10px';
+    el.style.boxShadow = '0 18px 30px rgba(0,0,0,0.2)';
+    el.style.background = kind === 'error' ? '#c0392b' : '#1f7a54';
+    el.style.color = '#fff';
+    el.style.fontWeight = '600';
+    document.body.appendChild(el);
+    return el;
+  })();
+
+  toast.textContent = message;
+  toast.dataset.kind = kind;
+  toast.style.background = kind === 'error' ? '#c0392b' : '#1f7a54';
+  toast.style.display = 'block';
+  clearTimeout(adminToastTimer);
+  adminToastTimer = setTimeout(() => {
+    toast.style.display = 'none';
+  }, 4200);
+}
+
+function getReportConfig(reportType) {
+  return REPORT_LIBRARY.find(report => report.type === reportType) || REPORT_LIBRARY[0];
+}
+
+function renderReportLibrary() {
+  const list = document.getElementById('reportLibrary');
+  if (!list) return;
+
+  const officerOptions = (portfolioLoans || []).map(loan => loan.officer || loan.assignedOfficer || loan.createdBy)
+    .filter(Boolean)
+    .map(String)
+    .filter((value, index, arr) => arr.indexOf(value) === index)
+    .sort();
+
+  list.innerHTML = REPORT_LIBRARY.map((report) => `
+    <article class="report-card" data-report-card="${report.type}">
+      <h3>${escapeHtml(report.title)}</h3>
+      <p>${escapeHtml(report.description)}</p>
+      <div class="report-fields">
+        <label>
+          <span>From</span>
+          <input type="date" data-report-from>
+        </label>
+        <label>
+          <span>To</span>
+          <input type="date" data-report-to>
+        </label>
+        <label class="wide">
+          <span>Officer</span>
+          <select data-report-officer>
+            <option value="">All officers</option>
+            ${officerOptions.map(option => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join('')}
+          </select>
+        </label>
+        ${report.borrowerSearch ? `
+          <label class="wide">
+            <span>Borrower search</span>
+            <input type="search" data-report-borrower placeholder="Search by name, email, or loan ID">
+          </label>
+        ` : ''}
+      </div>
+      <div class="report-actions">
+        <button type="button" class="toggle-mode" data-report-action data-report-type="${report.type}" data-report-format="xlsx">⬇ Download Excel</button>
+        <button type="button" class="toggle-mode" data-report-action data-report-type="${report.type}" data-report-format="pdf">📄 Download PDF</button>
+      </div>
+      <div class="last-generated">Last generated: —</div>
+    </article>
+  `).join('');
+
+  list.querySelectorAll('[data-report-action]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const { reportType, format } = button.dataset;
+      const card = button.closest('[data-report-card]');
+      if (!card) return;
+      const from = card.querySelector('[data-report-from]')?.value || '';
+      const to = card.querySelector('[data-report-to]')?.value || '';
+      const officer = card.querySelector('[data-report-officer]')?.value || '';
+      const borrower = card.querySelector('[data-report-borrower]')?.value || '';
+      await pullReport(reportType, format, { from, to, officer, borrower });
+    });
+  });
+}
+
+async function pullReport(reportType, format, params = {}) {
+  const config = getReportConfig(reportType);
+  const sourceType = config.source || reportType;
+  const token = localStorage.getItem('deviceToken') || '';
+  const qs = new URLSearchParams({ format });
+
+  if (params.from) qs.set('from', params.from);
+  if (params.to) qs.set('to', params.to);
+  if (params.officer) qs.set('officer', params.officer);
+
+  if ((reportType === 'full-history' || reportType === 'schedule') && params.borrower) {
+    const match = (portfolioLoans || []).find(loan => {
+      const email = String(loan.email || '').toLowerCase();
+      const receipt = String(loan.receiptNumber || loan.id || '').toLowerCase();
+      const borrowerText = String(params.borrower || '').toLowerCase();
+      const customer = (allUsers || []).find(user => String(user.email || '').toLowerCase() === email) || {};
+      return email.includes(borrowerText) || receipt.includes(borrowerText) || String(customer.username || '').toLowerCase().includes(borrowerText);
+    });
+
+    if (!match) {
+      showBmfToast('No matching loan was found for that borrower search.', 'error');
+      return;
+    }
+
+    qs.set('loanId', String(match.id));
+  }
+
+  try {
+    const res = await fetch(`/api/reports/${sourceType}?${qs.toString()}`, {
+      headers: { 'x-device-token': token }
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showBmfToast(err.error || 'Could not generate report. Please try again.', 'error');
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const filenameMatch = (res.headers.get('Content-Disposition') || '').match(/filename="?([^";]+)"?/i);
+    const dateStamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const fallbackName = `${config.filenamePrefix || sourceType}_${dateStamp}.${format}`;
+    a.download = filenameMatch?.[1] || fallbackName;
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showBmfToast('Report downloaded successfully.');
+  } catch (err) {
+    showBmfToast(err.message || 'Could not generate report. Please try again.', 'error');
+  }
 }
 
 function applyTheme(theme) {
@@ -178,6 +350,7 @@ function showDashboard() {
   setViewVisibility('adminDashboard', true);
   setActiveAdminMenu('adminMenuDashboard');
   renderLoggedInAdmin();
+  renderReportLibrary();
   initServerMode();
   if (portfolioRefreshTimer) clearInterval(portfolioRefreshTimer);
   portfolioRefreshTimer = setInterval(() => {
