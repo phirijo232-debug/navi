@@ -1418,6 +1418,7 @@ body.light .admin-decision-box textarea { background: #DDE1E0; border-color:rgba
 .customer-payment-table th, .customer-payment-table td { padding: 11px 12px; text-align: left; border-bottom: 1px solid rgba(127,127,127,.2); }
 .customer-payment-table th { font-size: .82rem; opacity: .76; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.payment-balance-output { display: block; min-height: 46px; }
 
 /* Screenshot-matched BMF admin dashboard */
 body:has(#adminDashboard:not(.hidden)) { background:#0d1117 !important; color:#e6edf3 !important; }

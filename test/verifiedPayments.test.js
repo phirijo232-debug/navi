@@ -131,6 +131,10 @@ test('customer proof rejects forged role, duplicate references, and missing proo
     const noProof = responseRecorder();
     submitPaymentProof({ ...base, body: { ...base.body, transactionReference: 'UNIQUE-123' }, files: {} }, noProof);
     assert.equal(noProof.statusCode, 400);
+    const forgedBalance = responseRecorder();
+    submitPaymentProof({ ...base, body: { ...base.body, amount: '51', transactionReference: 'UNIQUE-123', expectedBalance: '999999' } }, forgedBalance);
+    assert.equal(forgedBalance.statusCode, 400);
+    assert.equal(JSON.parse(fs.readFileSync(loanFile, 'utf8'))[0].paymentSubmissions.length, 1);
     const forgedStaff = responseRecorder();
     submitPaymentProof({ ...base, authUser: { role: 'store_admin', email: 'borrower@example.test', storeId: 'buraza' } }, forgedStaff);
     assert.equal(forgedStaff.statusCode, 403);

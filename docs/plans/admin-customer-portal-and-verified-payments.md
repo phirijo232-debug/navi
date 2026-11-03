@@ -18,6 +18,9 @@ Skin (admin/customer pages, styles, shared feedback), Brain (loan/payment/notifi
 - [x] Run the automated suite, inline/page and controller syntax checks, `git diff --check`, and verify `node server.js` starts.
 - [x] Update `AGENTS.md`, `docs/ROUTES.md`, and `TODO.md` for the new routes and final behavior.
 - [ ] Inspect authenticated dashboard pages at desktop/mobile sizes. The computer-use browser inventory is empty and the in-app browser reports `iab` unavailable, so only DOM/HTML, script parsing, route wiring, and app tests could be verified here.
+- [x] (2026-11-03) Simplify the customer Payments/Support screen by removing its nested menu bar while keeping payment history, verified payment submission, due dates, and inquiries accessible.
+- [x] Bind the expected balance to the selected loan’s current server-provided outstanding balance and keep it read-only; ensure submission authorization and balance checks remain server authoritative.
+- [x] Keep analytics charts off the customer portal; correct the miswired inquiry/payment form handlers and add regression coverage.
 
 ## Decision Log
 - 2026-10-16: Treat both pasted prompts as design references, not API contracts. Keep current route names and exact AGENTS role gates unless a new route is required for the payment feature.
@@ -29,6 +32,8 @@ Skin (admin/customer pages, styles, shared feedback), Brain (loan/payment/notifi
 - 2026-10-16: Use existing loan/feedback/user APIs for admin metrics; do not add fake `/loans/my`, `/users/me`, `/announcements`, or theme routes. Use native SVG for charts so no external script/CDN is required by the current CSP.
 - 2026-10-16: User-supplied guidance requires currency `K X,XXX.XX`, date `DD/MM/YYYY`, fixed tenure-specific BMF interest, canonical loan statuses, and loan decisions restricted to `store_admin`; these rules override contradictory sample values in the prompts.
 - 2026-10-16: Keep live device tokens out of the customer UI and all HTML/URLs. Escape or text-render user-supplied values in dynamic page content.
+- 2026-11-03: Implement the user's specific customer-portal changes over contradictory attachment details: remove nested Support/Record navigation, do not add analytics diagrams, and keep selected-loan expected balance server-derived and non-editable. Do not trust any client-supplied balance value for payment accounting.
+- 2026-11-03: The current Payments/Support submenu is redundant; show its useful sections on one page. The selected-loan form currently has no selection-to-balance binding, and its payment-submission handler is incorrectly attached to the inquiry form; wire each form to its own existing endpoint.
 
 ## Surprises and Discoveries
 - The design prompts name nonexistent or mismatched endpoints (`/loans/my`, `/payments/my`, `/announcements`, `/users/me`, `/loans/:id/pay`, `/admin/mode`, etc.). Existing working paths use `GET /loans?email=…`, `POST /loans/request`, `POST /loans/payment`, `POST /admin/announcements`, and `/admin/server-mode`.
@@ -46,6 +51,8 @@ Skin (admin/customer pages, styles, shared feedback), Brain (loan/payment/notifi
 5. Reorganize `admin.html`/`admin.js` and `user.html` around the prompts, use same-origin actual URLs and safe rendering, and preserve every existing staff operation.
 6. Add a shared BMF toast component and wire successful OTP/login/request/payment/admin actions to it while retaining accessible inline error details.
 7. Add route, security, UI-integrity, and lifecycle tests; update the route map and operating documentation.
+8. Rebuild the customer Payments/Support area without nested navigation, initialize the registered-payment form from the selected customer-owned loan and its current outstanding balance, and attach the right submission handlers to their respective forms.
+9. Add regression tests proving the customer page contains no analytics chart, has no nested Support/Record menu, populates a readonly expected balance from the selected loan, and never accepts a client balance as authority over server-side payment amount checks.
 
 ## Routes Added or Changed
 - `POST /loans/:id/payment-submissions` — authenticated borrower submits proof; creates pending review only.
@@ -62,6 +69,8 @@ Skin (admin/customer pages, styles, shared feedback), Brain (loan/payment/notifi
 - Upload tests prove NRC/payment proof cannot be accessed by anonymous, other borrowers, or out-of-scope staff, including signed URL issuance.
 - UI tests ensure all dynamic API URLs map to registered routes, required dashboard elements exist, and the customer page never displays a device token.
 - `npm.cmd test`, `node --check` on project JavaScript, `git diff --check`, visual browser review, then `node server.js` startup.
+- 2026-11-03: `node --test test/verifiedPayments.test.js test/userPortalPayments.test.js` passes. The new portal regression test verifies the single-section layout, no charts, read-only selected-loan balance, client-side amount limit, separate feedback/payment endpoints, and inline-script syntax. The payment controller test proves a forged expected-balance field cannot bypass the actual outstanding-balance limit.
+- 2026-11-03: Full `npm.cmd test` suite passes, `git diff --check` is clean, and `node server.js` starts and serves `/health` on temporary port 3101 because port 3000 was already occupied. The temporary server process was stopped after verification.
 
 ## Outcomes and Retrospective
 The pending-transfer accounting and access boundaries are implemented and covered by tests. Both portals now expose the requested payment, report, notification, review, NRC, and portfolio summary flows. Automated checks pass. Browser visual QA and checking the deployment's actual public URL remain for an environment with a browser surface and the deployment hostname.

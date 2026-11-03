@@ -223,52 +223,46 @@
       <div id="paymentsSection" class="screen-section hidden">
         <div class="board-card">
           <h2>Record Payment &amp; Support</h2>
-          <p>To record a payment, open a running loan and submit your payment proof. Track your payment history or contact BMF below.</p>
-          <div class="loan-filters support-tabs" role="tablist" aria-label="Payments and support">
-            <button type="button" class="loan-filter active" data-support-view="history">Payment History</button>
-            <button type="button" class="loan-filter" data-support-view="inquiry">Inquiries</button>
-            <button type="button" class="loan-filter" data-support-view="record-payment">Record Payment</button>
-            <button type="button" class="loan-filter" data-support-view="schedule">Due Schedule</button>
-            <button type="button" class="toggle-mode support-refresh" id="refreshSupportBtn">Refresh</button>
-          </div>
+          <div class="section-heading"><p>Review your payment history, submit proof for a loan, or contact BMF.</p><button type="button" class="toggle-mode" id="refreshSupportBtn">Refresh</button></div>
           <p id="supportMessage" class="message-text" role="status"></p>
-          <section data-support-panel="history">
+          <section aria-labelledby="paymentHistoryHeading">
+          <h3 id="paymentHistoryHeading">Payment History</h3>
           <div class="overview-grid" id="paymentSummary"></div>
           <div class="table-scroll"><table class="customer-payment-table"><thead><tr><th>Date</th><th>Loan</th><th>Amount</th><th>Method</th><th>Receipt</th><th>Proof</th></tr></thead><tbody id="customerPaymentHistory"></tbody></table></div>
           </section>
-          <section data-support-panel="inquiry" class="hidden">
-            <h3>Submit an Inquiry</h3>
+          <section aria-labelledby="recordPaymentHeading">
+            <h3 id="recordPaymentHeading">Record Payment</h3>
+            <p>Select a loan to see its current outstanding balance. BMF verifies the balance again when reviewing your payment.</p>
+            <form id="customerRecordPaymentForm" class="auth-form">
+              <div class="request-field-grid two-up">
+                <label class="field-label">Loan<select id="recordPaymentLoanId" class="auth-input" required><option value="">Choose a loan...</option></select></label>
+                <div class="field-label">Current outstanding balance<output id="recordPaymentExpectedBalance" class="auth-input payment-balance-output" aria-live="polite">Choose a loan</output></div>
+              </div>
+              <div class="request-field-grid two-up">
+                <label class="field-label">Amount paid (K)<input id="recordPaymentAmount" class="auth-input" type="number" min="0.01" step="0.01" required placeholder="Amount you paid"></label>
+                <label class="field-label">Transaction reference<input id="recordPaymentReference" class="auth-input" required minlength="4" maxlength="64" placeholder="Reference from your transfer receipt"></label>
+              </div>
+              <div class="request-field-grid two-up">
+                <label class="field-label">Transfer method<select id="recordPaymentMode" class="auth-input" required><option value="">Select method...</option><option>Airtel Money</option><option>MTN MoMo</option><option>Bank Transfer</option></select></label>
+                <label class="field-label">Payment proof<input id="recordPaymentProof" class="auth-input" type="file" accept="image/jpeg,image/png,image/webp" required></label>
+              </div>
+              <label class="field-label">Notes (optional)<textarea id="recordPaymentNotes" class="auth-input" rows="3" placeholder="Any notes for the payment team."></textarea></label>
+              <button class="enter-btn" type="submit" id="recordPaymentSubmitBtn">Submit Payment for Review</button>
+            </form>
+          </section>
+          <section aria-labelledby="customerDueHeading"><h3 id="customerDueHeading">Due Schedule</h3><div id="customerDueSchedule"></div></section>
+          <section aria-labelledby="customerInquiryHeading">
+            <h3 id="customerInquiryHeading">Submit an Inquiry</h3>
             <form id="customerInquiryForm" class="auth-form">
               <div class="request-field-grid two-up">
                 <label class="field-label">Inquiry type<select id="inquiryType" class="auth-input" required><option value="">Select type...</option><option>Payment not recorded</option><option>Balance discrepancy</option><option>Loan status query</option><option>Extension request</option><option>Receipt request</option><option>Other</option></select></label>
-                <label class="field-label">Related loan ID (optional)<select id="inquiryLoanId" class="auth-input"><option value="">Choose a loan...</option></select></label>
+                <label class="field-label">Related loan (optional)<select id="inquiryLoanId" class="auth-input"><option value="">Choose a loan...</option></select></label>
               </div>
               <label class="field-label">Details<textarea id="inquiryDetails" class="auth-input" rows="4" required placeholder="Tell us how we can help."></textarea></label>
               <button class="enter-btn" type="submit" id="submitInquiryBtn">Submit Inquiry</button>
             </form>
             <h3>Previous Inquiries</h3><div id="customerInquiryHistory"><p>Loading inquiries...</p></div>
           </section>
-          <section data-support-panel="record-payment" class="hidden">
-            <h3>Record Payment</h3>
-            <p>Record a payment against an active loan. Your expected balance is locked from your loan record — enter the amount you paid and the receipt number. <strong>Find your receipt number in My Loans.</strong></p>
-            <form id="customerRecordPaymentForm" class="auth-form">
-              <div class="request-field-grid two-up">
-                <label class="field-label">Loan<select id="recordPaymentLoanId" class="auth-input" required><option value="">Choose a loan...</option></select></label>
-                <label class="field-label">Expected balance (K)<input id="recordPaymentExpectedBalance" class="auth-input" type="number" min="0" step="0.01" readonly required></label>
-              </div>
-              <div class="request-field-grid two-up">
-                <label class="field-label">Amount paid (K)<input id="recordPaymentAmount" class="auth-input" type="number" min="0.01" step="0.01" required placeholder="Amount you paid"></label>
-                <label class="field-label">Receipt number<input id="recordPaymentReceipt" class="auth-input" required placeholder="e.g. PAY-YYYYMMDD-0001"></label>
-              </div>
-              <div class="request-field-grid two-up">
-                <label class="field-label">Transfer method<select id="recordPaymentMode" class="auth-input" required><option value="">Select method...</option><option>Airtel Money</option><option>MTN MoMo</option><option>Bank Transfer</option><option>Cash</option><option>Other</option></select></label>
-                <label class="field-label">Payment proof (optional)<input id="recordPaymentProof" class="auth-input" type="file" accept="image/jpeg,image/png,image/webp"></label>
-              </div>
-              <label class="field-label">Notes (optional)<textarea id="recordPaymentNotes" class="auth-input" rows="3" placeholder="Any notes for the payment team."></textarea></label>
-              <button class="enter-btn" type="submit">Record Payment</button>
-            </form>
-          </section>
-          <section data-support-panel="schedule" class="hidden"><h3>Due Schedule</h3><div id="customerDueSchedule"></div></section>
         </div>
       </div>
 
@@ -817,10 +811,9 @@
 
     async function loadCustomerSupport() {
       const history = document.getElementById('customerInquiryHistory');
-      const loanSelect = document.getElementById('inquiryLoanId');
       const schedule = document.getElementById('customerDueSchedule');
       const token = localStorage.getItem('deviceToken') || '';
-      if (loanSelect) loanSelect.innerHTML = '<option value="">Choose a loan...</option>' + allLoans.map(loan => `<option value="${escapeHtml(loan.id)}">${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)} · ${escapeHtml(loan.product || 'Loan')}</option>`).join('');
+      populateSupportLoanOptions();
       if (schedule) {
         const dueLoans = allLoans.filter(loan => Number(loan.outstanding) > 0).sort((a,b) => String(a.dueDate || '').localeCompare(String(b.dueDate || '')));
         schedule.innerHTML = dueLoans.length ? `<div class="table-scroll"><table class="customer-payment-table"><thead><tr><th>Loan</th><th>Due date</th><th>Balance</th><th>Status</th></tr></thead><tbody>${dueLoans.map(loan => `<tr><td>${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</td><td>${escapeHtml(formatDateDisplay(loan.dueDate))}</td><td>${formatKwacha(loan.outstanding)}</td><td>${escapeHtml(formatStatusLabel(loanStatusOf(loan)))}</td></tr>`).join('')}</tbody></table></div>` : '<p>No outstanding loans.</p>';
@@ -837,9 +830,40 @@
       } catch (error) { history.textContent = error.message || 'Unable to load inquiries.'; return false; }
     }
 
-    function selectSupportView(view) {
-      document.querySelectorAll('[data-support-panel]').forEach(panel => panel.classList.toggle('hidden', panel.dataset.supportPanel !== view));
-      document.querySelectorAll('[data-support-view]').forEach(button => button.classList.toggle('active', button.dataset.supportView === view));
+    function populateSupportLoanOptions() {
+      const inquiryLoanSelect = document.getElementById('inquiryLoanId');
+      const paymentLoanSelect = document.getElementById('recordPaymentLoanId');
+      const allLoanOptions = allLoans.map(loan => `<option value="${escapeHtml(loan.id)}">${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)} · ${escapeHtml(loan.product || 'Loan')}</option>`).join('');
+      const eligibleLoans = allLoans.filter(loan => ['active', 'grace', 'defaulted'].includes(loanStatusOf(loan)) && Number(loan.outstanding) > 0);
+      const paymentOptions = eligibleLoans.map(loan => `<option value="${escapeHtml(loan.id)}">${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)} · ${escapeHtml(loan.product || 'Loan')}</option>`).join('');
+      if (inquiryLoanSelect) {
+        const selectedLoanId = inquiryLoanSelect.value;
+        inquiryLoanSelect.innerHTML = '<option value="">Choose a loan...</option>' + allLoanOptions;
+        if (allLoans.some(loan => String(loan.id) === selectedLoanId)) inquiryLoanSelect.value = selectedLoanId;
+      }
+      if (paymentLoanSelect) {
+        const selectedLoanId = paymentLoanSelect.value;
+        paymentLoanSelect.innerHTML = '<option value="">Choose a loan...</option>' + paymentOptions;
+        if (eligibleLoans.some(loan => String(loan.id) === selectedLoanId)) paymentLoanSelect.value = selectedLoanId;
+        updateRecordPaymentBalance();
+      }
+    }
+
+    function updateRecordPaymentBalance() {
+      const loanSelect = document.getElementById('recordPaymentLoanId');
+      const balanceOutput = document.getElementById('recordPaymentExpectedBalance');
+      const amountInput = document.getElementById('recordPaymentAmount');
+      if (!loanSelect || !balanceOutput || !amountInput) return;
+      const loan = allLoans.find(item => String(item.id) === loanSelect.value &&
+        ['active', 'grace', 'defaulted'].includes(loanStatusOf(item)) && Number(item.outstanding) > 0);
+      if (!loan) {
+        balanceOutput.textContent = 'Choose a loan';
+        amountInput.removeAttribute('max');
+        return;
+      }
+      const outstanding = Number(loan.outstanding);
+      balanceOutput.textContent = formatKwacha(outstanding);
+      amountInput.max = outstanding.toFixed(2);
     }
 
     function renderOverviewSummary(loans) {
@@ -1091,6 +1115,7 @@
         }
 
         allLoans = data.loans || [];
+        populateSupportLoanOptions();
         const totalLoans = data.summary?.total || 0;
         const outstanding = data.summary?.outstanding || 0;
         document.getElementById('loanTotal').textContent = `${totalLoans} loan${totalLoans === 1 ? '' : 's'}`;
@@ -1206,7 +1231,7 @@
       button.disabled = true; button.textContent = 'Refreshing…';
       try { await loadCustomerReport(); } finally { button.disabled = false; button.textContent = 'Refresh report'; }
     });
-    document.querySelectorAll('[data-support-view]').forEach(button => button.addEventListener('click', () => selectSupportView(button.dataset.supportView)));
+    document.getElementById('recordPaymentLoanId')?.addEventListener('change', updateRecordPaymentBalance);
     document.getElementById('refreshSupportBtn')?.addEventListener('click', async event => {
       const button = event.currentTarget; const note = document.getElementById('supportMessage');
       button.disabled = true; button.textContent = 'Refreshing…'; note.textContent = 'Refreshing payment history and support…';
@@ -1216,33 +1241,61 @@
     });
     document.getElementById('customerInquiryForm')?.addEventListener('submit', async event => {
       event.preventDefault();
+      const form = event.currentTarget;
       const button = document.getElementById('submitInquiryBtn'); const note = document.getElementById('supportMessage');
-      button.disabled = true; button.textContent = 'Recording inquiry'; note.textContent = 'Recording payment';
+      const category = document.getElementById('inquiryType').value;
+      const details = document.getElementById('inquiryDetails').value.trim();
+      const relatedLoanId = document.getElementById('inquiryLoanId').value;
+      button.disabled = true; button.textContent = 'Submitting…'; note.textContent = 'Submitting your inquiry…';
+      try {
+        const response = await fetch('/feedback', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-device-token': localStorage.getItem('deviceToken') || '' },
+          body: JSON.stringify({ category: 'inquiry', message: `${category}: ${details}`, relatedLoanId })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Could not submit your inquiry.');
+        form.reset();
+        note.textContent = 'Inquiry submitted successfully.';
+        showBmfToast('Inquiry submitted successfully.');
+        await loadCustomerSupport();
+      } catch (error) { note.textContent = `Could not submit your inquiry: ${error.message}`; }
+      finally { button.disabled = false; button.textContent = 'Submit Inquiry'; }
+    });
+    document.getElementById('customerRecordPaymentForm')?.addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = document.getElementById('recordPaymentSubmitBtn'); const note = document.getElementById('supportMessage');
       const loanId = document.getElementById('recordPaymentLoanId').value;
-      if (!loanId) { note.textContent = 'Please choose a loan.'; return; }
+      const loan = allLoans.find(item => String(item.id) === loanId &&
+        ['active', 'grace', 'defaulted'].includes(loanStatusOf(item)) && Number(item.outstanding) > 0);
+      const amount = Number(document.getElementById('recordPaymentAmount').value);
+      if (!loan) { note.textContent = 'Choose an eligible loan with an outstanding balance.'; return; }
+      if (!Number.isFinite(amount) || amount < 0.01 || amount > Number(loan.outstanding) || amount !== Number(amount.toFixed(2))) {
+        note.textContent = "Enter an amount up to the loan's current outstanding balance, with no more than two decimal places.";
+        return;
+      }
+      button.disabled = true; button.textContent = 'Submitting…'; note.textContent = 'Submitting payment proof for review…';
       try {
         const formData = new FormData();
-        formData.append('amount', document.getElementById('recordPaymentAmount').value);
-        formData.append('mode', document.getElementById('recordPaymentMode').value || 'Cash');
-        formData.append('transactionReference', document.getElementById('recordPaymentReceipt').value.trim());
-        const proof = document.getElementById('recordPaymentProof').files[0];
-        if (proof) formData.append('paymentProof', proof);
+        formData.append('amount', String(amount));
+        formData.append('mode', document.getElementById('recordPaymentMode').value);
+        formData.append('transactionReference', document.getElementById('recordPaymentReference').value.trim());
+        formData.append('paymentProof', document.getElementById('recordPaymentProof').files[0]);
         const notes = document.getElementById('recordPaymentNotes').value.trim();
         if (notes) formData.append('note', notes);
-
-        const response = await fetch(`/loans/${loanId}/payment-submissions`, {
+        const response = await fetch(`/loans/${encodeURIComponent(loanId)}/payment-submissions`, {
           method: 'POST', headers: { 'x-device-token': localStorage.getItem('deviceToken') || '' }, body: formData
         });
         const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.error || 'Could not record payment.');
-        event.currentTarget.reset();
-        document.getElementById('recordPaymentExpectedBalance').value = '0';
-        note.textContent = 'Payment recorded successfully. It will be reviewed by BMF.';
-        showBmfToast('Payment recorded successfully.');
+        if (!response.ok) throw new Error(result.error || 'Could not submit payment proof.');
+        form.reset();
+        updateRecordPaymentBalance();
+        note.textContent = 'Payment proof submitted. Your balance will change after BMF approves it.';
+        showBmfToast('Payment proof submitted for review.');
         await loadLoans(currentHistoryFilter);
         await loadCustomerSupport();
-      } catch (error) { note.textContent = `Could not record payment: ${error.message}`; }
-      finally { button.disabled = false; button.textContent = 'Record Payment'; }
+      } catch (error) { note.textContent = `Could not submit payment proof: ${error.message}`; }
+      finally { button.disabled = false; button.textContent = 'Submit Payment for Review'; }
     });
 
     document.querySelectorAll('.support-link').forEach(button => {
@@ -1449,5 +1502,3 @@
   </div>
 </body>
 </html>
-
-
