@@ -3,18 +3,21 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const routes = require('../routes');
+const applyRouter = require('../routes/apply');
 
 // ─── Route wiring test: every endpoint the frontend calls must exist on the   ───
 // ─── router, otherwise a button silently dies with 404 ("spinal cord" check). ───
 
 function collectRegisteredRoutes() {
   const registered = [];
-  for (const layer of routes.stack) {
-    if (!layer.route) continue;
-    const routePath = layer.route.path;
-    const methods = Object.keys(layer.route.methods);
-    for (const method of methods) {
-      registered.push({ method: method.toUpperCase(), path: routePath });
+  for (const [router, prefix] of [[routes, ''], [applyRouter, '/api/apply']]) {
+    for (const layer of router.stack) {
+      if (!layer.route) continue;
+      const routePath = `${prefix}${layer.route.path === '/' ? '' : layer.route.path}`;
+      const methods = Object.keys(layer.route.methods);
+      for (const method of methods) {
+        registered.push({ method: method.toUpperCase(), path: routePath || '/' });
+      }
     }
   }
   return registered;

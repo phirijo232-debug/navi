@@ -5,9 +5,11 @@ const { findUserByDeviceToken } = require('../middleware/security');
 const { canAccessRecord, isAdminRole } = require('../middleware/storeScope');
 const { logError } = require('../middleware/logger');
 const { verifyUploadSig, signUploadQuery, TTL_SECONDS } = require('../middleware/signedUrl');
+const dataStore = require('../middleware/dataStore');
 
 const UPLOAD_DIR = path.join(__dirname, '../public/uploads');
 const ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
+const APPLICATIONS_FILE = dataStore.paths.applications || path.join(dataStore.DATA_DIR, 'applications.json');
 
 // Strict allowlist: reject traversal, separators, and non-image extensions.
 function safeFilename(raw) {
@@ -38,7 +40,7 @@ function canViewFile(user, filename) {
   if (!user) return false;
   const requester = String(user.email || '').trim().toLowerCase();
   const admin = isAdminRole(user.role);
-  return getLoansData().some(loan => {
+  const referencedByLoan = getLoansData().some(loan => {
     const referenced = loan.collateralFront === filename
       || loan.collateralBack === filename
       || loan.nrcFront === filename
@@ -48,6 +50,18 @@ function canViewFile(user, filename) {
     if (!referenced) return false;
     if (admin) return canAccessRecord({ authUser: user, headers: {} }, loan);
     return String(loan.email || '').trim().toLowerCase() === requester;
+  });
+  if (referencedByLoan) return true;
+
+  const applications = dataStore.readJson(APPLICATIONS_FILE, [], Array.isArray);
+  return applications.some(application => {
+    const referenced = application.nrcFront === filename
+      || application.nrcBack === filename
+      || application.collateralFront === filename
+      || application.collateralBack === filename;
+    if (!referenced) return false;
+    if (admin) return canAccessRecord({ authUser: user, headers: {} }, application);
+    return String(application.email || '').trim().toLowerCase() === requester;
   });
 }
 

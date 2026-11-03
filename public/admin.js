@@ -1,5 +1,6 @@
 let allUsers = [];
 let registeredUsers = [];
+let customerApplications = [];
 let customerLoans = [];
 let customerLoansError = '';
 let customerLoansLoaded = false;
@@ -57,6 +58,7 @@ let paymentDirectoryPage = 1;
 let showAllAdminNotifications = false;
 let activeAdminPage = 'portfolioOverview';
 let createUserReturnPage = 'portfolioOverview';
+let adminPageHistory = [];
 
 function openCreateUserModal(mode = 'customer') {
   createUserReturnPage = activeAdminPage || 'portfolioOverview';
@@ -277,12 +279,29 @@ function setAdminPageVisibility(activeId) {
   activeAdminPage = activeId || '';
 }
 
-function showAdminPage(pageId) {
+function ensureAdminPageBackButton(page) {
+  if (page.id === 'portfolioOverview' || page.querySelector('[data-admin-back]')) return;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'admin-page-back';
+  button.dataset.adminBack = '';
+  button.textContent = '← Back';
+  button.setAttribute('aria-label', 'Return to the previous admin page');
+  page.insertBefore(button, page.firstChild);
+}
+
+function showAdminPage(pageId, { recordHistory = true } = {}) {
   if (!ensureAdminAccess()) return false;
   const page = document.getElementById(pageId);
   if (!page || !page.classList.contains('admin-page')) {
     throw new Error(`Unknown admin page: ${pageId}`);
   }
+  if (pageId === 'portfolioOverview') {
+    adminPageHistory = [];
+  } else if (recordHistory && activeAdminPage && activeAdminPage !== pageId) {
+    adminPageHistory.push(activeAdminPage);
+  }
+  ensureAdminPageBackButton(page);
   setViewVisibility('storeSelect', false);
   setViewVisibility('adminAuth', false);
   setViewVisibility('adminDashboard', true);
@@ -305,6 +324,11 @@ function showAdminPage(pageId) {
     if (!customerLoansLoaded) fetchCustomerLoans();
   }
   return true;
+}
+
+function goBackAdminPage() {
+  const previous = adminPageHistory.pop() || 'portfolioOverview';
+  showAdminPage(previous, { recordHistory: false });
 }
 
 // ─── Logged-in admin header (topbar) ─────────────────────────────────────────
@@ -584,6 +608,14 @@ async function openSignedUpload(filename) {
 
 document.addEventListener('click', (event) => {
   const target = event.target;
+  const backButton = target && typeof target.closest === 'function'
+    ? target.closest('[data-admin-back]')
+    : null;
+  if (backButton) {
+    goBackAdminPage();
+    return;
+  }
+
   const link = target && typeof target.closest === 'function'
     ? target.closest('[data-upload-filename]')
     : null;
@@ -695,12 +727,14 @@ async function fetchUsers() {
     const enrichmentResults = await Promise.allSettled([
       fetchStoreFeedback(),
       fetchNewRequests(),
-      fetchCustomerLoans()
+      fetchCustomerLoans(),
+      fetchCustomerApplications()
     ]);
     const loanDetailsLoaded = enrichmentResults[2].status === 'fulfilled' && enrichmentResults[2].value === true;
+    const applicationDetailsLoaded = enrichmentResults[3].status === 'fulfilled' && enrichmentResults[3].value === true;
     if (directoryStatus) {
       directoryStatus.textContent = allUsers.length
-        ? `${allUsers.length} registered customer records${loanDetailsLoaded ? ' · loan details loaded from Loan Management.' : ' · loan details are temporarily unavailable.'}`
+        ? `${allUsers.length} customer records${loanDetailsLoaded ? ' · loan details loaded.' : ' · loan details are temporarily unavailable.'}${applicationDetailsLoaded ? ' · Quick Screen applicants included.' : ' · Quick Screen applicants could not be loaded.'}`
         : 'No registered customer accounts were returned for this scope.';
     }
     applyUserFilterAndSort();
@@ -753,7 +787,57 @@ function mergeLoanOnlyCustomers(loans = customerLoans) {
       loanOnly: true
     });
   });
-  allUsers = registeredUsers.concat([...loanCustomers.values()]);
+  const mergedUsers = registeredUsers.concat([...loanCustomers.values()]);
+  const byEmail = new Map(mergedUsers.map(user => [String(user.email || '').trim().toLowerCase(), user]));
+  const applicationsByEmail = new Map();
+  customerApplications.forEach(application => {
+    const email = String(application.email || '').trim().toLowerCase();
+    if (!email) return;
+    if (!applicationsByEmail.has(email)) applicationsByEmail.set(email, []);
+    applicationsByEmail.get(email).push(application);
+  });
+  applicationsByEmail.forEach((applications, email) => {
+    applications.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    const existing = byEmail.get(email);
+    if (existing) {
+      existing.quickScreenApplications = applications;
+      return;
+    }
+    const latest = applications[0];
+    mergedUsers.push({
+      id: `quick-screen:${latest.applicationId || latest.id}`,
+      email,
+      username: latest.fullName || email,
+      phone: latest.phone || '',
+      nrc: latest.nrcNumber || '',
+      storeId: latest.storeId || 'buraza',
+      createdAt: latest.createdAt || '',
+      role: 'user',
+      quickScreenApplicant: true,
+      quickScreenApplications: applications
+    });
+  });
+  allUsers = mergedUsers;
+}
+
+async function fetchCustomerApplications() {
+  try {
+    const params = addAllStoreScope(new URLSearchParams());
+    const response = await fetch(`/api/apply?${params}`, { headers: getCustomerScopeHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to load Quick Screen applicants.');
+    if (!Array.isArray(data.applications)) throw new Error('The application service returned an unexpected customer format.');
+    customerApplications = data.applications;
+    mergeLoanOnlyCustomers();
+    if (activeAdminPage === 'customersView') applyUserFilterAndSort();
+    return true;
+  } catch (error) {
+    console.error('Quick Screen customer enrichment failed:', error);
+    customerApplications = [];
+    mergeLoanOnlyCustomers();
+    if (activeAdminPage === 'customersView') applyUserFilterAndSort();
+    return false;
+  }
 }
 
 async function fetchCustomerLoans() {
@@ -1739,7 +1823,7 @@ async function reviewApplication(appId, action, providedNote) {
     }
   }
   try {
-    const response = await fetch('/api/apply/' + encodeURIComponent(appId), {
+    const response = await fetch(`/api/apply/${encodeURIComponent(appId)}`, {
       method: 'PATCH',
       headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ action, note })
@@ -1809,7 +1893,7 @@ function renderUsers(users) {
     return `
       <tr>
         <td>${escapeHtml(user.id ?? '—')}</td>
-        <td><strong>${escapeHtml(user.username || 'Unknown user')}</strong>${user.loanOnly ? '<small class="table-subtext">Loan record only</small>' : ''}</td>
+        <td><strong>${escapeHtml(user.username || 'Unknown user')}</strong>${user.quickScreenApplicant ? '<small class="table-subtext">Quick Screen applicant · not registered</small>' : user.loanOnly ? '<small class="table-subtext">Loan record only</small>' : user.quickScreenApplications?.length ? '<small class="table-subtext">Quick Screen applicant</small>' : ''}</td>
         <td>${escapeHtml(user.phone || '—')}</td>
         <td>${escapeHtml(user.email || '—')}</td>
         <td>${escapeHtml(user.nrc || user.nrcNumber || '—')}</td>
@@ -2094,12 +2178,27 @@ function renderSelectedUser() {
   );
 
   const canNotifyUser = ['admin', 'franchise_admin', 'store_admin'].includes(localStorage.getItem('userRole') || '');
+  const applicationHistory = (selectedUser.quickScreenApplications || []).map(application => `
+    <article class="customer-application-summary">
+      <h3>Quick Screen application ${escapeHtml(application.applicationId || application.id || '')}</h3>
+      <p><strong>Status:</strong> ${escapeHtml(formatStatus(application.status || 'pending'))} · <strong>Submitted:</strong> ${escapeHtml(formatDate(application.createdAt))}</p>
+      <p><strong>Product:</strong> ${escapeHtml(application.product || '—')} · <strong>Requested:</strong> ${formatCurrency(application.amount)}</p>
+      <p><strong>Tenure:</strong> ${escapeHtml(application.tenureWeeks || '—')} week(s) · <strong>Urgency:</strong> ${escapeHtml(formatStatus(application.urgency || 'standard'))}</p>
+      <div class="customer-application-files">
+        ${application.nrcFront ? `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(application.nrcFront)}">View NRC front</a>` : ''}
+        ${application.nrcBack ? `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(application.nrcBack)}">View NRC back</a>` : ''}
+        ${application.collateralFront ? `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(application.collateralFront)}">View collateral front</a>` : ''}
+        ${application.collateralBack ? `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(application.collateralBack)}">View collateral back</a>` : ''}
+      </div>
+    </article>
+  `).join('');
 
   modalBody.innerHTML = `
     <h2>Customer: ${escapeHtml(selectedUser.username || 'Unknown user')}</h2>
     <p><strong>Email:</strong> ${escapeHtml(selectedUser.email)}</p>
     <p><strong>Phone:</strong> ${escapeHtml(selectedUser.phone || 'N/A')}</p>
-    <p><strong>Role:</strong> ${escapeHtml(selectedUser.role || 'user')}</p>
+    <p><strong>Record:</strong> ${selectedUser.quickScreenApplicant ? 'Quick Screen applicant (not a registered login)' : escapeHtml(selectedUser.role || 'user')}</p>
+    ${applicationHistory ? `<section class="customer-application-history"><h3>Quick Screen history</h3>${applicationHistory}</section>` : ''}
     ${canNotifyUser ? `
     <div class="button-row" style="margin: 10px 0;">
       <button class="toggle-mode" type="button" data-notify-user>Notify this customer</button>
@@ -2251,9 +2350,10 @@ function closeCreateUserModal() {
   document.getElementById('newUserRole').querySelector('option[value="user"]').hidden = false;
   document.getElementById('createUserTitle').textContent = 'Create New User';
   const returnPage = createUserReturnPage;
+  if (adminPageHistory[adminPageHistory.length - 1] === returnPage) adminPageHistory.pop();
   createUserMode = 'customer';
   setCreateUserMessage('');
-  showAdminPage(returnPage);
+  showAdminPage(returnPage, { recordHistory: false });
 }
 
 function closeAnnouncementModal() {
@@ -2865,13 +2965,15 @@ async function verifyStoreSwitchOtp(event) {
 }
 
 // ─── Add New Loan (admin manual entry) ───────────────────────────────────────
-function openAddLoanModal() {
+async function openAddLoanModal() {
+  if (!usersLoaded) await fetchUsers();
   const select = document.getElementById('addLoanCustomer');
-  select.innerHTML = '<option value="">Select a customer…</option>' +
-    allUsers
-      .filter(user => !['admin', 'franchise_admin', 'store_admin'].includes(user.role))
+  const customers = registeredUsers.filter(user => !['admin', 'franchise_admin', 'store_admin'].includes(user.role));
+  select.innerHTML = customers.length
+    ? '<option value="">Select a registered customer…</option>' + customers
       .map(user => `<option value="${escapeHtml(user.email)}">${escapeHtml(user.username || '')} — ${escapeHtml(user.email || '')}</option>`)
-      .join('');
+      .join('')
+    : '<option value="" disabled selected>No registered customers found</option>';
   document.getElementById('addLoanFeedback').textContent = '';
   updateAddLoanPreview();
   document.getElementById('addLoanModal').style.display = 'block';
@@ -3002,6 +3104,7 @@ document.getElementById('announcementForm').addEventListener('submit', handleAnn
 document.getElementById('notifyOverdueBtn').addEventListener('click', notifyAllOverdue);
 document.getElementById('createUserForm').addEventListener('submit', handleCreateUser);
 document.getElementById('addLoanBtn').addEventListener('click', openAddLoanModal);
+document.getElementById('addLoanFromLoansBtn')?.addEventListener('click', openAddLoanModal);
 document.getElementById('addLoanForm').addEventListener('submit', handleAddLoanSubmit);
 document.getElementById('addLoanAmount').addEventListener('input', updateAddLoanPreview);
 document.getElementById('addLoanTenure').addEventListener('change', updateAddLoanPreview);
@@ -3201,7 +3304,7 @@ document.getElementById('adminDashboard')?.addEventListener('click', event => {
             showStoreSelection();
           }
         },
-        logout: () => document.getElementById('logoutBtn')?.click()
+        logout: logoutAdmin
       };
       actions[action]?.();
     }

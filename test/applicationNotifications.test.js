@@ -5,6 +5,8 @@ const path = require('node:path');
 const express = require('express');
 const dataStore = require('../middleware/dataStore');
 const applyRouter = require('../routes/apply');
+const emailService = require('../middleware/email');
+const { getNotifications } = require('../controllers/loanController');
 
 const APPLICATIONS_FILE = dataStore.paths.applications || path.join(dataStore.DATA_DIR, 'applications.json');
 const NOTIFICATIONS_FILE = dataStore.paths.notifications;
@@ -38,6 +40,65 @@ test('public Quick Screen submission bypasses device auth while other applicatio
 
   const protectedList = await fetch(baseUrl);
   assert.equal(protectedList.status, 403, 'application listing must still require device authentication');
+});
+
+test('Quick Screen applications appear in admin notifications and send an admin email', async t => {
+  const files = [APPLICATIONS_FILE, NOTIFICATIONS_FILE, USERS_FILE];
+  const originals = files.map(file => fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null);
+  const deliveries = [];
+  t.mock.method(emailService, 'sendCustomerEmail', async message => {
+    deliveries.push(message);
+    return { ok: true };
+  });
+  const app = express();
+  app.use('/api/apply', applyRouter);
+  const server = app.listen(0);
+  t.after(async () => {
+    await new Promise(resolve => server.close(resolve));
+    files.forEach((file, index) => {
+      if (originals[index] === null) {
+        if (fs.existsSync(file)) fs.unlinkSync(file);
+      } else {
+        fs.writeFileSync(file, originals[index]);
+      }
+    });
+  });
+
+  dataStore.writeJson(USERS_FILE, [
+    { email: 'main-admin@example.test', role: 'admin' }
+  ]);
+  dataStore.writeJson(APPLICATIONS_FILE, []);
+  dataStore.writeJson(NOTIFICATIONS_FILE, []);
+
+  const form = new FormData();
+  form.set('fullName', 'Quick Screen Applicant');
+  form.set('email', 'applicant@example.test');
+  form.set('phone', '0977123456');
+  form.set('nrcNumber', '123456/78/1');
+  form.set('product', 'Business equipment');
+  form.set('amount', '100');
+  form.set('tenureWeeks', '1');
+  form.set('agreedToTerms', 'true');
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/apply`, {
+    method: 'POST',
+    body: form
+  });
+
+  assert.equal(response.status, 201);
+  const application = (await response.json()).applicationId;
+  const savedNotifications = dataStore.readJson(NOTIFICATIONS_FILE, [], Array.isArray);
+  assert.ok(savedNotifications.some(item =>
+    item.applicationId === application &&
+    item.recipientEmail === 'main-admin@example.test' &&
+    item.type === 'application-request'
+  ));
+  const adminInbox = { json(body) { this.body = body; return this; } };
+  getNotifications({ authUser: { email: 'main-admin@example.test', role: 'admin' } }, adminInbox);
+  assert.ok(adminInbox.body.some(item => item.applicationId === application && item.type === 'application-request'));
+  assert.ok(deliveries.some(item => item.to === 'applicant@example.test'));
+  const adminEmail = deliveries.find(item => item.subject.includes('New BMF Loan Application'));
+  assert.ok(adminEmail, 'an administrator application email should be sent');
+  assert.ok(!String(adminEmail.to).includes('applicant@example.test'));
 });
 
 test('Quick Screen notifications are store-scoped, backfilled, and idempotent', async t => {

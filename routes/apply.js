@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { logError, logBreakage } = require('../middleware/logger');
-const { sendCustomerEmail } = require('../middleware/email');
+const emailService = require('../middleware/email');
 const config = require('../config');
 const dataStore = require('../middleware/dataStore');
 const { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, isAdminRole } = require('../middleware/storeScope');
@@ -180,22 +180,31 @@ router.post('/', upload.fields([
     const interest = application.amount * rate;
     const totalRepayment = application.amount + interest;
 
+    const applicantEmail = {
+      to: application.email,
+      subject: `BMF Loan Application Received — ${application.applicationId}`,
+      text: `Good day ${application.fullName},\n\nThank you for applying for a BMF loan. Your application has been received and is under review.\n\nApplication reference: ${application.applicationId}\nProduct: ${application.product}\nRequested amount: K ${application.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nTenure: ${application.tenureWeeks} week${application.tenureWeeks === 1 ? '' : 's'}\nUrgency: ${application.urgency}\nEstimated interest: K ${interest.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nTotal repayment: K ${totalRepayment.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\nA BMF loan officer will review your application and contact you shortly.\n\nWarm regards,\nThe BMF Team`
+    };
     try {
-      await sendCustomerEmail({
-        to: application.email,
-        subject: `BMF Loan Application Received — ${application.applicationId}`,
-        text: `Good day ${application.fullName},\n\nThank you for applying for a BMF loan. Your application has been received and is under review.\n\nApplication reference: ${application.applicationId}\nProduct: ${application.product}\nRequested amount: K ${application.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nTenure: ${application.tenureWeeks} week${application.tenureWeeks === 1 ? '' : 's'}\nUrgency: ${application.urgency}\nEstimated interest: K ${interest.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nTotal repayment: K ${totalRepayment.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\nA BMF loan officer will review your application and contact you shortly.\n\nWarm regards,\nThe BMF Team`
-      }).catch(() => {});
+      const applicantDelivery = await emailService.sendCustomerEmail(applicantEmail);
+      if (!applicantDelivery.ok) {
+        logError(`APPLICATION CONFIRMATION EMAIL ${applicantDelivery.skipped ? 'SKIPPED' : 'FAILED'} for ${application.applicationId}: ${applicantDelivery.reason || 'delivery failed'}`);
+      }
     } catch (emailErr) {
-      logError(`APPLICATION CONFIRMATION EMAIL FAILED: ${emailErr.message}`);
+      logError(`APPLICATION CONFIRMATION EMAIL FAILED for ${application.applicationId}: ${emailErr.message}`);
     }
 
     try {
-      await sendCustomerEmail({
-        to: process.env.ADMIN_EMAILS,
+      const adminRecipients = emailService.getNotificationRecipients(application.email)
+        .filter(recipient => recipient.toLowerCase() !== application.email.toLowerCase());
+      const adminDelivery = await emailService.sendCustomerEmail({
+        to: adminRecipients,
         subject: `New BMF Loan Application — ${application.applicationId}`,
         text: `A new loan application has been submitted and awaits review.\n\nApplication ID: ${application.applicationId}\nApplicant: ${application.fullName}\nEmail: ${application.email}\nPhone: ${application.phone}\nNRC: ${application.nrcNumber}\nPurpose: ${application.product}\nAmount: K ${application.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nTenure: ${application.tenureWeeks} week${application.tenureWeeks === 1 ? '' : 's'}\nUrgency: ${application.urgency}\nSubmitted: ${new Date().toISOString()}\n\nReview this application in the BMF Admin panel under Applications.\n\n— BMF System`
-      }).catch(() => {});
+      });
+      if (!adminDelivery.ok) {
+        logError(`APPLICATION ADMIN EMAIL ${adminDelivery.skipped ? 'SKIPPED' : 'FAILED'} for ${application.applicationId}: ${adminDelivery.reason || 'delivery failed'}`);
+      }
     } catch (adminEmailErr) {
       logError(`APPLICATION ADMIN ALERT EMAIL FAILED: ${adminEmailErr.message}`);
     }

@@ -112,6 +112,12 @@ test('admin directories expose wired filters, bounded paging, and application be
     assert.ok(html.includes(`id="${id}"`), `${id} must exist in the admin page`);
   }
   assert.match(js, /function getDirectoryPage\(items, page, pageSize/);
+  assert.match(js, /async function fetchCustomerApplications\(\)/);
+  assert.match(js, /quickScreenApplicant: true/);
+  assert.match(js, /Quick Screen applicant · not registered/);
+  assert.match(js, /function goBackAdminPage\(\)/);
+  assert.match(js, /data-admin-back/);
+  assert.match(js, /addLoanFromLoansBtn/);
   assert.match(js, /data-notification-application-action="approve"/);
   assert.match(js, /data-notification-application-action="reject"/);
   assert.match(js, /data-notification-application-action="view"/);

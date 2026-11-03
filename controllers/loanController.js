@@ -42,7 +42,7 @@ function getNotifications(req, res) {
       : String(loan.email || '').toLowerCase() === email).map(loan => Number(loan.id)));
     return res.json(records.filter(n => n.kind === 'in-app' &&
       ((String(n.recipientEmail || '').toLowerCase() === email) ||
-        (isAdminRole(user.role) && !n.recipientEmail && ['loan-request', 'payment-review'].includes(n.type) && allowedLoanIds.has(Number(n.loanId))))));
+        (isAdminRole(user.role) && !n.recipientEmail && ['loan-request', 'payment-review', 'admin-loan-created'].includes(n.type) && allowedLoanIds.has(Number(n.loanId))))));
   } catch (err) {
     logError(`GET_NOTIFICATIONS FAILED: ${err.message}`);
     return res.status(503).json({ error: 'Notifications are temporarily unavailable.' });
@@ -58,7 +58,7 @@ function markNotificationRead(req, res) {
     if (!item) return res.status(404).json({ error: 'Notification not found.' });
     const own = item.recipientEmail === String(user.email).toLowerCase();
     const loan = getLoansData().find(l => Number(l.id) === Number(item.loanId));
-    const scoped = isAdminRole(user.role) && !item.recipientEmail && ['loan-request', 'payment-review'].includes(item.type) && loan &&
+    const scoped = isAdminRole(user.role) && !item.recipientEmail && ['loan-request', 'payment-review', 'admin-loan-created'].includes(item.type) && loan &&
       canAccessRecord({ authUser: user, headers: {} }, loan);
     if (!own && !scoped) return res.status(404).json({ error: 'Notification not found.' });
     item.readAt = item.readAt || new Date().toISOString();
@@ -1410,8 +1410,7 @@ async function notifyAllOverdue(req, res) {
 }
 
 // Admin manual loan entry — creates an already-disbursed (active) loan for a
-// registered customer, bypassing the borrower-only guard on requestLoan. No
-// customer email is sent (admin is recording an agreed, in-person loan).
+// registered customer, bypassing the borrower-only guard on requestLoan.
 async function createAdminLoan(req, res) {
   try {
     if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'Admin access required to create loans.' });
@@ -1518,6 +1517,59 @@ async function createAdminLoan(req, res) {
     rebuildPaymentLedger(newLoan);
     loans.push(newLoan);
     saveLoansData(loans);
+
+    try {
+      addInAppNotification(
+        newLoan.email,
+        'admin-loan-created',
+        `A new active loan ${newLoan.receiptNumber} was created for you.`,
+        newLoan.id,
+        { storeId: newLoan.storeId }
+      );
+      addAdminInAppNotification(
+        'admin-loan-created',
+        `A new active loan was created for ${newLoan.email}: ${newLoan.receiptNumber}.`,
+        newLoan.id,
+        { storeId: newLoan.storeId }
+      );
+    } catch (notificationErr) {
+      logError(`ADMIN LOAN IN-APP NOTIFICATION FAILED for loan ${newLoan.id}: ${notificationErr.message}`);
+    }
+
+    const customerNotice = emailService.buildLoanStatusNotification(
+      'approve',
+      newLoan.product,
+      reason,
+      newLoan.email,
+      newLoan
+    );
+    try {
+      const customerDelivery = await emailService.sendCustomerEmail({
+        to: newLoan.email,
+        subject: `New BMF loan created — ${newLoan.receiptNumber}`,
+        text: customerNotice.body
+      });
+      if (!customerDelivery.ok) {
+        logError(`ADMIN LOAN CUSTOMER EMAIL ${customerDelivery.skipped ? 'SKIPPED' : 'FAILED'} for loan ${newLoan.id}: ${customerDelivery.reason || 'delivery failed'}`);
+      }
+    } catch (mailErr) {
+      logError(`ADMIN LOAN CUSTOMER EMAIL FAILED for loan ${newLoan.id}: ${mailErr.message}`);
+    }
+
+    const adminRecipients = emailService.getNotificationRecipients(newLoan.email)
+      .filter(recipient => recipient.toLowerCase() !== newLoan.email.toLowerCase());
+    try {
+      const adminDelivery = await emailService.sendCustomerEmail({
+        to: adminRecipients,
+        subject: `BMF admin loan created — ${newLoan.receiptNumber}`,
+        text: `An admin created and activated a loan.\n\nBorrower: ${newLoan.email}\nLoan receipt: ${newLoan.receiptNumber}\nProduct: ${newLoan.product}\nPrincipal: ${formatCurrency(newLoan.amount)}\nTotal repayment: ${formatCurrency(newLoan.totalRepayment)}\nDue date: ${newLoan.dueDate}\nCreated by: ${activatingAdmin}\nReason: ${reason}`
+      });
+      if (!adminDelivery.ok) {
+        logError(`ADMIN LOAN ADMIN EMAIL ${adminDelivery.skipped ? 'SKIPPED' : 'FAILED'} for loan ${newLoan.id}: ${adminDelivery.reason || 'delivery failed'}`);
+      }
+    } catch (mailErr) {
+      logError(`ADMIN LOAN ADMIN EMAIL FAILED for loan ${newLoan.id}: ${mailErr.message}`);
+    }
 
     res.status(201).json({
       message: 'Loan created and marked active.',
