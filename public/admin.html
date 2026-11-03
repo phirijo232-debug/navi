@@ -3,21 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script>(function(){try{var m=localStorage.getItem('mode')==='light'?'light':'dark';document.documentElement.classList.add(m);}catch(_){document.documentElement.classList.add('dark');}})();</script>
+  <script>document.documentElement.classList.add('dark');</script>
   <title>PrymeBMF Admin — Dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="style.css?v=20261017-shared-theme-refresh">
   <style>
     body {
       min-height: 100vh;
       background: #0B0F17;
       color: #F0F6FC;
-    }
-    body.light {
-      background: #DDE1E0;
-      color: #06141B;
     }
     .admin-shell {
       position: relative;
@@ -61,14 +54,6 @@
     .store-context {
       font-size: 0.9rem;
       opacity: 0.75;
-    }
-    #modeBtn {
-      position: fixed;
-      top: 16px;
-      right: 18px;
-      z-index: 30;
-      width: auto;
-      max-width: none;
     }
     .screen-title {
       margin-bottom: 8px;
@@ -474,22 +459,8 @@
   </style>
 </head>
 <body>
-  <script>(function(){var m=document.documentElement.classList.contains('light')?'light':'dark';document.body.classList.add(m);})();</script>
+  <script>document.body.classList.add('dark');</script>
   <div id="bmfToast" class="bmf-toast" role="status" aria-live="polite"></div>
-  <button class="menu-toggle" id="adminMenuBtn" type="button" aria-label="Open business menu"><svg class="business-menu-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="4" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="10" cy="16" r="1.5"/></svg></button>
-  <div class="dropdown-menu" id="adminMenuDropdown">
-    <div class="admin-menu-heading">Pryme Vertex Holdings</div>
-    <button class="menu-action" type="button" id="adminMenuDashboard"><svg class="menu-icon icon-dashboard" viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="2" width="6" height="7" rx="1"/><rect x="12" y="2" width="6" height="4" rx="1"/><rect x="12" y="9" width="6" height="9" rx="1"/><rect x="2" y="12" width="6" height="6" rx="1"/></svg><span>Dashboard</span></button>
-    <button class="menu-action" type="button" id="adminMenuCustomers"><svg class="menu-icon icon-customers" viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="6" r="3"/><circle cx="14" cy="7" r="2.4"/><path d="M1.5 17c.3-3 2.4-4.7 5.5-4.7s5.2 1.7 5.5 4.7z"/><path d="M12 12.8c3.6-.9 6.2.7 6.5 3.8h-4.4"/></svg><span>Customers</span></button>
-    <button class="menu-action" type="button" id="adminMenuApplications"><svg class="menu-icon icon-applications" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6zm14 0a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V6zM2 12a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4zm14 0a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-4z"/></svg><span>Applications</span></button>
-    <button class="menu-action" type="button" id="adminMenuHr"><svg class="menu-icon icon-hr" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6" r="3.1"/><path d="M3.5 18c.4-4 2.7-6 6.5-6s6.1 2 6.5 6z"/><path d="M15 2.5v4M13 4.5h4"/></svg><span>HR</span></button>
-    <div class="admin-menu-divider"></div>
-    <button class="menu-action" type="button" id="backToStoresDashboard" hidden><svg class="menu-icon icon-store" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8.5 4.5 3h11L17 8.5M4 8.5V17h12V8.5M7 17v-5h6v5"/><path d="M3 8.5a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/></svg><span>Switch Store</span></button>
-    <button class="menu-action" type="button" id="logoutBtn"><svg class="menu-icon icon-logout" viewBox="0 0 20 20" aria-hidden="true"><path d="M9 3H4v14h5M11 6l4 4-4 4M7 10h8"/></svg><span>Logout</span></button>
-  </div>
-
-  <button class="toggle-mode" id="modeBtn" type="button" hidden aria-hidden="true">Theme</button>
-
   <div class="admin-shell">
     <header class="brand-header"><a class="brand-mark" href="index.html">PrymeBMF Admin</a><span class="store-context" id="storeContext"></span></header>
 
@@ -552,50 +523,189 @@
     <section id="adminDashboard" class="hidden">
       <header class="admin-appbar">
         <span id="loggedInAdmin" hidden></span>
-        <div class="admin-brand"><strong>PrymeBMF</strong><span>| Admin</span><small>Buraza Micro Finance</small></div>
+        <div class="admin-brand"><strong>BMF</strong><span>· Admin</span><small>Buraza Micro Finance</small></div>
         <label class="admin-search-wrap"><span aria-hidden="true">Find:</span><input id="adminDashboardSearch" type="search" placeholder="Loans, borrowers, receipts..." aria-label="Search dashboard"></label>
         <div class="admin-user-controls">
-          <div class="notification-anchor"><button id="adminNotificationBtn" type="button" aria-label="Notifications" aria-expanded="false">&#128276;<span id="adminNotificationCount" class="notification-count hidden">0</span><span id="bell-badge" class="notification-count" style="display:none;">0</span></button><section id="adminNotificationMenu" class="notification-menu hidden" aria-label="Notifications"><header><strong>Notifications</strong><button id="markAllNotificationsRead" type="button">Mark all read</button></header><div id="adminNotificationList"></div></section></div>
+          <div class="notification-anchor"><button id="adminNotificationBtn" type="button" aria-label="Notifications" aria-expanded="false">&#128276;<span id="adminNotificationCount" class="notification-count hidden">0</span></button><section id="adminNotificationMenu" class="notification-menu hidden" aria-label="Notifications"><header><strong>Notifications</strong><button id="markAllNotificationsRead" type="button">Mark all read</button></header><div id="adminNotificationList"></div><footer><button id="viewAllNotifications" type="button">View all notifications</button></footer></section></div>
           <span id="adminAvatar" class="admin-avatar">BM</span><span id="adminDisplayName" class="admin-display-name">Admin</span>
-          <button id="serverModeBtn" class="toggle-mode admin-mode-btn" type="button" hidden>Switch Mode</button>
         </div>
-        <p id="serverModeStatus" class="message-text" style="text-align:left;margin:2px 0 0" hidden></p>
-        <div id="serverModeConfirm" class="server-mode-confirm" hidden><span id="serverModeConfirmText"></span><button id="serverModeConfirmCancel" class="toggle-mode" type="button">Cancel</button><button id="serverModeConfirmSwitch" class="enter-btn" type="button">Switch</button></div>
       </header>
 
-      <section id="portfolioOverview" class="dashboard-screen" aria-labelledby="portfolioOverviewTitle">
-        <h1 id="portfolioOverviewTitle" class="visually-hidden">PrymeBMF Admin Dashboard</h1>
-        <div id="portfolioKpis" class="admin-kpi-grid"></div>
-        <section class="panel admin-chart-panel"><header><strong>Collections This Month</strong><span id="collectionMonthLabel"></span><button type="button" class="toggle-mode" id="refreshPortfolioBtn">Refresh</button></header><div id="collectionsChart" aria-live="polite"></div></section>
-        <section class="panel admin-activity-panel"><h2>Recent Activity</h2><ul id="recentActivity" class="activity-list"></ul></section>
-        <section class="admin-data-section"><header><h2>Loan Management</h2><button id="addLoanBtn" class="enter-btn" type="button">+ Add Loan</button></header><div id="adminLoanTable" class="admin-table-wrap"></div></section>
-        <section class="admin-data-section"><header><h2>Loyal Borrowers</h2><button type="button" id="jumpCustomersBtn" class="link-button">View all -&gt;</button></header><div id="loyalBorrowers" class="admin-table-wrap"></div></section>
-        <section id="feedbackOverview" class="panel admin-feedback-panel"><h2>Customer Feedback</h2><div id="adminFeedbackPreview"></div><button type="button" class="link-button" data-admin-jump="feedbackDetails">Manage feedback -&gt;</button></section>
-        <section class="panel admin-quick-actions"><h2>Quick Actions</h2><div class="admin-quick-grid">
-          <button id="announcementBtn" class="quick-blue" type="button">Send Announcement</button><button id="inviteBtn" type="button">Create Invite Link</button><button id="dailyReportQuickBtn" class="quick-gold" type="button">Generate Daily Report</button><button id="createUserBtn" type="button">Create User</button><button id="notifyOverdueBtn" class="quick-red" type="button">Notify All Overdue</button>
-        </div></section>
-        <section id="requestQueue" class="panel store-section admin-utility-section" aria-labelledby="newRequestsTitle"><div class="admin-topbar"><div><h2 id="newRequestsTitle">Requests &amp; payment reviews <span id="newRequestsBadge" class="request-badge" aria-live="polite">0</span></h2><p>Review loan requests and submitted payment proofs.</p></div><div class="button-row"><button type="button" class="toggle-mode" id="refreshRequestsBtn">Refresh requests</button><button type="button" class="toggle-mode" data-export-table="requests">Export CSV</button><button type="button" class="toggle-mode" data-export-table="requests" data-export-format="pdf">Export PDF</button></div></div><div id="newRequestsList"><p>Loading requests...</p></div><p id="newRequestsNote" class="message-text"></p></section>
-        <section id="portfolioReports" class="panel store-section admin-utility-section" aria-labelledby="storeReportsTitle">
-          <div class="admin-topbar">
-            <div>
-              <h2 id="storeReportsTitle">Reports &amp; Analytics</h2>
-              <p>Manual BMF Excel and PDF downloads for the portfolio.</p>
-            </div>
+    <div class="admin-dashboard-layout">
+      <aside id="adminSidebar" class="admin-sidebar" aria-label="Admin navigation">
+        <nav>
+          <span class="admin-sidebar-section">Main</span>
+          <button type="button" class="admin-nav-item active" data-admin-page="portfolioOverview" title="Dashboard" aria-current="page"><span class="admin-nav-icon icon-dashboard" aria-hidden="true">▦</span><span>Dashboard</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="requestQueue" title="Loan Requests"><span class="admin-nav-icon icon-applications" aria-hidden="true">▤</span><span>Loan Requests</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="allLoansView" title="All Loans"><span class="admin-nav-icon" aria-hidden="true">▥</span><span>All Loans</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="customersView" title="Customers"><span class="admin-nav-icon icon-customers" aria-hidden="true">♧</span><span>Customers</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="paymentsView" title="Payments"><span class="admin-nav-icon icon-payments" aria-hidden="true">¤</span><span>Payments</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="overdueView" title="Overdue"><span class="admin-nav-icon icon-overdue" aria-hidden="true">!</span><span>Overdue</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="defaultersView" title="Defaulters"><span class="admin-nav-icon icon-defaulters" aria-hidden="true">!</span><span>Defaulters</span></button>
+          <span class="admin-sidebar-section">Management</span>
+          <button type="button" class="admin-nav-item" data-admin-page="announcementView" title="Announcements"><span class="admin-nav-icon" aria-hidden="true">◉</span><span>Announcements</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="inviteView" title="Invite Links"><span class="admin-nav-icon" aria-hidden="true">↗</span><span>Invite Links</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="createUserView" title="Create User"><span class="admin-nav-icon" aria-hidden="true">＋</span><span>Create User</span></button>
+          <button type="button" class="admin-nav-item" id="adminSidebarHr" data-admin-page="hrView" title="HR"><span class="admin-nav-icon icon-hr" aria-hidden="true">♙</span><span>HR</span></button>
+          <button type="button" class="admin-nav-item" id="adminSidebarApplications" data-admin-page="applicationsView" title="Quick Screen"><span class="admin-nav-icon icon-applications" aria-hidden="true">▦</span><span>Quick Screen</span></button>
+          <button type="button" class="admin-nav-item" id="adminSidebarSwitchStore" data-dashboard-action="switch-store" title="Switch Store" hidden><span class="admin-nav-icon icon-store" aria-hidden="true">▤</span><span>Switch Store</span></button>
+          <span class="admin-sidebar-section">Reports</span>
+          <button type="button" class="admin-nav-item" data-admin-page="portfolioReports" title="Reports Platform"><span class="admin-nav-icon icon-reports" aria-hidden="true">↗</span><span>Reports Platform</span></button>
+          <span class="admin-sidebar-section">Settings</span>
+          <button type="button" class="admin-nav-item" id="adminSidebarServerMode" data-admin-page="serverSettingsView" title="Server Mode"><span class="admin-nav-icon" aria-hidden="true">⚙</span><span>Server Mode</span></button>
+          <button type="button" id="logoutBtn" class="admin-nav-item" data-dashboard-action="logout" title="Logout"><span class="admin-nav-icon icon-logout" aria-hidden="true">⇥</span><span>Logout</span></button>
+        </nav>
+      </aside>
+      <main class="admin-main-content">
+        <section id="portfolioOverview" class="dashboard-screen admin-page" aria-labelledby="portfolioOverviewTitle">
+          <h1 id="portfolioOverviewTitle" class="visually-hidden">BMF Admin Dashboard</h1>
+          <div id="portfolioKpis" class="admin-kpi-grid"></div>
+          <section class="panel admin-chart-panel">
+            <header>
+              <div class="chart-heading"><strong>Collections Overview</strong><span id="collectionMonthLabel">Last 30 days</span></div>
+              <div class="chart-range-pills" role="group" aria-label="Collections chart time range">
+                <button type="button" data-collection-range="7D">7D</button>
+                <button type="button" class="active" data-collection-range="1M" aria-pressed="true">1M</button>
+                <button type="button" data-collection-range="3M">3M</button>
+                <button type="button" data-collection-range="1Y">1Y</button>
+              </div>
+              <button type="button" class="toggle-mode" id="refreshPortfolioBtn">Refresh</button>
+            </header>
+            <div id="collectionsChart" aria-live="polite"></div>
+            <div class="chart-legend"><span><i class="legend-payments"></i>Payments Received</span><span><i class="legend-loans"></i>New Loans</span></div>
+          </section>
+          <section class="panel admin-activity-panel"><h2>Recent Activity</h2><ul id="recentActivity" class="activity-list"></ul><button type="button" class="link-button" data-admin-jump="requestQueue">View all activity →</button></section>
+          <section class="admin-data-section" id="loanManagementPanel">
+            <header><h2>Loan Management</h2><div class="loan-table-tools"><select id="loanStatusFilter" class="search-box" aria-label="Filter loans by status"><option value="">All statuses</option><option value="pending">Pending</option><option value="active">Active</option><option value="grace">Grace</option><option value="defaulted">Defaulted</option><option value="liquidated">Liquidated</option><option value="paid">Paid</option><option value="declined">Declined</option></select><button type="button" id="allLoansViewBtn" class="link-button">View all →</button></div></header>
+            <div id="adminLoanTable" class="admin-table-wrap"></div>
+            <nav id="loanTablePagination" class="loan-table-pagination" aria-label="Loan table pages"></nav>
+          </section>
+          <section class="admin-data-section" id="loyalBorrowersPanel"><header><div><h2>Loyal Borrowers</h2><p>Verified on-time repayers</p></div><button type="button" id="jumpCustomersBtn" class="link-button">View all →</button></header><div id="loyalBorrowers" class="admin-table-wrap"></div></section>
+          <section id="feedbackOverview" class="panel admin-feedback-panel"><header><h2>Customer Feedback</h2><div class="feedback-export-actions"><button type="button" class="toggle-mode" data-export-table="feedback">Export CSV</button><button type="button" class="toggle-mode" data-export-table="feedback" data-export-format="pdf">Export PDF</button></div></header><div id="adminFeedbackPreview"></div><button type="button" class="link-button" data-admin-jump="feedbackDetails">Manage feedback →</button></section>
+          <section class="panel admin-quick-actions"><h2>Quick Actions</h2><div class="admin-quick-grid">
+            <button id="addLoanBtn" class="quick-primary" type="button">+ Add New Loan</button>
+            <button id="notifyOverdueBtn" class="quick-warning" type="button">Notify Overdue</button>
+            <button id="announcementBtn" type="button">Send Announcement</button>
+            <button id="dailyReportQuickBtn" type="button">Generate Report</button>
+            <button id="inviteBtn" type="button">Invite Links</button>
+            <button id="createUserBtn" type="button">Create User</button>
+          </div></section>
+        </section>
+
+        <section id="allLoansView" class="admin-page hidden" aria-labelledby="allLoansTitle">
+          <header class="admin-page-header"><div><h1 id="allLoansTitle">All Loans</h1><p>Search and review every loan in your authorized scope.</p></div><button type="button" class="toggle-mode" id="refreshAllLoansBtn">Refresh</button></header>
+          <div class="toolbar" role="search" aria-label="Filter loans">
+            <input id="allLoansSearch" class="search-box" type="search" placeholder="Search borrower, loan ID, phone or status" aria-label="Search loans">
+            <select id="allLoansStatus" class="search-box" aria-label="Filter loans by status"><option value="">All statuses</option><option value="pending">Pending</option><option value="active">Active</option><option value="grace">Grace</option><option value="defaulted">Defaulted</option><option value="liquidated">Liquidated</option><option value="paid">Paid</option><option value="declined">Declined</option></select>
+            <label class="directory-date-filter">From <input type="date" id="allLoansFrom" class="search-box" aria-label="Loan date from"></label>
+            <label class="directory-date-filter">To <input type="date" id="allLoansTo" class="search-box" aria-label="Loan date to"></label>
           </div>
+          <p id="allLoansStatusMessage" class="directory-status" role="status" aria-live="polite"></p>
+          <div id="allLoansList" class="admin-table-wrap"></div>
+          <nav id="allLoansPagination" class="directory-pagination" aria-label="Loan pages"></nav>
+        </section>
+
+        <section id="paymentsView" class="admin-page hidden" aria-labelledby="paymentsTitle">
+          <header class="admin-page-header"><div><h1 id="paymentsTitle">Payments Received</h1><p>Recorded payments only. Pending proofs remain in Loan Requests for review.</p></div><button type="button" class="toggle-mode" id="refreshPaymentsBtn">Refresh payments</button></header>
+          <div class="toolbar" role="search" aria-label="Filter recorded payments">
+            <input id="paymentsSearch" class="search-box" type="search" placeholder="Search borrower, payment/loan receipt, mode or recorder" aria-label="Search payments">
+            <label class="directory-date-filter">From <input type="date" id="paymentsFrom" class="search-box" aria-label="Payment date from"></label>
+            <label class="directory-date-filter">To <input type="date" id="paymentsTo" class="search-box" aria-label="Payment date to"></label>
+          </div>
+          <p id="paymentsStatus" class="directory-status" role="status" aria-live="polite">Open this page to load recorded payments.</p>
+          <div id="paymentsList" class="admin-table-wrap"></div>
+          <nav id="paymentsPagination" class="directory-pagination" aria-label="Payment pages"></nav>
+        </section>
+
+        <section id="overdueView" class="admin-page hidden" aria-labelledby="overdueTitle">
+          <header class="admin-page-header"><div><h1 id="overdueTitle">Overdue Loans</h1><p>Loans currently in grace/default with an outstanding balance.</p></div><button type="button" class="toggle-mode" id="refreshOverdueBtn">Refresh</button></header>
+          <div class="toolbar" role="search" aria-label="Filter overdue loans">
+            <input id="overdueSearch" class="search-box" type="search" placeholder="Search borrower, loan ID, phone or email" aria-label="Search overdue loans">
+            <label class="directory-date-filter">Due from <input type="date" id="overdueFrom" class="search-box" aria-label="Overdue due date from"></label>
+            <label class="directory-date-filter">Due to <input type="date" id="overdueTo" class="search-box" aria-label="Overdue due date to"></label>
+          </div>
+          <p id="overdueStatusMessage" class="directory-status" role="status" aria-live="polite"></p>
+          <div id="overdueLoansList" class="admin-table-wrap"></div>
+          <nav id="overduePagination" class="directory-pagination" aria-label="Overdue loan pages"></nav>
+        </section>
+
+        <section id="defaultersView" class="admin-page hidden" aria-labelledby="defaultersTitle">
+          <header class="admin-page-header"><div><h1 id="defaultersTitle">Defaulters</h1><p>Defaulted loans with an outstanding balance.</p></div><button type="button" class="toggle-mode" id="refreshDefaultersBtn">Refresh</button></header>
+          <div class="toolbar" role="search" aria-label="Filter defaulted loans">
+            <input id="defaultersSearch" class="search-box" type="search" placeholder="Search borrower, loan ID, phone or email" aria-label="Search defaulters">
+            <label class="directory-date-filter">Due from <input type="date" id="defaultersFrom" class="search-box" aria-label="Defaulter due date from"></label>
+            <label class="directory-date-filter">Due to <input type="date" id="defaultersTo" class="search-box" aria-label="Defaulter due date to"></label>
+          </div>
+          <p id="defaultersStatusMessage" class="directory-status" role="status" aria-live="polite"></p>
+          <div id="defaultersLoansList" class="admin-table-wrap"></div>
+          <nav id="defaultersPagination" class="directory-pagination" aria-label="Defaulter pages"></nav>
+        </section>
+
+        <section id="requestQueue" class="panel store-section admin-utility-section admin-page hidden" aria-labelledby="newRequestsTitle"><div class="admin-topbar"><div><h1 id="newRequestsTitle">Loan Requests &amp; Payment Reviews <span id="newRequestsBadge" class="request-badge" aria-live="polite">0</span></h1><p>Review loan requests and submitted payment proofs.</p></div><div class="button-row"><button type="button" class="toggle-mode" id="refreshRequestsBtn">Refresh requests</button><button type="button" class="toggle-mode" data-export-table="requests">Export CSV</button><button type="button" class="toggle-mode" data-export-table="requests" data-export-format="pdf">Export PDF</button></div></div><div id="newRequestsList"><p>Loading requests...</p></div><p id="newRequestsNote" class="message-text"></p></section>
+        <section id="portfolioReports" class="panel store-section admin-utility-section admin-page hidden" aria-labelledby="storeReportsTitle">
+          <div class="admin-page-header"><div><h1 id="storeReportsTitle">Reports Platform</h1><p>Manually generate and download the BMF Excel and PDF reports.</p></div></div>
           <div id="reportLibrary" class="report-library"></div>
         </section>
-        <section id="feedbackDetails" class="panel store-section admin-utility-section"><h2>Feedback review</h2><div class="loan-filters" id="storeFeedbackFilters" role="group" aria-label="Filter customer feedback"><button class="toggle-mode loan-filter active" data-feedback-filter="all" type="button">All</button><button class="toggle-mode loan-filter" data-feedback-filter="complaint" type="button">Complaints</button><button class="toggle-mode loan-filter" data-feedback-filter="experience" type="button">Experiences</button><button class="toggle-mode loan-filter" data-feedback-filter="improvement" type="button">Improvements</button><button class="toggle-mode loan-filter" data-feedback-filter="inquiry" type="button">Inquiries</button></div><div id="storeFeedbackList"><p>Loading feedback...</p></div></section>
-    </section>
+        <section id="feedbackDetails" class="panel store-section admin-utility-section admin-page hidden" aria-labelledby="feedbackDetailsTitle"><h1 id="feedbackDetailsTitle">Feedback Review</h1><div class="loan-filters" id="storeFeedbackFilters" role="group" aria-label="Filter customer feedback"><button class="toggle-mode loan-filter active" data-feedback-filter="all" type="button">All</button><button class="toggle-mode loan-filter" data-feedback-filter="complaint" type="button">Complaints</button><button class="toggle-mode loan-filter" data-feedback-filter="experience" type="button">Experiences</button><button class="toggle-mode loan-filter" data-feedback-filter="improvement" type="button">Improvements</button><button class="toggle-mode loan-filter" data-feedback-filter="inquiry" type="button">Inquiries</button></div><div id="storeFeedbackList"><p>Loading feedback...</p></div></section>
 
-    <section id="customersView" class="hidden">
+        <section id="announcementView" class="admin-page hidden panel" aria-labelledby="announcementTitle">
+          <h1 id="announcementTitle">Buraza customer announcement</h1>
+          <p>Send an email to all registered customer accounts.</p>
+          <form id="announcementForm" class="auth-form announcement-form">
+            <input id="announcementSubject" class="modal-input" type="text" maxlength="120" placeholder="Subject" required>
+            <textarea id="announcementMessage" class="modal-input" maxlength="5000" placeholder="Announcement or interest-rate update" required></textarea>
+            <button type="submit" class="enter-btn">Send to all customers</button>
+          </form>
+          <p id="announcementFeedback" class="message-text" role="status"></p>
+        </section>
+
+        <section id="createUserView" class="admin-page hidden panel" aria-labelledby="createUserTitle">
+          <h1 id="createUserTitle">Create New User</h1>
+          <form id="createUserForm" class="auth-form" style="margin-top: 18px;">
+            <input type="text" id="newUserName" class="modal-input" placeholder="Full name" required>
+            <input type="email" id="newUserEmail" class="modal-input" placeholder="Email" required>
+            <input type="tel" id="newUserPhone" class="modal-input" placeholder="Phone (Zambian, e.g. 0977...)" required>
+            <input type="text" id="newUserNrc" class="modal-input" placeholder="NRC number (123456/78/1)" required>
+            <select id="newUserRole" class="modal-input">
+              <option value="user">Customer account</option>
+              <option value="store_admin">BMF store admin (restricted)</option>
+              <option value="franchise_admin" data-franchise-role>Franchise Employee Admin</option>
+            </select>
+            <input type="password" id="newUserPassword" class="modal-input" placeholder="Password" required>
+            <input type="password" id="newUserConfirmPassword" class="modal-input" placeholder="Confirm password" required>
+            <button type="submit" class="enter-btn">Create User</button>
+          </form>
+          <p id="createUserMessage" class="message-text"></p>
+        </section>
+
+        <section id="inviteView" class="admin-page hidden panel" aria-labelledby="inviteTitle">
+          <h1 id="inviteTitle">Invite Links</h1>
+          <p>Generate a signup link for a new customer. Links expire after 24 hours.</p>
+          <form id="inviteForm" class="auth-form" style="margin-top: 18px;">
+            <input type="email" id="inviteEmail" class="modal-input" placeholder="Customer email" required>
+            <button type="submit" class="enter-btn">Generate invite link</button>
+          </form>
+          <p id="inviteFeedback" class="message-text" role="status"></p>
+          <div id="inviteLinkResult" class="message-text"></div>
+          <h2 style="margin-top: 18px;">Pending invite links</h2>
+          <div id="inviteList"><p>Loading invites...</p></div>
+        </section>
+
+        <section id="serverSettingsView" class="admin-page hidden panel" aria-labelledby="serverSettingsTitle">
+          <h1 id="serverSettingsTitle">Server Mode</h1>
+          <p>Control whether the server is reachable from outside the local network. Protected routes still require a valid device token.</p>
+          <p id="serverModeStatus" class="message-text" style="text-align:left;margin:12px 0" role="status"></p>
+          <button id="serverModeBtn" class="toggle-mode admin-mode-btn" type="button">Switch Mode</button>
+          <div id="serverModeConfirm" class="server-mode-confirm" hidden><span id="serverModeConfirmText"></span><button id="serverModeConfirmCancel" class="toggle-mode" type="button">Cancel</button><button id="serverModeConfirmSwitch" class="enter-btn" type="button">Switch</button></div>
+        </section>
+
+    <section id="customersView" class="admin-page hidden" aria-labelledby="customersTitle">
       <div class="admin-topbar">
         <div>
-          <h1>Customers</h1>
-          <p class="message-text" style="text-align:left;">Full customer directory for this store. Search, sort, and open a customer to view their loans.</p>
+          <h1 id="customersTitle">Customer Management</h1>
+          <p class="message-text" style="text-align:left;">Search, filter, and open customer profiles and their complete loan history.</p>
         </div>
-        <div class="button-row">
-          <button type="button" class="toggle-mode" id="customersBackBtn" style="max-width: 220px;">Back to dashboard</button>
-        </div>
+        <div id="customerResultCount" class="directory-status" role="status" aria-live="polite"></div>
       </div>
       <div class="toolbar">
         <input type="text" id="userSearch" class="search-box" placeholder="Search users by name, email or phone..." style="max-width: 520px;">
@@ -604,28 +714,46 @@
           <option value="loans">Sort: Most loans</option>
           <option value="outstanding">Sort: Highest outstanding</option>
         </select>
+        <select id="customerDateBasis" class="search-box" style="max-width: 230px;" aria-label="Customer date filter basis">
+          <option value="loan">Filter by loan/request date</option>
+          <option value="registered">Filter by registration date</option>
+        </select>
+        <label class="directory-date-filter">From <input type="date" id="userDateFrom" class="search-box" aria-label="Customer date from"></label>
+        <label class="directory-date-filter">To <input type="date" id="userDateTo" class="search-box" aria-label="Customer date to"></label>
         <button type="button" id="refreshCustomerDirectory" class="toggle-mode" style="max-width: 190px;">Refresh customers</button>
         <button type="button" class="toggle-mode" data-export-table="users" style="max-width: 180px;">Export CSV</button>
         <button type="button" class="toggle-mode" data-export-table="users" data-export-format="pdf" style="max-width: 180px;">Export PDF</button>
       </div>
       <p id="customerDirectoryStatus" class="directory-status" role="status" aria-live="polite"></p>
-      <div id="userList" class="user-grid"><div class="directory-empty" role="status">Customer records will appear here after loading.</div></div>
+      <div id="userList" class="admin-table-wrap"><div class="directory-empty" role="status">Customer records will appear here after loading.</div></div>
+      <nav id="customerPagination" class="directory-pagination" aria-label="Customer pages"></nav>
     </section>
 
-    <section id="hrView" class="hidden">
+    <section id="hrView" class="admin-page hidden" aria-labelledby="hrTitle">
       <div class="admin-topbar">
         <div>
-          <h1>Employee Securities (HR)</h1>
+          <h1 id="hrTitle">Employee Securities (HR)</h1>
           <p class="message-text" style="text-align:left;">Manage admin users, permissions, and store-switch approvals for this store.</p>
           <p id="hrEmployeeCount" class="directory-status" aria-live="polite"></p>
         </div>
         <div class="button-row">
           <button type="button" class="toggle-mode" id="hrRefreshBtn" style="max-width: 180px;">Refresh</button>
           <button type="button" class="toggle-mode" id="hrCreateBtn" style="max-width: 200px;">Create admin</button>
-          <button type="button" class="toggle-mode" id="hrBackBtn" style="max-width: 220px;">Back to dashboard</button>
         </div>
       </div>
+      <div class="toolbar" role="search" aria-label="Filter employee directory">
+        <input type="search" id="hrSearch" class="search-box" placeholder="Search staff by name, email, phone or NRC..." aria-label="Search staff">
+        <select id="hrRoleFilter" class="search-box" aria-label="Filter staff by role">
+          <option value="">All staff roles</option>
+          <option value="admin">Main admin</option>
+          <option value="franchise_admin">Franchise Employee Admin</option>
+          <option value="store_admin">Store admin</option>
+        </select>
+        <label class="directory-date-filter">Created from <input type="date" id="hrDateFrom" class="search-box" aria-label="Staff created from"></label>
+        <label class="directory-date-filter">Created to <input type="date" id="hrDateTo" class="search-box" aria-label="Staff created to"></label>
+      </div>
       <div id="hrEmployeeList"><div class="directory-empty" role="status">Employee records will appear here after loading.</div></div>
+      <nav id="hrPagination" class="directory-pagination" aria-label="Employee pages"></nav>
       <p id="hrMessage" class="message-text"></p>
 
       <section class="panel store-section" aria-labelledby="hrSwitchTitle">
@@ -651,20 +779,35 @@
       </section>
     </section>
 
-    <section id="applicationsView" class="hidden">
+    <section id="applicationsView" class="admin-page hidden" aria-labelledby="applicationsTitle">
       <div class="admin-topbar">
         <div>
-          <h1>Loan Applications</h1>
+          <h1 id="applicationsTitle">Quick Screen Applications</h1>
           <p class="message-text">Review and decide on new loan applications from the Quick Screen.</p>
           <p id="applicationsCount" class="directory-status" aria-live="polite"></p>
         </div>
         <div class="button-row">
           <button type="button" class="toggle-mode" id="applicationsRefreshBtn" style="max-width: 180px;">Refresh</button>
-          <button type="button" class="toggle-mode" id="applicationsBackBtn" style="max-width: 220px;">Back to dashboard</button>
         </div>
       </div>
+      <div class="toolbar" role="search" aria-label="Filter loan applicants">
+        <input type="search" id="applicationSearch" class="search-box" placeholder="Search applicants, email, phone, NRC or reference..." aria-label="Search applicants">
+        <select id="applicationStatusFilter" class="search-box" aria-label="Filter applications by status">
+          <option value="">All application statuses</option>
+          <option value="pending">Awaiting review</option>
+          <option value="info_requested">More information requested</option>
+          <option value="approved">Approved</option>
+          <option value="declined">Declined</option>
+        </select>
+        <label class="directory-date-filter">Submitted from <input type="date" id="applicationDateFrom" class="search-box" aria-label="Applications submitted from"></label>
+        <label class="directory-date-filter">Submitted to <input type="date" id="applicationDateTo" class="search-box" aria-label="Applications submitted to"></label>
+      </div>
       <div id="applicationsList"><div class="directory-empty" role="status">Loading applications…</div></div>
+      <nav id="applicationsPagination" class="directory-pagination" aria-label="Application pages"></nav>
       <p id="applicationsMessage" class="message-text"></p>
+    </section>
+      </main>
+    </div>
     </section>
   </div>
 
@@ -673,42 +816,6 @@
       <button class="close" type="button" data-close-modal="userModal" aria-label="Close">&times;</button>
       <div id="modalBody"></div>
       <p id="detailFeedback" class="detail-feedback" role="status"></p>
-    </div>
-  </div>
-
-  <div id="announcementModal" class="modal">
-    <div class="modal-content">
-      <button class="close" type="button" data-close-modal="announcementModal" aria-label="Close">&times;</button>
-      <h2>Buraza customer announcement</h2>
-      <p>Send an email to all registered customer accounts.</p>
-      <form id="announcementForm" class="auth-form announcement-form">
-        <input id="announcementSubject" class="modal-input" type="text" maxlength="120" placeholder="Subject" required>
-        <textarea id="announcementMessage" class="modal-input" maxlength="5000" placeholder="Announcement or interest-rate update" required></textarea>
-        <button type="submit" class="enter-btn">Send to all customers</button>
-      </form>
-      <p id="announcementFeedback" class="message-text" role="status"></p>
-    </div>
-  </div>
-
-  <div id="createUserModal" class="modal">
-    <div class="modal-content">
-      <button class="close" type="button" data-close-modal="createUserModal" aria-label="Close">&times;</button>
-      <h2 id="createUserTitle">Create New User</h2>
-      <form id="createUserForm" class="auth-form" style="margin-top: 18px;">
-        <input type="text" id="newUserName" class="modal-input" placeholder="Full name" required>
-        <input type="email" id="newUserEmail" class="modal-input" placeholder="Email" required>
-        <input type="tel" id="newUserPhone" class="modal-input" placeholder="Phone (Zambian, e.g. 0977...)" required>
-        <input type="text" id="newUserNrc" class="modal-input" placeholder="NRC number (123456/78/1)" required>
-        <select id="newUserRole" class="modal-input">
-          <option value="user">Customer account</option>
-          <option value="store_admin">BMF store admin (restricted)</option>
-          <option value="franchise_admin" data-franchise-role>Franchise Employee Admin</option>
-        </select>
-        <input type="password" id="newUserPassword" class="modal-input" placeholder="Password" required>
-        <input type="password" id="newUserConfirmPassword" class="modal-input" placeholder="Confirm password" required>
-        <button type="submit" class="enter-btn">Create User</button>
-      </form>
-      <p id="createUserMessage" class="message-text"></p>
     </div>
   </div>
 
@@ -797,22 +904,6 @@
         <button type="submit" class="enter-btn">Create active loan</button>
       </form>
       <p id="addLoanFeedback" class="message-text" role="status"></p>
-    </div>
-  </div>
-
-  <div id="inviteModal" class="modal">
-    <div class="modal-content">
-      <button class="close" type="button" data-close-modal="inviteModal" aria-label="Close">&times;</button>
-      <h2>Invite Links</h2>
-      <p>Generate a signup link for a new customer. Links expire after 24 hours.</p>
-      <form id="inviteForm" class="auth-form" style="margin-top: 18px;">
-        <input type="email" id="inviteEmail" class="modal-input" placeholder="Customer email" required>
-        <button type="submit" class="enter-btn">Generate invite link</button>
-      </form>
-      <p id="inviteFeedback" class="message-text" role="status"></p>
-      <div id="inviteLinkResult" class="message-text"></div>
-      <h3 style="margin-top: 18px;">Pending invite links</h3>
-      <div id="inviteList"><p>Loading invites...</p></div>
     </div>
   </div>
 

@@ -1,4 +1,8 @@
 let allUsers = [];
+let registeredUsers = [];
+let customerLoans = [];
+let customerLoansError = '';
+let customerLoansLoaded = false;
 let selectedUserId = null;
 let selectedUser = null;
 let selectedLoans = [];
@@ -9,69 +13,53 @@ let activeTimeframeFilter = 'all';
 let customTimeframeFrom = '';
 let customTimeframeTo = '';
 
-// Report panel state
-let reportScope = 'buraza';
-let reportType = 'daily';
-let reportFrom = '';
-let reportTo = '';
-
-const REPORT_TYPE_LABELS = {
-  'how-risky': 'How Risky Are Our Loans?',
-  'who-owes': 'Who Owes What and How Late?',
-  'full-history': 'One Borrower\'s Full History',
-  'all-loans': 'All Loans We Gave Out This Period',
-  'schedule': 'Payment Schedule Per Loan',
-  'collection': 'How Well Is Money Being Collected?',
-  'problem-loans': 'Problem Loans & Write-Offs',
-  'daily-cashbook': 'Daily Money In and Out',
-  'officer-scorecard': 'Officer Scorecard',
-  daily: 'Daily Money In and Out',
-  overdue: 'How Risky Are Our Loans?',
-  defaulters: 'Problem Loans & Write-Offs'
-};
-
-const REPORT_ENDPOINT = {
-  'how-risky': 'overdue',
-  'who-owes': 'all-loans',
-  'full-history': 'repayment-tracker',
-  'all-loans': 'all-loans',
-  'schedule': 'repayment-tracker',
-  'collection': 'monthly-collections',
-  'problem-loans': 'defaulters',
-  'daily-cashbook': 'daily',
-  'officer-scorecard': 'interest-revenue',
-  daily: 'daily',
-  overdue: 'overdue',
-  defaulters: 'defaulters'
-};
-
 const REPORT_LIBRARY = [
-  { type: 'how-risky', title: 'How Risky Are Our Loans?', description: 'Shows which loans are overdue and by how long', source: 'overdue', filenamePrefix: 'bmf_how_risky' },
-  { type: 'who-owes', title: 'Who Owes What and How Late?', description: 'Lists every borrower\'s arrears in time buckets', source: 'all-loans', filenamePrefix: 'bmf_who_owes' },
-  { type: 'full-history', title: 'One Borrower\'s Full History', description: 'Every payment made and still owed for one loan', source: 'repayment-tracker', filenamePrefix: 'bmf_full_history', borrowerSearch: true },
-  { type: 'all-loans', title: 'All Loans We Gave Out This Period', description: 'Every loan issued in a date range', source: 'all-loans', filenamePrefix: 'bmf_all_loans' },
-  { type: 'schedule', title: 'Payment Schedule Per Loan', description: 'Instalment-by-instalment plan for one loan', source: 'repayment-tracker', filenamePrefix: 'bmf_schedule', borrowerSearch: true },
-  { type: 'collection', title: 'How Well Is Money Being Collected?', description: 'Officer performance vs CGAP target', source: 'monthly-collections', filenamePrefix: 'bmf_collection' },
-  { type: 'problem-loans', title: 'Problem Loans & Write-Offs', description: 'Every defaulted loan and net loss', source: 'defaulters', filenamePrefix: 'bmf_problem_loans' },
-  { type: 'daily-cashbook', title: 'Daily Money In and Out', description: 'Cashbook — every receipt and disbursement', source: 'daily', filenamePrefix: 'bmf_daily_cashbook' },
-  { type: 'officer-scorecard', title: 'Officer Scorecard', description: 'KPIs for each loan officer vs MIX Market targets', source: 'interest-revenue', filenamePrefix: 'bmf_officer_scorecard' }
+  { type: 'how-risky', title: 'How Risky Are Our Loans?', description: 'Shows which loans are overdue and by how long', source: 'par', filenamePrefix: 'bmf_how_risky' },
+  { type: 'who-owes', title: 'Who Owes What and How Late?', description: 'Lists every borrower\'s arrears in time buckets', source: 'aging', filenamePrefix: 'bmf_who_owes' },
+  { type: 'full-history', title: 'One Borrower\'s Full History', description: 'Every payment made and still owed for one loan', source: 'statement', filenamePrefix: 'bmf_full_history', borrowerSearch: true },
+  { type: 'all-loans', title: 'All Loans We Gave Out This Period', description: 'Every loan issued in a date range', source: 'disbursements', filenamePrefix: 'bmf_all_loans' },
+  { type: 'schedule', title: 'Payment Schedule Per Loan', description: 'Instalment-by-instalment plan for one loan', source: 'schedule', filenamePrefix: 'bmf_schedule', borrowerSearch: true },
+  { type: 'collection', title: 'How Well Is Money Being Collected?', description: 'Officer performance vs CGAP target', source: 'collection', filenamePrefix: 'bmf_collection' },
+  { type: 'problem-loans', title: 'Problem Loans & Write-Offs', description: 'Every defaulted loan and net loss', source: 'defaults', filenamePrefix: 'bmf_problem_loans' },
+  { type: 'daily-cashbook', title: 'Daily Money In and Out', description: 'Cashbook — every receipt and disbursement', source: 'cashbook', filenamePrefix: 'bmf_daily_cashbook' },
+  { type: 'officer-scorecard', title: 'Officer Scorecard', description: 'KPIs for each loan officer vs MIX Market targets', source: 'officers', filenamePrefix: 'bmf_officer_scorecard' }
 ];
 let storeFeedback = [];
 let activeFeedbackFilter = 'all';
 let portfolioLoans = [];
+let portfolioLoaded = false;
+let paymentRecords = [];
+let paymentsLoading = false;
 let pendingPaymentReviews = [];
 let allApplications = [];
 let pendingEmail = '';
 let pendingResetEmail = '';
 let adminToastTimer;
 let portfolioRefreshTimer = null;
+let bellRefreshTimer = null;
 let adminNotifications = [];
+let activeCollectionRange = '1M';
+let loanTablePage = 1;
+const LOAN_TABLE_PAGE_SIZE = 10;
 let usersLoaded = false;
 let usersLoading = false;
 let usersRequestController = null;
 let createUserMode = 'customer';
+const DIRECTORY_PAGE_SIZE = 15;
+const CUSTOMER_DIRECTORY_PAGE_SIZE = 50;
+const PAYMENT_DIRECTORY_PAGE_SIZE = 20;
+const LOAN_DIRECTORY_PAGE_SIZE = 20;
+let customerDirectoryPage = 1;
+let hrDirectoryPage = 1;
+let applicationDirectoryPage = 1;
+const loanDirectoryPages = { allLoansView: 1, overdueView: 1, defaultersView: 1 };
+let paymentDirectoryPage = 1;
+let showAllAdminNotifications = false;
+let activeAdminPage = 'portfolioOverview';
+let createUserReturnPage = 'portfolioOverview';
 
 function openCreateUserModal(mode = 'customer') {
+  createUserReturnPage = activeAdminPage || 'portfolioOverview';
   createUserMode = mode === 'hr' ? 'hr' : 'customer';
   const title = document.getElementById('createUserTitle');
   const roleSelect = document.getElementById('newUserRole');
@@ -79,7 +67,7 @@ function openCreateUserModal(mode = 'customer') {
   if (customerRole) customerRole.hidden = createUserMode === 'hr';
   if (title) title.textContent = createUserMode === 'hr' ? 'Create Staff Account' : 'Create New User';
   roleSelect.value = createUserMode === 'hr' ? 'store_admin' : 'user';
-  document.getElementById('createUserModal').style.display = 'block';
+  showAdminPage('createUserView');
 }
 
 function showAdminSuccess(message) {
@@ -179,7 +167,7 @@ function renderReportLibrary() {
       const to = card.querySelector('[data-report-to]')?.value || '';
       const officer = card.querySelector('[data-report-officer]')?.value || '';
       const borrower = card.querySelector('[data-report-borrower]')?.value || '';
-      await pullReport(reportType, format, { from, to, officer, borrower });
+      await pullReport(reportType, format, { from, to, officer, borrower, card });
     });
   });
 }
@@ -187,15 +175,20 @@ function renderReportLibrary() {
 async function pullReport(reportType, format, params = {}) {
   const config = getReportConfig(reportType);
   const sourceType = config.source || reportType;
-  const token = localStorage.getItem('deviceToken') || '';
   const qs = new URLSearchParams({ format });
 
   if (params.from) qs.set('from', params.from);
   if (params.to) qs.set('to', params.to);
   if (params.officer) qs.set('officer', params.officer);
+  const scope = localStorage.getItem('adminStore') || 'buraza';
+  qs.set('scope', scope);
 
-  if ((reportType === 'full-history' || reportType === 'schedule') && params.borrower) {
-    const match = (portfolioLoans || []).find(loan => {
+  if (reportType === 'full-history' || reportType === 'schedule') {
+    if (!params.borrower) {
+      showBmfToast('Search for a borrower or loan ID before downloading this report.', 'error');
+      return;
+    }
+    const matches = (portfolioLoans || []).filter(loan => {
       const email = String(loan.email || '').toLowerCase();
       const receipt = String(loan.receiptNumber || loan.id || '').toLowerCase();
       const borrowerText = String(params.borrower || '').toLowerCase();
@@ -203,17 +196,21 @@ async function pullReport(reportType, format, params = {}) {
       return email.includes(borrowerText) || receipt.includes(borrowerText) || String(customer.username || '').toLowerCase().includes(borrowerText);
     });
 
-    if (!match) {
+    if (!matches.length) {
       showBmfToast('No matching loan was found for that borrower search.', 'error');
       return;
     }
+    if (matches.length > 1) {
+      showBmfToast('More than one loan matches. Search by the exact loan receipt ID.', 'error');
+      return;
+    }
 
-    qs.set('loanId', String(match.id));
+    qs.set('loanId', String(matches[0].id));
   }
 
   try {
     const res = await fetch(`/api/reports/${sourceType}?${qs.toString()}`, {
-      headers: { 'x-device-token': token }
+      headers: getStoreHeaders()
     });
 
     if (!res.ok) {
@@ -234,6 +231,8 @@ async function pullReport(reportType, format, params = {}) {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+    const lastGenerated = params.card?.querySelector('.last-generated');
+    if (lastGenerated) lastGenerated.textContent = `Last generated: ${new Date().toLocaleString('en-GB')}`;
     showBmfToast('Report downloaded successfully.');
   } catch (err) {
     showBmfToast(err.message || 'Could not generate report. Please try again.', 'error');
@@ -246,12 +245,6 @@ function applyTheme(theme) {
   document.body.classList.remove('dark', 'light');
   document.documentElement.classList.add(activeTheme);
   document.body.classList.add(activeTheme);
-}
-
-function toggleTheme() {
-  const nextMode = document.body.classList.contains('dark') ? 'light' : 'dark';
-  applyTheme(nextMode);
-  localStorage.setItem('mode', nextMode);
 }
 
 function showAuthScreen() {
@@ -270,7 +263,48 @@ function setViewVisibility(id, visible) {
 }
 
 function hideAdminViews() {
-  ['adminDashboard', 'customersView', 'hrView', 'applicationsView'].forEach(id => setViewVisibility(id, false));
+  setViewVisibility('adminDashboard', false);
+  setAdminPageVisibility(null);
+}
+
+function setAdminPageVisibility(activeId) {
+  document.querySelectorAll('#adminDashboard .admin-page').forEach(page => {
+    const visible = page.id === activeId;
+    page.hidden = !visible;
+    page.classList.toggle('hidden', !visible);
+    page.style.display = '';
+  });
+  activeAdminPage = activeId || '';
+}
+
+function showAdminPage(pageId) {
+  if (!ensureAdminAccess()) return false;
+  const page = document.getElementById(pageId);
+  if (!page || !page.classList.contains('admin-page')) {
+    throw new Error(`Unknown admin page: ${pageId}`);
+  }
+  setViewVisibility('storeSelect', false);
+  setViewVisibility('adminAuth', false);
+  setViewVisibility('adminDashboard', true);
+  setAdminPageVisibility(pageId);
+  const navButton = document.querySelector(`#adminSidebar [data-admin-page="${pageId}"]`);
+  setDashboardNavActive(navButton || null);
+  window.scrollTo({ top: 0, behavior: 'instant' });
+
+  if (pageId === 'paymentsView') fetchPayments();
+  else if (pageId === 'customersView') fetchUsers();
+  else if (pageId === 'hrView') fetchHrEmployees();
+  else if (pageId === 'applicationsView') fetchApplications();
+  else if (pageId === 'requestQueue') fetchNewRequests();
+  else if (pageId === 'portfolioReports') renderReportLibrary();
+  else if (pageId === 'feedbackDetails') fetchStoreFeedback();
+  else if (pageId === 'serverSettingsView') initServerMode();
+  else if (['allLoansView', 'overdueView', 'defaultersView'].includes(pageId)) {
+    renderLoanDirectory(pageId);
+    if (!portfolioLoaded) fetchNewRequests();
+    if (!customerLoansLoaded) fetchCustomerLoans();
+  }
+  return true;
 }
 
 // ─── Logged-in admin header (topbar) ─────────────────────────────────────────
@@ -343,62 +377,45 @@ function initServerMode() {
 }
 
 function showDashboard() {
-  if (!ensureAdminAccess()) return;
-  setViewVisibility('storeSelect', false);
-  setViewVisibility('adminAuth', false);
-  hideAdminViews();
-  setViewVisibility('adminDashboard', true);
-  setActiveAdminMenu('adminMenuDashboard');
+  if (!showAdminPage('portfolioOverview')) return;
   renderLoggedInAdmin();
   renderReportLibrary();
   initServerMode();
+  renderPortfolioOverview();
   if (portfolioRefreshTimer) clearInterval(portfolioRefreshTimer);
   portfolioRefreshTimer = setInterval(() => {
-    if (!document.getElementById('adminDashboard').classList.contains('hidden')) fetchNewRequests();
+    if (activeAdminPage === 'portfolioOverview') fetchNewRequests();
   }, 30000);
-  // Refresh bell count on load and every 60 seconds
+  if (bellRefreshTimer) clearInterval(bellRefreshTimer);
   refreshBellCount();
-  setInterval(refreshBellCount, 60000);
+  bellRefreshTimer = setInterval(refreshBellCount, 60000);
+}
+
+function showReportsView() {
+  showAdminPage('portfolioReports');
 }
 
 function showCustomersView() {
-  if (!ensureAdminAccess()) return;
-  setViewVisibility('storeSelect', false);
-  setViewVisibility('adminAuth', false);
-  hideAdminViews();
-  setViewVisibility('customersView', true);
-  setActiveAdminMenu('adminMenuCustomers');
-  if (allUsers.length) applyUserFilterAndSort();
-  else {
-    const list = document.getElementById('userList');
-    if (list) list.innerHTML = '<div class="directory-empty" role="status">Loading customer accounts…</div>';
-  }
-  fetchUsers();
+  showAdminPage('customersView');
 }
 
 function showHrView() {
-  if (!ensureAdminAccess()) return;
-  setViewVisibility('storeSelect', false);
-  setViewVisibility('adminAuth', false);
-  hideAdminViews();
-  setViewVisibility('hrView', true);
-  setActiveAdminMenu('adminMenuHr');
-  const role = localStorage.getItem('userRole');
-  if (!['admin', 'franchise_admin'].includes(role)) {
-    document.getElementById('hrEmployeeList').innerHTML = '<div class="directory-empty">Employee management is available to the main admin and Franchise Employee Admin only.</div>';
-    return;
-  }
-  fetchHrEmployees();
+  showAdminPage('hrView');
 }
 
-function showApplicationsView() {
-  if (!ensureAdminAccess()) return;
-  setViewVisibility('storeSelect', false);
-  setViewVisibility('adminAuth', false);
-  hideAdminViews();
-  setViewVisibility('applicationsView', true);
-  setActiveAdminMenu('adminMenuApplications');
-  fetchApplications();
+async function showApplicationsView(applicationId = null) {
+  if (!showAdminPage('applicationsView')) return;
+  if (applicationId) {
+    document.getElementById('applicationSearch').value = applicationId;
+    document.getElementById('applicationStatusFilter').value = '';
+    document.getElementById('applicationDateFrom').value = '';
+    document.getElementById('applicationDateTo').value = '';
+  }
+  if (applicationId) {
+    const card = [...document.querySelectorAll('#applicationsList [data-application-card]')]
+      .find(element => element.dataset.applicationCard === String(applicationId));
+    card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 function showStoreSelection() {
@@ -425,7 +442,15 @@ function isKnownStore(storeId) {
 function enterStore(storeId) {
   if (!isKnownStore(storeId)) return;
   allUsers = [];
+  registeredUsers = [];
+  customerLoans = [];
+  customerLoansLoaded = false;
+  customerLoansError = '';
+  paymentRecords = [];
+  paymentsLoading = false;
   usersLoaded = false;
+  portfolioLoans = [];
+  portfolioLoaded = false;
   localStorage.setItem('adminStore', storeId);
   document.getElementById('storeContext').textContent = getStoreName(storeId);
 
@@ -474,6 +499,48 @@ function getStoreHeaders(extraHeaders = {}) {
     'x-business-unit': localStorage.getItem('adminStore') || 'buraza',
     ...extraHeaders
   };
+}
+
+function getCustomerScopeHeaders(extraHeaders = {}) {
+  if (localStorage.getItem('userRole') === 'admin') {
+    return { 'x-device-token': getDeviceToken(), ...extraHeaders };
+  }
+  return getStoreHeaders(extraHeaders);
+}
+
+function addAllStoreScope(params) {
+  if (localStorage.getItem('userRole') === 'admin') params.set('storeId', 'all');
+  return params;
+}
+
+function dateMatchesRange(value, from, to) {
+  if (!from && !to) return true;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const day = date.toISOString().slice(0, 10);
+  return (!from || day >= from) && (!to || day <= to);
+}
+
+function getDirectoryPage(items, page, pageSize = DIRECTORY_PAGE_SIZE) {
+  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
+  const currentPage = Math.min(Math.max(1, page), pageCount);
+  return {
+    items: items.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    currentPage,
+    pageCount
+  };
+}
+
+function renderDirectoryPagination(containerId, page, total, directory, pageSize = DIRECTORY_PAGE_SIZE) {
+  const nav = document.getElementById(containerId);
+  if (!nav) return;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const currentPage = Math.min(Math.max(1, page), pageCount);
+  nav.innerHTML = pageCount > 1 ? `
+    <button type="button" class="toggle-mode" data-directory-page="${directory}" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+    <span>Page ${currentPage} of ${pageCount} · ${total} records</span>
+    <button type="button" class="toggle-mode" data-directory-page="${directory}" data-page="${currentPage + 1}" ${currentPage === pageCount ? 'disabled' : ''}>Next</button>
+  ` : total ? `<span>${total} record${total === 1 ? '' : 's'}</span>` : '';
 }
 
 async function runRefresh(button, task, label = 'Refresh') {
@@ -558,18 +625,20 @@ function applyRolePermissions() {
   const isStoreOperator = role === 'store_admin';
   const isFranchiseLevel = role === 'admin' || role === 'franchise_admin';
   
-  // ALL buttons visible to super admins and franchise admins
-  document.getElementById('announcementBtn').hidden = false;
+  document.getElementById('announcementBtn').hidden = !['store_admin', 'franchise_admin'].includes(role);
   document.getElementById('notifyOverdueBtn').hidden = false;
   
   // HR menu only for main admin and franchise level
-  const hrMenu = document.getElementById('adminMenuHr');
-  if (hrMenu) hrMenu.hidden = !isFranchiseLevel;
+  const sidebarHr = document.getElementById('adminSidebarHr');
+  if (sidebarHr) sidebarHr.hidden = !isFranchiseLevel;
+  const sidebarServerMode = document.getElementById('adminSidebarServerMode');
+  if (sidebarServerMode) sidebarServerMode.hidden = !isFranchiseLevel;
+  const sidebarSwitchStore = document.getElementById('adminSidebarSwitchStore');
+  if (sidebarSwitchStore) sidebarSwitchStore.hidden = BMF_STORES.length < 2;
+  const sidebarAnnouncement = document.querySelector('[data-admin-page="announcementView"]');
+  if (sidebarAnnouncement) sidebarAnnouncement.hidden = !['store_admin', 'franchise_admin'].includes(role);
   
   // Switch store button: show if more than 1 store OR if super admin
-  const switchStoreButton = document.getElementById('backToStoresDashboard');
-  if (switchStoreButton) switchStoreButton.hidden = !isSuperAdmin && BMF_STORES.length < 2;
-  
   // Only franchise-level roles may create store admins; only the main admin may
   // create Franchise Employee Admins.
   document.querySelector('#newUserRole option[value="store_admin"]').hidden = !isFranchiseLevel;
@@ -589,11 +658,13 @@ async function fetchUsers() {
   const directoryStatus = document.getElementById('customerDirectoryStatus');
   const userList = document.getElementById('userList');
   const timeoutId = setTimeout(() => controller.abort(), 15000);
-  if (directoryStatus) directoryStatus.textContent = 'Loading customers…';
+  if (directoryStatus) directoryStatus.textContent = 'Loading registered customer accounts…';
+  if (userList) userList.innerHTML = '<div class="directory-empty" role="status">Loading customer records…</div>';
 
   try {
-    const response = await fetch('/users', {
-      headers: getStoreHeaders(),
+    const userParams = addAllStoreScope(new URLSearchParams());
+    const response = await fetch(`/users?${userParams}`, {
+      headers: getCustomerScopeHeaders(),
       signal: controller.signal
     });
     if (controller.signal.aborted) return;
@@ -609,27 +680,28 @@ async function fetchUsers() {
     if (controller.signal.aborted) return;
     const users = Array.isArray(payload) ? payload : Array.isArray(payload?.users) ? payload.users : null;
     if (!users) throw new Error('The customer service returned data in an unexpected format.');
-    allUsers = users.filter(user => !user.role || user.role === 'user');
+    registeredUsers = users.filter(user => !user.role || user.role === 'user');
+    allUsers = registeredUsers.slice();
     usersLoaded = true;
-    // Draw the directory as soon as its own endpoint succeeds. Reports,
-    // feedback, and loan management enrich the cards, but a slow/failing
+    // Draw the directory as soon as its own endpoint succeeds. Feedback
+    // and loan management enrich the cards, but a slow/failing
     // secondary endpoint must never leave valid customers invisible.
     applyUserFilterAndSort();
     if (directoryStatus) {
       directoryStatus.textContent = allUsers.length
-        ? `${allUsers.length} customer accounts in this store · loading loan details...`
-        : 'No customer accounts have been added to this store yet.';
+        ? `${allUsers.length} registered customer records · loading loan details...`
+        : 'No registered customer accounts were returned for this scope.';
     }
     const enrichmentResults = await Promise.allSettled([
-      fetchReportData(),
       fetchStoreFeedback(),
-      fetchNewRequests()
+      fetchNewRequests(),
+      fetchCustomerLoans()
     ]);
     const loanDetailsLoaded = enrichmentResults[2].status === 'fulfilled' && enrichmentResults[2].value === true;
     if (directoryStatus) {
       directoryStatus.textContent = allUsers.length
-        ? `${allUsers.length} customer accounts in this store${loanDetailsLoaded ? ' · loan details loaded from Loan Management.' : ' · loan details are temporarily unavailable.'}`
-        : 'No customer accounts have been added to this store yet.';
+        ? `${allUsers.length} registered customer records${loanDetailsLoaded ? ' · loan details loaded from Loan Management.' : ' · loan details are temporarily unavailable.'}`
+        : 'No registered customer accounts were returned for this scope.';
     }
     applyUserFilterAndSort();
   } catch (err) {
@@ -645,6 +717,7 @@ async function fetchUsers() {
         : err.message || 'Unable to load customers. Your admin session is still active.';
     if (directoryStatus) directoryStatus.textContent = message;
     if (userList) userList.innerHTML = `<div class="directory-empty">${escapeHtml(message)}</div>`;
+    renderDirectoryPagination('customerPagination', 1, 0, 'customers');
     if (err.status === 401) {
       localStorage.removeItem('deviceToken');
       localStorage.removeItem('userRole');
@@ -663,6 +736,56 @@ async function fetchUsers() {
 }
 
 // ─── New Requests (BMF store only) ───────────────────────────────────────────
+function mergeLoanOnlyCustomers(loans = customerLoans) {
+  const knownEmails = new Set(registeredUsers.map(user => String(user.email || '').trim().toLowerCase()).filter(Boolean));
+  const loanCustomers = new Map();
+  loans.forEach(loan => {
+    const email = String(loan.email || '').trim().toLowerCase();
+    if (!email || knownEmails.has(email) || loanCustomers.has(email)) return;
+    loanCustomers.set(email, {
+      id: `loan-only:${email}`,
+      email,
+      username: loan.username || loan.borrowerName || loan.fullName || email,
+      phone: loan.phone || '',
+      nrc: loan.nrcNumber || loan.nrc || '',
+      createdAt: loan.createdAt || '',
+      role: 'user',
+      loanOnly: true
+    });
+  });
+  allUsers = registeredUsers.concat([...loanCustomers.values()]);
+}
+
+async function fetchCustomerLoans() {
+  try {
+    const params = addAllStoreScope(new URLSearchParams());
+    const response = await fetch(`/loans/all?${params}`, { headers: getCustomerScopeHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to load customer loan details.');
+    if (!Array.isArray(data.loans)) throw new Error('The loan service returned an unexpected customer-loan format.');
+    customerLoans = data.loans;
+    customerLoansError = '';
+    customerLoansLoaded = true;
+    mergeLoanOnlyCustomers();
+    if (activeAdminPage === 'customersView') applyUserFilterAndSort();
+    if (['allLoansView', 'overdueView', 'defaultersView'].includes(activeAdminPage)) {
+      renderLoanDirectory(activeAdminPage);
+    }
+    return true;
+  } catch (error) {
+    customerLoans = [];
+    customerLoansError = error.message || 'Unable to load customer loan details.';
+    customerLoansLoaded = true;
+    console.error('Customer loan enrichment failed:', error);
+    mergeLoanOnlyCustomers([]);
+    if (activeAdminPage === 'customersView') applyUserFilterAndSort();
+    if (['allLoansView', 'overdueView', 'defaultersView'].includes(activeAdminPage)) {
+      renderLoanDirectory(activeAdminPage);
+    }
+    return false;
+  }
+}
+
 // Numbered pending loan rows with full customer information pulled from the
 // registered customer record. The badge shows how many requests await review.
 let pendingRequests = [];
@@ -686,8 +809,11 @@ async function fetchNewRequests() {
       .filter(loan => String(loan.status || '').trim().toLowerCase().replace(/\s+/g, '_') === 'pending')
       .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
     portfolioLoans = Array.isArray(data.loans) ? data.loans : [];
+    mergeLoanOnlyCustomers();
     pendingPaymentReviews = portfolioLoans.flatMap(loan => (loan.paymentSubmissions || [])
       .filter(submission => submission.status === 'pending').map(submission => ({ loan, submission })));
+    portfolioLoaded = true;
+    mergeLoanOnlyCustomers();
     renderNewRequests();
     renderPortfolioOverview();
     renderAdminFeedbackPreview();
@@ -700,10 +826,13 @@ async function fetchNewRequests() {
   } catch (err) {
     pendingRequests = [];
     portfolioLoans = [];
+    portfolioLoaded = false;
+    allUsers = registeredUsers.slice();
     pendingPaymentReviews = [];
     if (badge) badge.textContent = '0';
     renderPortfolioOverview();
     if (list) list.innerHTML = `<p>${escapeHtml(err.message || 'Unable to load requests.')}</p>`;
+    applyUserFilterAndSort();
     return false;
   }
 }
@@ -751,127 +880,511 @@ function renderNewRequests() {
   list.innerHTML = `${paymentReviewsHtml}${loanRequestsHtml}`;
 }
 
+function parseDashboardDate(value) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+function dashboardDateKey(value) {
+  const date = parseDashboardDate(value);
+  if (!date) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function getDashboardPayments() {
+  return portfolioLoans.flatMap(loan => (Array.isArray(loan.payments) ? loan.payments : [])
+    .map(payment => ({ loan, payment, date: parseDashboardDate(payment.paymentDate || payment.date) }))
+    .filter(item => item.date));
+}
+
+function getCustomerScopeQuery() {
+  const params = new URLSearchParams();
+  addAllStoreScope(params);
+  return params.toString();
+}
+
+async function fetchPayments() {
+  if (!ensureAdminAccess() || paymentsLoading) return false;
+  const list = document.getElementById('paymentsList');
+  const status = document.getElementById('paymentsStatus');
+  if (list) list.innerHTML = '<div class="directory-empty" role="status">Loading recorded payments…</div>';
+  if (status) status.textContent = 'Loading every recorded payment in your authorized scope…';
+  paymentsLoading = true;
+  try {
+    const records = [];
+    const scopeQuery = getCustomerScopeQuery();
+    const scopeSuffix = scopeQuery ? `&${scopeQuery}` : '';
+    let page = 1;
+    let totalPages = 1;
+    do {
+      const response = await fetch(`/payments?page=${page}&pageSize=500${scopeSuffix}`, {
+        headers: getCustomerScopeHeaders()
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Unable to load payment history.');
+      if (!Array.isArray(data.payments)) throw new Error('The payment service returned an unexpected response.');
+      records.push(...data.payments);
+      totalPages = Math.max(1, Number(data.summary?.totalPages) || 1);
+      page += 1;
+    } while (page <= totalPages);
+    paymentRecords = records;
+    paymentDirectoryPage = 1;
+    renderPaymentsView();
+    return true;
+  } catch (error) {
+    paymentRecords = [];
+    if (list) list.innerHTML = `<div class="directory-empty" role="status">${escapeHtml(error.message || 'Unable to load payment history.')}</div>`;
+    if (status) status.textContent = error.message || 'Unable to load payment history.';
+    renderDirectoryPagination('paymentsPagination', 1, 0, 'payments', PAYMENT_DIRECTORY_PAGE_SIZE);
+    console.error('Payment history load failed:', error);
+    return false;
+  } finally {
+    paymentsLoading = false;
+  }
+}
+
+function renderPaymentsView() {
+  const list = document.getElementById('paymentsList');
+  const status = document.getElementById('paymentsStatus');
+  if (!list || !status) return;
+  const term = String(document.getElementById('paymentsSearch')?.value || '').trim().toLowerCase();
+  const from = document.getElementById('paymentsFrom')?.value || '';
+  const to = document.getElementById('paymentsTo')?.value || '';
+  const enriched = paymentRecords.map(payment => {
+    const paymentEmail = String(payment.email || payment.borrowerEmail || '').trim().toLowerCase();
+    const loan = customerLoans.find(item =>
+      (payment.loanId != null && String(item.id) === String(payment.loanId)) ||
+      (payment.loanReceiptId && String(item.receiptNumber) === String(payment.loanReceiptId)) ||
+      (payment.loanReceiptNumber && String(item.receiptNumber) === String(payment.loanReceiptNumber))
+    );
+    const user = allUsers.find(item => String(item.email || '').trim().toLowerCase() === paymentEmail) ||
+      (loan ? findCustomerForLoan(loan) : null);
+    const date = payment.paymentDate || payment.date;
+    return {
+      ...payment,
+      date,
+      borrowerName: payment.borrowerName || payment.fullName || user?.username || loan?.username || 'Customer',
+      email: payment.email || payment.borrowerEmail || loan?.email || '',
+      loanReceipt: payment.loanReceiptId || payment.loanReceiptNumber || loan?.receiptNumber || payment.loanId || '—',
+      receipt: payment.paymentReceiptId || payment.receiptNumber || payment.id || '—'
+    };
+  });
+  const filtered = enriched.filter(payment => {
+    const matchesText = !term || [
+      payment.receipt, payment.loanReceipt, payment.borrowerName, payment.email,
+      payment.phone, payment.mode, payment.recordedBy, payment.note
+    ].some(value => String(value || '').toLowerCase().includes(term));
+    return matchesText && dateMatchesRange(payment.date, from, to);
+  }).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+  const page = getDirectoryPage(filtered, paymentDirectoryPage, PAYMENT_DIRECTORY_PAGE_SIZE);
+  paymentDirectoryPage = page.currentPage;
+  status.textContent = `${filtered.length} recorded payment${filtered.length === 1 ? '' : 's'} match the filters · page ${page.currentPage} of ${page.pageCount}.`;
+  if (!page.items.length) {
+    list.innerHTML = `<div class="directory-empty" role="status">${paymentRecords.length ? 'No recorded payments match these filters.' : 'No payments have been recorded in this scope yet. Pending proofs appear under Loan Requests.'}</div>`;
+  } else {
+    list.innerHTML = `<table class="admin-table payment-history-table">
+      <thead><tr><th>Payment Receipt</th><th>Loan</th><th>Borrower</th><th>Date</th><th>Amount</th><th>Balance Before</th><th>Balance After</th><th>Mode</th><th>Recorded By</th><th>Note / Proof</th></tr></thead>
+      <tbody>${page.items.map(payment => `<tr>
+        <td class="loan-id-cell">${escapeHtml(payment.receipt)}</td>
+        <td>${escapeHtml(payment.loanReceipt)}</td>
+        <td><strong>${escapeHtml(payment.borrowerName)}</strong><small class="table-subtext">${escapeHtml(payment.email)}</small></td>
+        <td>${escapeHtml(formatDate(payment.date))}</td>
+        <td class="money-cell">${formatCurrency(payment.amount)}</td>
+        <td class="money-cell">${formatCurrency(payment.balanceBefore)}</td>
+        <td class="money-cell">${formatCurrency(payment.balanceAfter)}</td>
+        <td>${escapeHtml(formatStatus(payment.mode || '—'))}</td>
+        <td>${escapeHtml(payment.recordedBy || '—')}</td>
+        <td>${payment.screenshot ? `<a href="#" data-upload-filename="${escapeHtml(payment.screenshot)}">Proof</a>` : ''}${payment.note ? `<span class="table-subtext">${escapeHtml(payment.note)}</span>` : '—'}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+  renderDirectoryPagination('paymentsPagination', page.currentPage, filtered.length, 'payments', PAYMENT_DIRECTORY_PAGE_SIZE);
+}
+
+function renderLoanDirectory(pageId = activeAdminPage) {
+  const config = {
+    allLoansView: {
+      itemsId: 'allLoansList', paginationId: 'allLoansPagination', statusId: 'allLoansStatusMessage',
+      searchId: 'allLoansSearch', fromId: 'allLoansFrom', toId: 'allLoansTo', type: 'all'
+    },
+    overdueView: {
+      itemsId: 'overdueLoansList', paginationId: 'overduePagination', statusId: 'overdueStatusMessage',
+      searchId: 'overdueSearch', fromId: 'overdueFrom', toId: 'overdueTo', type: 'overdue'
+    },
+    defaultersView: {
+      itemsId: 'defaultersLoansList', paginationId: 'defaultersPagination', statusId: 'defaultersStatusMessage',
+      searchId: 'defaultersSearch', fromId: 'defaultersFrom', toId: 'defaultersTo', type: 'defaulted'
+    }
+  }[pageId];
+  if (!config) return;
+  const list = document.getElementById(config.itemsId);
+  const statusMessage = document.getElementById(config.statusId);
+  if (!list) return;
+  const term = String(document.getElementById(config.searchId)?.value || '').trim().toLowerCase();
+  const from = document.getElementById(config.fromId)?.value || '';
+  const to = document.getElementById(config.toId)?.value || '';
+  const selectedStatus = pageId === 'allLoansView' ? (document.getElementById('allLoansStatus')?.value || '') : '';
+  const currentPage = loanDirectoryPages[pageId] || 1;
+  const loans = (customerLoans.length || customerLoansLoaded ? customerLoans : portfolioLoans).filter(loan => {
+    const loanStatus = getLoanStatus(loan);
+    const balance = Number(loan.outstanding) || 0;
+    const isOverdue = ['grace', 'defaulted'].includes(loanStatus) && balance > 0;
+    const include = config.type === 'overdue'
+      ? isOverdue
+      : config.type === 'defaulted'
+        ? loanStatus === 'defaulted' && balance > 0
+        : true;
+    const user = findCustomerForLoan(loan) || {};
+    const matchesText = !term || [
+      loan.receiptNumber, loan.id, loan.email, loan.product, loan.status,
+      user.username, user.phone, user.nrc
+    ].some(value => String(value || '').toLowerCase().includes(term));
+    const dateField = config.type === 'all' ? (loan.approvedAt || loan.createdAt) : loan.dueDate;
+    const matchesDate = dateMatchesRange(dateField, from, to);
+    return include && matchesText && matchesDate && (!selectedStatus || loanStatus === selectedStatus);
+  }).sort((a, b) => new Date(b.approvedAt || b.createdAt || 0) - new Date(a.approvedAt || a.createdAt || 0));
+  const page = getDirectoryPage(loans, currentPage, LOAN_DIRECTORY_PAGE_SIZE);
+  loanDirectoryPages[pageId] = page.currentPage;
+  if (statusMessage) statusMessage.textContent = `${loans.length} loan${loans.length === 1 ? '' : 's'} match this view · page ${page.currentPage} of ${page.pageCount}${customerLoansError ? ` · ${customerLoansError}` : ''}.`;
+  if (!page.items.length) {
+    list.innerHTML = `<div class="directory-empty" role="status">${customerLoansError ? escapeHtml(customerLoansError) : config.type === 'overdue' ? 'No overdue loans with an outstanding balance were found.' : config.type === 'defaulted' ? 'No defaulted loans with an outstanding balance were found.' : 'No loans match these filters.'}</div>`;
+  } else {
+    list.innerHTML = `<table class="admin-table loan-directory-table">
+      <thead><tr><th>Loan ID</th><th>Borrower</th><th>Phone</th><th>Borrowed</th><th>Due Date</th><th>Status</th><th>Principal</th><th>Paid</th><th>Outstanding</th><th>Action</th></tr></thead>
+      <tbody>${page.items.map(loan => {
+        const user = findCustomerForLoan(loan) || {};
+        const loanStatus = getLoanStatus(loan);
+        const paid = Array.isArray(loan.payments)
+          ? loan.payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0)
+          : Number(loan.paidTotal) || 0;
+        const notify = ['grace', 'defaulted'].includes(loanStatus) && Number(loan.outstanding) > 0;
+        const action = notify
+          ? `<button type="button" class="quick-red-small" data-notify-loan="${escapeHtml(loan.id)}">Notify</button>`
+          : `<button type="button" class="row-view" data-user-id="${escapeHtml(user.id ?? '')}" ${user.id == null ? 'disabled' : ''}>Borrower</button>`;
+        return `<tr>
+          <td class="loan-id-cell">${escapeHtml(loan.receiptNumber || loan.id)}</td>
+          <td><strong>${escapeHtml(user.username || loan.username || loan.borrowerName || 'Customer')}</strong><small class="table-subtext">${escapeHtml(loan.email || '')}</small></td>
+          <td>${escapeHtml(user.phone || loan.phone || '—')}</td>
+          <td>${escapeHtml(formatDate(loan.approvedAt))}</td>
+          <td>${escapeHtml(formatDate(loan.dueDate))}</td>
+          <td><span class="admin-status status-${escapeHtml(loanStatus)}">${escapeHtml(formatStatus(loanStatus))}</span></td>
+          <td class="money-cell">${formatCurrency(loan.amount)}</td>
+          <td class="money-cell">${formatCurrency(paid)}</td>
+          <td class="money-cell ${Number(loan.outstanding) > 0 ? 'outstanding-positive' : ''}">${formatCurrency(loan.outstanding)}</td>
+          <td class="admin-row-actions">${action}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  }
+  renderDirectoryPagination(config.paginationId, page.currentPage, loans.length, pageId, LOAN_DIRECTORY_PAGE_SIZE);
+}
+
+function renderKpiSparkline(values, color, label) {
+  const width = 84;
+  const height = 34;
+  const max = Math.max(1, ...values);
+  const points = values.map((value, index) => {
+    const x = values.length < 2 ? width / 2 : 2 + index * (width - 4) / (values.length - 1);
+    const y = height - 3 - (value / max) * (height - 8);
+    return `${x},${y}`;
+  });
+  const line = points.map((point, index) => `${index ? 'L' : 'M'} ${point}`).join(' ');
+  const firstX = points.length ? points[0].split(',')[0] : '2';
+  const lastX = points.length ? points[points.length - 1].split(',')[0] : String(width - 2);
+  const area = `${line} L ${lastX},${height} L ${firstX},${height} Z`;
+  return `<svg class="kpi-sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(label)}"><path d="${area}" fill="${color}" opacity=".15"></path><path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
+}
+
+function renderLoanTablePagination(pageCount, currentPage) {
+  const nav = document.getElementById('loanTablePagination');
+  if (!nav) return;
+  if (pageCount <= 1) {
+    nav.innerHTML = '';
+    return;
+  }
+  const start = Math.max(1, Math.min(currentPage - 2, pageCount - 4));
+  const end = Math.min(pageCount, start + 4);
+  const numbers = Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  nav.innerHTML = `<button type="button" data-loan-page="${currentPage - 1}" aria-label="Previous loan page" ${currentPage === 1 ? 'disabled' : ''}>&lt;</button>${numbers.map(page => `<button type="button" data-loan-page="${page}" aria-current="${page === currentPage ? 'page' : 'false'}">${page}</button>`).join('')}<button type="button" data-loan-page="${currentPage + 1}" aria-label="Next loan page" ${currentPage === pageCount ? 'disabled' : ''}>&gt;</button>`;
+}
+
+function setDashboardNavActive(activeButton) {
+  document.querySelectorAll('#adminSidebar .admin-nav-item').forEach(button => {
+    const active = button === activeButton;
+    button.classList.toggle('active', active);
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+}
+
 function renderPortfolioOverview() {
   const kpis = document.getElementById('portfolioKpis');
   const chart = document.getElementById('collectionsChart');
   const activityList = document.getElementById('recentActivity');
   const loyalList = document.getElementById('loyalBorrowers');
   if (!kpis || !chart || !activityList || !loyalList) return;
-  const activeStatuses = ['active', 'grace', 'defaulted', 'liquidated'];
-  const active = portfolioLoans.filter(loan => activeStatuses.includes(getLoanStatus(loan)));
-  const overdue = portfolioLoans.filter(loan => ['grace', 'defaulted'].includes(getLoanStatus(loan)));
-  const defaulters = portfolioLoans.filter(loan => getLoanStatus(loan) === 'defaulted');
-  const outstanding = active.reduce((sum, loan) => sum + Math.max(0, Number(loan.outstanding) || 0), 0);
-  const overdueOutstanding = overdue.reduce((sum, loan) => sum + Math.max(0, Number(loan.outstanding) || 0), 0);
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const paymentDate = payment => {
-    const raw = payment.paymentDate || payment.date;
-    const date = raw ? new Date(raw) : null;
-    return date && !Number.isNaN(date.getTime()) ? date : null;
-  };
-  const monthPayments = portfolioLoans.flatMap(loan => Array.isArray(loan.payments) ? loan.payments : [])
-    .filter(payment => { const date = paymentDate(payment); return date && date >= monthStart && date < monthEnd; });
-  const collectedMonth = monthPayments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
-  const monthLabel = document.getElementById('collectionMonthLabel');
-  if (monthLabel) monthLabel.textContent = now.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-  const kpiData = [
-    ['Cash Collected', formatCurrency(collectedMonth), `${monthPayments.length} payments this month`, 'blue'],
-    ['Active Loans', String(active.length), `${pendingRequests.length} awaiting approval`, 'green'],
-    ['Overdue', String(overdue.length), `${formatCurrency(overdueOutstanding)} outstanding`, 'amber'],
-    ['Defaulters', String(defaulters.length), 'Past due with balance remaining', 'red']
-  ];
-  kpis.innerHTML = kpiData.map(([label, value, note, color]) => `<article class="admin-kpi-card accent-${color}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></article>`).join('');
 
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const monthlyDays = Array.from({ length: daysInMonth }, (_, index) => {
-    const dayDate = new Date(now.getFullYear(), now.getMonth(), index + 1);
-    const amount = monthPayments.reduce((sum, payment) => {
-      const date = paymentDate(payment);
-      return date && date.getDate() === index + 1 ? sum + (Number(payment.amount) || 0) : sum;
-    }, 0);
-    return { date: dayDate, amount };
+  const now = new Date();
+  const todayKey = dashboardDateKey(now);
+  const active = portfolioLoans.filter(loan => getLoanStatus(loan) === 'active');
+  const openLoans = portfolioLoans.filter(loan =>
+    ['active', 'grace', 'defaulted', 'liquidated'].includes(getLoanStatus(loan)) &&
+    Number(loan.outstanding) > 0
+  );
+  const overdue = portfolioLoans.filter(loan => ['grace', 'defaulted'].includes(getLoanStatus(loan)));
+  const openBalance = openLoans.reduce((sum, loan) => sum + Math.max(0, Number(loan.outstanding) || 0), 0);
+  const overdueBalance = overdue.reduce((sum, loan) => sum + Math.max(0, Number(loan.outstanding) || 0), 0);
+  const payments = getDashboardPayments();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthPayments = payments.filter(item => item.date >= monthStart && dashboardDateKey(item.date) <= todayKey);
+  const collectedMonth = monthPayments.reduce((sum, item) => sum + (Number(item.payment.amount) || 0), 0);
+  const monthLabel = document.getElementById('collectionMonthLabel');
+  if (monthLabel) monthLabel.textContent = `Last ${activeCollectionRange === '7D' ? 7 : activeCollectionRange === '1M' ? 30 : activeCollectionRange === '3M' ? 90 : 365} days`;
+
+  const sparkDays = Array.from({ length: 14 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13 + index);
+    return { date, key: dashboardDateKey(date) };
   });
-  const max = Math.max(100, ...monthlyDays.map(day => day.amount));
-  const width = 1000; const height = 250; const left = 48; const top = 14; const bottom = 34;
-  const plotW = width - left - 12; const plotH = height - top - bottom;
-  const yTicks = 4;
-  const grid = Array.from({ length: yTicks + 1 }, (_, i) => {
-    const y = top + (plotH / yTicks) * i;
-    const value = max * (1 - i / yTicks);
-    return `<g><line x1="${left}" y1="${y}" x2="${width - 8}" y2="${y}"/><text x="${left - 8}" y="${y + 4}" text-anchor="end">K${Math.round(value)}</text></g>`;
+  const paymentByDay = new Map();
+  payments.forEach(item => {
+    const key = dashboardDateKey(item.date);
+    paymentByDay.set(key, (paymentByDay.get(key) || 0) + (Number(item.payment.amount) || 0));
+  });
+  const activeByDay = new Map();
+  active.forEach(loan => {
+    const key = dashboardDateKey(loan.approvedAt);
+    if (key) activeByDay.set(key, (activeByDay.get(key) || 0) + 1);
+  });
+  const overdueByDay = new Map();
+  overdue.forEach(loan => {
+    const key = dashboardDateKey(loan.dueDate);
+    if (key) overdueByDay.set(key, (overdueByDay.get(key) || 0) + 1);
+  });
+  const balanceByDay = new Map();
+  openLoans.forEach(loan => {
+    const key = dashboardDateKey(loan.approvedAt);
+    if (key) balanceByDay.set(key, (balanceByDay.get(key) || 0) + Math.max(0, Number(loan.outstanding) || 0));
+  });
+  const sparklineValues = {
+    cash: sparkDays.map(day => paymentByDay.get(day.key) || 0),
+    active: sparkDays.map(day => activeByDay.get(day.key) || 0),
+    overdue: sparkDays.map(day => overdueByDay.get(day.key) || 0),
+    balance: sparkDays.map(day => balanceByDay.get(day.key) || 0)
+  };
+  const kpiData = [
+    { label: 'Cash Collected', value: formatCurrency(collectedMonth), note: `${monthPayments.length} payments this month`, color: '#2f81f7', accent: 'blue', spark: 'cash', metric: 'payments by date' },
+    { label: 'Active Loans', value: String(active.length), note: `${pendingRequests.length} requests awaiting review`, color: '#d29922', accent: 'amber', spark: 'active', metric: 'active loans by approval date' },
+    { label: 'Overdue Loans', value: String(overdue.length), note: `${formatCurrency(overdueBalance)} outstanding`, color: '#f85149', accent: 'red', spark: 'overdue', metric: 'overdue loans by due date' },
+    { label: 'Outstanding Balance', value: formatCurrency(openBalance), note: 'Across all open loans', color: '#a371f7', accent: 'purple', spark: 'balance', metric: 'open balances by approval date' }
+  ];
+  kpis.innerHTML = kpiData.map(item => `
+    <article class="admin-kpi-card accent-${item.accent}">
+      <div class="kpi-copy"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong><small>${escapeHtml(item.note)}</small></div>
+      ${renderKpiSparkline(sparklineValues[item.spark], item.color, `${item.label}: ${item.metric}, last 14 days`)}
+    </article>
+  `).join('');
+
+  const rangeDays = { '7D': 7, '1M': 30, '3M': 90, '1Y': 365 }[activeCollectionRange] || 30;
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - rangeDays + 1);
+  const dates = Array.from({ length: rangeDays }, (_, index) =>
+    new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate() + index)
+  );
+  const rangeStart = firstDay.getTime();
+  const rangeEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+  const chartPayments = new Map();
+  payments.forEach(item => {
+    if (item.date.getTime() < rangeStart || item.date.getTime() >= rangeEnd) return;
+    const key = dashboardDateKey(item.date);
+    chartPayments.set(key, (chartPayments.get(key) || 0) + (Number(item.payment.amount) || 0));
+  });
+  const chartLoans = new Map();
+  portfolioLoans.forEach(loan => {
+    if (getLoanStatus(loan) === 'pending' || getLoanStatus(loan) === 'declined') return;
+    const date = parseDashboardDate(loan.approvedAt);
+    if (!date || date.getTime() < rangeStart || date.getTime() >= rangeEnd) return;
+    const key = dashboardDateKey(date);
+    chartLoans.set(key, (chartLoans.get(key) || 0) + (Number(loan.amount) || 0));
+  });
+  const series = dates.map(date => ({
+    date,
+    payments: chartPayments.get(dashboardDateKey(date)) || 0,
+    loans: chartLoans.get(dashboardDateKey(date)) || 0
+  }));
+  const chartWidth = 1000;
+  const chartHeight = 250;
+  const left = 76;
+  const right = 18;
+  const top = 16;
+  const bottom = 34;
+  const plotWidth = chartWidth - left - right;
+  const plotHeight = chartHeight - top - bottom;
+  const max = Math.max(1, ...series.map(point => Math.max(point.payments, point.loans)));
+  const x = index => left + (series.length <= 1 ? 0 : index * plotWidth / (series.length - 1));
+  const y = value => top + plotHeight - (value / max) * plotHeight;
+  const pointsFor = field => series.map((point, index) => ({ x: x(index), y: y(point[field]), value: point[field] }));
+  const makeLine = points => points.map((point, index) => `${index ? 'L' : 'M'} ${point.x},${point.y}`).join(' ');
+  const makeArea = points => `${makeLine(points)} L ${points[points.length - 1]?.x || left},${top + plotHeight} L ${points[0]?.x || left},${top + plotHeight} Z`;
+  const paymentPoints = pointsFor('payments');
+  const loanPoints = pointsFor('loans');
+  const grid = Array.from({ length: 5 }, (_, index) => {
+    const value = max * (1 - index / 4);
+    const yPosition = top + plotHeight * index / 4;
+    return `<g><line x1="${left}" y1="${yPosition}" x2="${chartWidth - right}" y2="${yPosition}"/><text x="${left - 10}" y="${yPosition + 4}" text-anchor="end">${escapeHtml(formatCurrency(value))}</text></g>`;
   }).join('');
-  const bars = monthlyDays.map((day, index) => {
-    const bw = Math.max(5, (plotW / daysInMonth) * .54);
-    const x = left + (index + .23) * (plotW / daysInMonth);
-    const barH = day.amount ? Math.max(2, (day.amount / max) * plotH) : 0;
-    const y = top + plotH - barH;
-    const title = `${day.date.toLocaleDateString('en-GB')}: ${formatCurrency(day.amount)}`;
-    return `<g><title>${escapeHtml(title)}</title>${day.amount ? `<rect x="${x}" y="${y}" width="${bw}" height="${barH}" rx="3"/>` : ''}${(index === 0 || (index + 1) % 5 === 0 || index === daysInMonth - 1) ? `<text x="${x + bw / 2}" y="${height - 8}" text-anchor="middle">${index + 1}</text>` : ''}</g>`;
+  const tickIndexes = [...new Set([0, Math.floor((series.length - 1) / 4), Math.floor((series.length - 1) / 2), Math.floor((series.length - 1) * 3 / 4), series.length - 1])];
+  const xLabels = tickIndexes.map(index =>
+    `<text x="${x(index)}" y="${chartHeight - 8}" text-anchor="middle">${escapeHtml(dates[index].toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }))}</text>`
+  ).join('');
+  const tooltips = tickIndexes.map(index => {
+    const point = series[index];
+    return `<g><circle cx="${x(index)}" cy="${y(point.payments)}" r="4" fill="#2f81f7"><title>${escapeHtml(formatDate(point.date))} · Payments: ${escapeHtml(formatCurrency(point.payments))} · New loans: ${escapeHtml(formatCurrency(point.loans))}</title></circle><circle cx="${x(index)}" cy="${y(point.loans)}" r="4" fill="#3fb950"><title>${escapeHtml(formatDate(point.date))} · Payments: ${escapeHtml(formatCurrency(point.payments))} · New loans: ${escapeHtml(formatCurrency(point.loans))}</title></circle></g>`;
   }).join('');
-  chart.innerHTML = `<svg class="collections-svg admin-month-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Daily collections for ${escapeHtml(monthLabel?.textContent || 'this month')}">${grid}${bars}</svg><p>Collected this month: <strong>${formatCurrency(collectedMonth)}</strong></p>`;
+  chart.innerHTML = `<svg class="collections-svg admin-month-chart" viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="Daily payments received and newly approved loan amounts for the last ${rangeDays} days">
+    ${grid}${xLabels}
+    <path d="${makeArea(paymentPoints)}" fill="#2f81f7" opacity=".1"></path>
+    <path d="${makeArea(loanPoints)}" fill="#3fb950" opacity=".1"></path>
+    <path d="${makeLine(paymentPoints)}" fill="none" stroke="#2f81f7" stroke-width="3"></path>
+    <path d="${makeLine(loanPoints)}" fill="none" stroke="#3fb950" stroke-width="3"></path>
+    ${tooltips}
+  </svg>`;
+  document.querySelectorAll('[data-collection-range]').forEach(button => {
+    const selected = button.dataset.collectionRange === activeCollectionRange;
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
 
   const activity = portfolioLoans.flatMap(loan => {
     const customer = findCustomerForLoan(loan) || {};
-    const name = customer.username || customer.name || 'Customer';
-    const loanId = loan.receiptNumber || `BMF-${loan.id}`;
+    const name = customer.username || loan.email || 'Customer';
+    const loanId = loan.receiptNumber || String(loan.id);
     const events = [];
     const history = Array.isArray(loan.statusHistory) ? loan.statusHistory : [];
     const latestHistory = history.at(-1);
-    if (latestHistory?.updatedAt || loan.updatedAt) {
-      const status = String(latestHistory?.status || loan.status || '').toLowerCase();
-      const kind = status === 'pending' ? 'amber' : ['declined', 'defaulted'].includes(status) ? 'red' : 'blue';
-      const text = status === 'pending' ? `New loan request — ${name} ${formatCurrency(loan.amount)}` : `Loan ${loanId} ${formatStatus(status).toLowerCase()} — ${name}`;
-      events.push({ at: latestHistory?.updatedAt || loan.updatedAt, text, kind });
+    const status = String(latestHistory?.status || loan.status || '').toLowerCase();
+    const statusDate = latestHistory?.updatedAt || loan.updatedAt;
+    if (statusDate) {
+      const kind = status === 'pending' ? 'amber' : ['declined', 'defaulted', 'grace'].includes(status) ? 'red' : ['paid', 'active'].includes(status) ? 'green' : 'blue';
+      const title = status === 'pending' ? 'New Loan Request' : status === 'approved' ? 'Loan Approved' : `Loan ${formatStatus(status)}`;
+      events.push({ at: statusDate, title, detail: `${name} · ${loanId}`, amount: Number(loan.amount) || 0, kind });
     }
-    (Array.isArray(loan.payments) ? loan.payments : []).forEach(payment => events.push({ at: payment.paymentDate || payment.date, text: `Payment ${formatCurrency(payment.amount)} received — ${name}`, kind: 'green' }));
+    (Array.isArray(loan.payments) ? loan.payments : []).forEach(payment => {
+      events.push({
+        at: payment.paymentDate || payment.date,
+        title: 'Payment Received',
+        detail: `${name} · ${payment.paymentReceiptId || loanId}`,
+        amount: Number(payment.amount) || 0,
+        kind: 'green'
+      });
+    });
     return events;
-  }).filter(item => item.at).sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 5);
-  activityList.innerHTML = activity.length ? activity.map(item => `<li class="activity-${item.kind}"><span>${escapeHtml(item.text)}</span><small>${escapeHtml(formatRelativeTime(item.at))}</small></li>`).join('') : '<li class="activity-empty">No recent loan activity.</li>';
+  }).filter(item => parseDashboardDate(item.at))
+    .sort((a, b) => new Date(b.at) - new Date(a.at))
+    .slice(0, 5);
+  activityList.innerHTML = activity.length ? activity.map(item => `
+    <li class="activity-${item.kind}">
+      <i class="activity-dot" aria-hidden="true"></i>
+      <div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p><small>${escapeHtml(formatRelativeTime(item.at))}</small></div>
+      <b>${formatCurrency(item.amount)}</b>
+    </li>
+  `).join('') : '<li class="activity-empty">No recent loan activity.</li>';
 
   const search = String(document.getElementById('adminDashboardSearch')?.value || '').trim().toLowerCase();
-  const visibleLoans = portfolioLoans.filter(loan => {
-    if (!search) return true;
+  const statusFilter = document.getElementById('loanStatusFilter')?.value || '';
+  const filteredLoans = portfolioLoans.filter(loan => {
     const customer = findCustomerForLoan(loan) || {};
-    return [loan.receiptNumber, loan.id, loan.email, loan.product, customer.username, customer.phone]
-      .some(value => String(value || '').toLowerCase().includes(search));
-  }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 12);
+    const textMatches = !search || [
+      loan.receiptNumber, loan.id, loan.email, loan.product, loan.status, customer.username, customer.phone
+    ].some(value => String(value || '').toLowerCase().includes(search));
+    return textMatches && (!statusFilter || getLoanStatus(loan) === statusFilter);
+  }).sort((a, b) => new Date(b.approvedAt || 0) - new Date(a.approvedAt || 0) || Number(b.id) - Number(a.id));
+  const pageCount = Math.max(1, Math.ceil(filteredLoans.length / LOAN_TABLE_PAGE_SIZE));
+  loanTablePage = Math.min(Math.max(1, loanTablePage), pageCount);
+  const pageStart = (loanTablePage - 1) * LOAN_TABLE_PAGE_SIZE;
+  const visibleLoans = filteredLoans.slice(pageStart, pageStart + LOAN_TABLE_PAGE_SIZE);
   const loanTable = document.getElementById('adminLoanTable');
-  if (loanTable) loanTable.innerHTML = visibleLoans.length ? `<table class="admin-table"><thead><tr><th>Loan ID</th><th>Borrower</th><th>Amount</th><th>Interest</th><th>Total</th><th>Due Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>${visibleLoans.map(loan => {
-    const customer = findCustomerForLoan(loan) || {};
-    const status = getLoanStatus(loan);
-    const customerId = customer.id;
-    const canRecord = ['active', 'grace', 'defaulted'].includes(status) && Number(loan.outstanding) > 0;
-    const actionLabel = status === 'pending' ? 'Review' : ['grace', 'defaulted'].includes(status) ? 'Notify' : status === 'paid' ? 'Receipt' : canRecord ? 'Pay' : 'View';
-    const actionClass = ['grace', 'defaulted'].includes(status) ? 'quick-red-small' : 'quick-blue-small';
-    const quickAction = ['grace', 'defaulted'].includes(status)
-      ? `<button type="button" class="${actionClass}" data-notify-loan="${escapeHtml(loan.id)}">Notify</button>`
-      : customerId != null ? `<button type="button" class="${actionClass}" data-user-id="${escapeHtml(customerId)}">${actionLabel}</button>` : '<span>—</span>';
-    return `<tr data-loan-row><td class="loan-id-cell">${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</td><td>${escapeHtml(customer.username || loan.email || 'Customer')}</td><td>${formatCurrency(loan.amount)}</td><td>${formatCurrency(loan.interestAmount || 0)}</td><td>${formatCurrency(loan.totalRepayment || loan.amount || 0)}</td><td>${escapeHtml(formatDate(loan.dueDate))}</td><td><span class="admin-status status-${escapeHtml(status)}">${escapeHtml(formatStatus(status))}</span></td><td class="admin-row-actions">${quickAction}<button type="button" class="row-view" data-user-id="${escapeHtml(customerId ?? '')}" ${customerId == null ? 'disabled' : ''}>View</button></td></tr>`;
-  }).join('')}</tbody></table>` : '<p class="table-empty">No loans match this search.</p>';
+  if (loanTable) loanTable.innerHTML = visibleLoans.length ? `
+    <table class="admin-table">
+      <thead><tr><th>Loan ID</th><th>Borrower</th><th>Date</th><th>Status</th><th>Amount</th><th>Outstanding</th><th>Action</th></tr></thead>
+      <tbody>${visibleLoans.map(loan => {
+        const customer = findCustomerForLoan(loan) || {};
+        const status = getLoanStatus(loan);
+        const customerId = customer.id;
+        const overdueLoan = ['grace', 'defaulted'].includes(status);
+        const action = overdueLoan
+          ? `<button type="button" class="quick-red-small" data-notify-loan="${escapeHtml(loan.id)}">Notify</button>`
+          : `<button type="button" class="row-view" data-user-id="${escapeHtml(customerId ?? '')}" ${customerId == null ? 'disabled' : ''}>View / Manage</button>`;
+        return `<tr data-loan-row>
+          <td class="loan-id-cell">${escapeHtml(loan.receiptNumber || String(loan.id))}</td>
+          <td><strong>${escapeHtml(customer.username || loan.email || 'Customer')}</strong><small class="table-subtext">${escapeHtml(loan.email || '')}</small></td>
+          <td>${escapeHtml(formatDate(loan.approvedAt))}</td>
+          <td><span class="admin-status status-${escapeHtml(status)}">${escapeHtml(formatStatus(status))}</span></td>
+          <td class="money-cell">${formatCurrency(loan.amount)}</td>
+          <td class="money-cell ${Number(loan.outstanding) > 0 ? 'outstanding-positive' : ''}">${formatCurrency(loan.outstanding)}</td>
+          <td class="admin-row-actions">${action}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>` : '<p class="table-empty">No loans match the current search and status filter.</p>';
+  renderLoanTablePagination(pageCount, loanTablePage);
 
   const customerMap = new Map();
   portfolioLoans.forEach(loan => {
-    const key = String(loan.email || '').trim().toLowerCase();
-    if (!key) return;
-    const item = customerMap.get(key) || { email: loan.email, count: 0, paid: 0, lastPayment: null };
-    item.count += 1;
+    const email = String(loan.email || '').trim().toLowerCase();
+    if (!email) return;
+    const customer = customerMap.get(email) || { email, loans: [], totalPaid: 0, lastPayment: null };
+    customer.loans.push(loan);
     (Array.isArray(loan.payments) ? loan.payments : []).forEach(payment => {
-      item.paid += Number(payment.amount) || 0;
-      const date = paymentDate(payment);
-      if (date && (!item.lastPayment || date > item.lastPayment)) item.lastPayment = date;
+      customer.totalPaid += Number(payment.amount) || 0;
+      const date = parseDashboardDate(payment.paymentDate || payment.date);
+      if (date && (!customer.lastPayment || date > customer.lastPayment)) customer.lastPayment = date;
     });
-    customerMap.set(key, item);
+    customerMap.set(email, customer);
   });
-  const loyal = [...customerMap.values()].filter(customer => customer.count > 1)
-    .sort((a, b) => b.count - a.count || b.paid - a.paid).slice(0, 5);
-  loyalList.innerHTML = loyal.length ? `<table class="admin-table loyal-table"><thead><tr><th>#</th><th>Borrower</th><th>Phone</th><th>Total Loans</th><th>Total Repaid</th><th>Last Payment</th><th>Standing</th></tr></thead><tbody>${loyal.map((customer, index) => {
-    const user = findCustomerForLoan({ email: customer.email }) || {};
-    const stats = getCustomerLoanStats(customer.email);
-    const standing = formatStatus(stats.status);
-    return `<tr><td>${index + 1}</td><td>${escapeHtml(user.username || customer.email)}</td><td>${escapeHtml(user.phone || '—')}</td><td>${customer.count}</td><td class="paid-cell">${formatCurrency(customer.paid)}</td><td>${customer.lastPayment ? escapeHtml(formatDate(customer.lastPayment)) : '—'}</td><td><span class="admin-status status-${escapeHtml(String(stats.status).toLowerCase())}">${escapeHtml(standing)}</span></td></tr>`;
-  }).join('')}</tbody></table>` : '<p class="table-empty">Returning borrowers will appear here after their second loan.</p>';
+  const loyal = [...customerMap.values()].map(customer => {
+    const settled = customer.loans.filter(loan => {
+      const status = getLoanStatus(loan);
+      return status !== 'declined' && (status === 'paid' || Number(loan.outstanding) <= 0);
+    });
+    const overdueHistory = customer.loans.some(loan => {
+      const history = Array.isArray(loan.statusHistory) ? loan.statusHistory : [];
+      return ['grace', 'defaulted'].includes(getLoanStatus(loan)) ||
+        history.some(event => ['grace', 'defaulted'].includes(String(event.status || '').toLowerCase()));
+    });
+    const outcomes = settled.map(loan => {
+      const paymentsForLoan = Array.isArray(loan.payments) ? loan.payments : [];
+      const settledAt = parseDashboardDate(loan.settledAt) ||
+        paymentsForLoan.map(payment => parseDashboardDate(payment.paymentDate || payment.date))
+          .filter(Boolean).sort((a, b) => b - a)[0];
+      const dueDate = parseDashboardDate(loan.dueDate);
+      return settledAt && dueDate ? settledAt <= dueDate : null;
+    });
+    const hasCompleteDates = outcomes.length > 0 && outcomes.every(outcome => outcome !== null);
+    const onTimeRate = hasCompleteDates ? outcomes.filter(Boolean).length / outcomes.length : null;
+    return { ...customer, settledCount: settled.length, overdueHistory, onTimeRate };
+  }).filter(customer =>
+    !customer.overdueHistory && customer.onTimeRate !== null && customer.onTimeRate >= 0.9
+  ).sort((a, b) => b.onTimeRate - a.onTimeRate || b.totalPaid - a.totalPaid).slice(0, 5);
+  loyalList.innerHTML = loyal.length ? `
+    <table class="admin-table loyal-table">
+      <thead><tr><th>#</th><th>Borrower</th><th>Phone</th><th>Total Loans</th><th>Total Repaid</th><th>On-Time Rate</th><th>Last Payment</th><th>Badge</th></tr></thead>
+      <tbody>${loyal.map((customer, index) => {
+        const user = findCustomerForLoan({ email: customer.email }) || {};
+        const tier = customer.settledCount >= 3 && customer.onTimeRate === 1
+          ? { name: 'Gold', icon: '★', cls: 'gold' }
+          : customer.settledCount >= 1
+            ? { name: 'Trusted', icon: '✓', cls: 'trusted' }
+            : { name: 'Reliable', icon: '●', cls: 'reliable' };
+        return `<tr>
+          <td>${index + 1}</td>
+          <td><strong>${escapeHtml(user.username || customer.email)}</strong><small class="table-subtext">${escapeHtml(customer.email)}</small></td>
+          <td>${escapeHtml(user.phone || '—')}</td>
+          <td>${customer.loans.length}</td>
+          <td class="paid-cell">${formatCurrency(customer.totalPaid)}</td>
+          <td class="loyal-rate">${Math.round(customer.onTimeRate * 100)}%</td>
+          <td>${customer.lastPayment ? escapeHtml(formatDate(customer.lastPayment)) : '—'}</td>
+          <td><span class="loyalty-badge ${tier.cls}">${tier.icon} ${tier.name}</span></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>` : '<p class="table-empty">No fully settled loans with verifiable on-time dates are recorded yet.</p>';
 }
 
 function formatRelativeTime(value) {
@@ -898,25 +1411,30 @@ function renderAdminFeedbackPreview() {
 async function fetchAdminNotifications() {
   try {
     const response = await fetch('/notifications', { headers: getStoreHeaders() });
-    if (!response.ok) return;
     const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Unable to load notifications.');
     adminNotifications = Array.isArray(data) ? data : Array.isArray(data.notifications) ? data.notifications : [];
     renderAdminNotifications();
-  } catch { /* notification refresh is best effort; core dashboard remains available */ }
+    return true;
+  } catch (error) {
+    console.error('Notification refresh failed:', error);
+    const list = document.getElementById('adminNotificationList');
+    if (list) list.innerHTML = '<p class="notification-error" role="status">Notifications could not be loaded. Close and reopen this menu to retry.</p>';
+    return false;
+  }
 }
 
-// Quick Screen bell badge: count pending applications
 async function refreshBellCount() {
   try {
-    const res = await fetch('/api/apply?status=pending', { headers: getStoreHeaders() });
-    const data = await res.json().catch(() => ({}));
-    const pending = (data.applications || data).filter(a => String(a.status || '').toLowerCase() === 'pending').length;
-    const badge = document.getElementById('bell-badge');
-    if (badge) {
-      badge.textContent = String(pending);
-      badge.style.display = pending > 0 ? 'flex' : 'none';
-    }
-  } catch { /* bell badge is best effort */ }
+    const response = await fetch('/api/apply?notificationsOnly=true', { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to sync application notifications.');
+    await fetchAdminNotifications();
+  } catch (error) {
+    console.error('Application notification sync failed:', error);
+    const list = document.getElementById('adminNotificationList');
+    if (list) list.innerHTML = `<p class="notification-error" role="status">${escapeHtml(error.message || 'Application notifications could not be refreshed.')}</p>`;
+  }
 }
 
 function renderAdminNotifications() {
@@ -926,13 +1444,22 @@ function renderAdminNotifications() {
   const unread = adminNotifications.filter(item => !item.readAt).length;
   badge.textContent = String(unread);
   badge.classList.toggle('hidden', unread === 0);
-  const recent = adminNotifications.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 6);
+  const recent = adminNotifications.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    .slice(0, showAllAdminNotifications ? 50 : 6);
+  const showAllButton = document.getElementById('viewAllNotifications');
+  if (showAllButton) showAllButton.textContent = showAllAdminNotifications ? 'Show recent notifications' : 'View all notifications';
   list.innerHTML = recent.length ? recent.map(item => {
     const reviewLabel = item.type === 'loan-request' ? 'Review request' : item.type === 'payment-review' ? 'Review payment' : '';
-    const action = reviewLabel
+    const loanAction = reviewLabel
       ? `<button type="button" data-notification-open-loan="${escapeHtml(item.loanId)}" data-notification-id="${escapeHtml(item.id)}">${reviewLabel}</button>`
       : '';
-    return `<article class="notification-item ${item.readAt ? '' : 'unread'}"><strong>${escapeHtml(formatStatus(item.type || 'Update'))}</strong><p>${escapeHtml(item.message || 'There is an update to review.')}</p><small>${escapeHtml(formatRelativeTime(item.createdAt))}</small>${action}</article>`;
+    const applicationActions = item.type === 'application-request'
+      ? `<div class="notification-actions">
+          ${String(item.applicationStatus || 'pending').toLowerCase() === 'pending' ? `<button type="button" data-notification-application-action="approve" data-application-id="${escapeHtml(item.applicationId)}">Approve</button><button type="button" class="notification-decline" data-notification-application-action="reject" data-application-id="${escapeHtml(item.applicationId)}">Decline</button>` : ''}
+          <button type="button" class="notification-view" data-notification-application-action="view" data-application-id="${escapeHtml(item.applicationId)}">View</button>
+        </div>`
+      : '';
+    return `<article class="notification-item ${item.readAt ? '' : 'unread'}"><strong>${escapeHtml(formatStatus(item.type || 'Update'))}</strong><p>${escapeHtml(item.message || 'There is an update to review.')}</p><small>${escapeHtml(formatRelativeTime(item.createdAt))}</small>${loanAction}${applicationActions}</article>`;
   }).join('') : '<p class="table-empty">You are all caught up.</p>';
 }
 
@@ -941,10 +1468,14 @@ async function markAdminNotificationRead(id) {
   if (!item || item.readAt) return;
   try {
     const response = await fetch(`/notifications/${encodeURIComponent(id)}/read`, { method: 'PATCH', headers: getStoreHeaders() });
-    if (!response.ok) return;
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to mark the notification as read.');
     item.readAt = new Date().toISOString();
     renderAdminNotifications();
-  } catch { /* keep the notification unread if the write failed */ }
+  } catch (error) {
+    console.error('Notification read update failed:', error);
+    showBmfToast(error.message || 'Unable to mark the notification as read.', 'error');
+  }
 }
 
 async function notifySelectedUser() {
@@ -1011,82 +1542,6 @@ BMF Customer Service`;
     document.getElementById('detailFeedback').textContent = `FAILED: ${err.message || 'Unable to send notification.'}`;
   } finally {
     if (notifyButton) { notifyButton.disabled = false; notifyButton.textContent = 'Notify this customer'; }
-  }
-}
-
-async function fetchReportData() {
-  const metrics = document.getElementById('storeReportMetrics');
-  const table = document.getElementById('storeReportTable');
-  const note = document.getElementById('storeReportNote');
-  metrics.innerHTML = '<p>Loading report summary...</p>';
-  table.innerHTML = '';
-  note.textContent = '';
-
-  try {
-    maybeRedirectToLoginIfNoToken();
-    const scope = reportScope;
-    const endpoint = REPORT_ENDPOINT[reportType] || 'summary';
-    const qs = new URLSearchParams();
-    if (reportFrom) qs.set('from', reportFrom);
-    if (reportTo) qs.set('to', reportTo);
-    const url = `/reports/${scope}/${endpoint}${qs.toString() ? '?' + qs.toString() : ''}`;
-
-    const response = await fetch(url, { headers: getStoreHeaders() });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Unable to load BMF reports.');
-
-    // --- Render summary metrics ---
-    const summary = data.summary || {};
-    const values = [
-      ['Total loans', String(summary.totalLoans || summary.settledCount || summary.overdue || summary.defaulters || summary.active || 0)],
-      ['Cash collected', formatCurrency(summary.cashCollected || summary.totalCollected || 0)],
-      ['Gross interest booked', formatCurrency(summary.grossInterestBooked || summary.totalInterestBooked || 0)],
-      ['Outstanding', formatCurrency(summary.totalOutstanding || 0)],
-      ['Pending payments', String(summary.pendingPayments || 0)],
-      ['Defaulters', String(summary.defaulters || 0)],
-      ['Settled loans', String(summary.settledLoans || summary.paid || 0)],
-      ['Loyal customers', String(summary.loyalCustomers || 0)]
-    ];
-    metrics.innerHTML = values.map(([label, value]) => `
-      <div class="report-metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>
-    `).join('');
-    if (data.note) note.textContent = data.note;
-
-    // --- Render loan table ---
-    const loans = data.loans || data.byStatus ? Object.values(data.byStatus).flat() : [];
-    if (loans && loans.length) {
-      const headers = ['Receipt', 'Customer', 'Product', 'Status', 'Principal (K)', 'Interest (K)', 'Paid (K)', 'Outstanding (K)', 'Due Date'];
-      const rows = loans.map(loan => {
-        const statusClass = 'status-' + String(loan.status || loan.businessStatus || 'unknown').toLowerCase().replace(/\s+/g, '-');
-        return `
-          <tr>
-            <td>${escapeHtml(loan.receiptNumber || loan.id || '')}</td>
-            <td>${escapeHtml(loan.customer || loan.email || '')}</td>
-            <td>${escapeHtml(loan.product || '')}</td>
-            <td><span class="status-tag ${statusClass}">${escapeHtml(loan.status || loan.businessStatus || 'unknown')}</span></td>
-            <td>${formatCurrency(loan.amount || loan.principal || 0)}</td>
-            <td>${formatCurrency(loan.interestBooked || loan.interestAmount || 0)}</td>
-            <td>${formatCurrency(loan.totalCollected || loan.paidTotal || 0)}</td>
-            <td>${formatCurrency(loan.outstanding || 0)}</td>
-            <td>${escapeHtml(loan.dueDate || '')}</td>
-          </tr>
-        `;
-      }).join('');
-      table.innerHTML = `
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead>
-            <tr>${headers.map(h => `<th style="text-align:left;padding:8px;border:1px solid rgba(255,255,255,0.12);">${escapeHtml(h)}</th>`).join('')}</tr>
-          </thead>
-          <tbody>${rows.map(r => `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">${r}</tr>`).join('')}</tbody>
-        </table>
-      `;
-    } else {
-      table.innerHTML = '<p style="opacity:0.7;">No loan records found for the selected scope and period.</p>';
-    }
-  } catch (err) {
-    metrics.innerHTML = `<p>${escapeHtml(err.message || 'Unable to load BMF reports.')}</p>`;
-    table.innerHTML = '';
-    note.textContent = '';
   }
 }
 
@@ -1169,8 +1624,6 @@ async function fetchApplications() {
     }
     allApplications = Array.isArray(data.applications) ? data.applications : [];
     renderApplications();
-    const pendingCount = allApplications.filter(app => app.status === 'pending').length;
-    if (countEl) countEl.textContent = `${pendingCount} application${pendingCount !== 1 ? 's' : ''} awaiting review.`;
   } catch (err) {
     const msg = controller.signal.aborted
       ? 'Applications took too long to load. Please retry.'
@@ -1181,6 +1634,7 @@ async function fetchApplications() {
           : err.message || 'Unable to load applications.';
     list.innerHTML = `<div class="directory-empty" role="status">${escapeHtml(msg)}</div>`;
     if (countEl) countEl.textContent = '';
+    renderDirectoryPagination('applicationsPagination', 1, 0, 'applications');
     if (message) message.textContent = msg;
   } finally {
     clearTimeout(timeoutId);
@@ -1198,9 +1652,34 @@ function renderApplications() {
   if (!list) return;
   if (!allApplications.length) {
     list.innerHTML = '<div class="directory-empty" role="status">No loan applications found.</div>';
+    document.getElementById('applicationsCount').textContent = '0 applications awaiting review.';
+    renderDirectoryPagination('applicationsPagination', 1, 0, 'applications');
     return;
   }
-  list.innerHTML = allApplications.map(app => {
+  const term = (document.getElementById('applicationSearch')?.value || '').trim().toLowerCase();
+  const status = (document.getElementById('applicationStatusFilter')?.value || '').toLowerCase();
+  const from = document.getElementById('applicationDateFrom')?.value || '';
+  const to = document.getElementById('applicationDateTo')?.value || '';
+  const filtered = allApplications.filter(app => {
+    const textMatches = !term || [
+      app.fullName, app.email, app.phone, app.nrcNumber, app.nrc, app.applicationId, app.id,
+      app.product, app.loanPurpose, app.status
+    ].some(value => String(value || '').toLowerCase().includes(term));
+    return textMatches &&
+      (!status || String(app.status || '').toLowerCase() === status) &&
+      dateMatchesRange(app.createdAt, from, to);
+  });
+  const page = getDirectoryPage(filtered, applicationDirectoryPage);
+  applicationDirectoryPage = page.currentPage;
+  const pendingCount = allApplications.filter(app => String(app.status || '').toLowerCase() === 'pending').length;
+  document.getElementById('applicationsCount').textContent =
+    `${pendingCount} application${pendingCount === 1 ? '' : 's'} awaiting review · ${filtered.length} match the filters · page ${page.currentPage} of ${page.pageCount}.`;
+  renderDirectoryPagination('applicationsPagination', page.currentPage, filtered.length, 'applications');
+  if (!filtered.length) {
+    list.innerHTML = '<div class="directory-empty" role="status">No applications match these filters.</div>';
+    return;
+  }
+  list.innerHTML = page.items.map(app => {
     const weeklyRates = { 1: 0.10, 2: 0.16, 3: 0.24, 4: 0.32 };
     const amount = Number(app.amount) || 0;
     const tenureWeeks = Number(app.tenureWeeks) || 1;
@@ -1215,7 +1694,7 @@ function renderApplications() {
       <p><strong>Reviewed:</strong> ${escapeHtml(formatDate(app.reviewedAt))} by ${escapeHtml(app.reviewedBy || '—')}</p>
       ${app.reviewNote ? `<p><strong>Note:</strong> ${escapeHtml(app.reviewNote)}</p>` : ''}
     ` : '';
-    const actions = app.status === 'pending' ? `
+    const actions = String(app.status || '').toLowerCase() === 'pending' ? `
       <div class="button-row" style="margin-top:8px;">
         <button class="toggle-mode" type="button" data-app-action="approve" data-app-id="${escapeHtml(app.id)}" style="background:var(--bmf-green);">Approve</button>
         <button class="toggle-mode" type="button" data-app-action="request_info" data-app-id="${escapeHtml(app.id)}" style="background:var(--bmf-amber);">Request Info</button>
@@ -1227,7 +1706,7 @@ function renderApplications() {
       </div>
     ` : `<p style="margin-top:8px; opacity:0.7;">Decision already made.</p>`;
     return `
-      <article class="panel loan-item" style="margin-top:10px;">
+      <article class="panel loan-item" data-application-card="${escapeHtml(app.applicationId || app.id)}" style="margin-top:10px;">
         <div class="loan-header">
           <strong style="margin-left:8px;">${escapeHtml(product)} — ${escapeHtml(applicationId)}</strong>
           ${statusBadge(app.status)}
@@ -1247,12 +1726,17 @@ function renderApplications() {
   }).join('');
 }
 
-async function reviewApplication(appId, action) {
+async function reviewApplication(appId, action, providedNote) {
   const noteInput = document.getElementById('appNote-' + appId);
-  const note = noteInput ? noteInput.value.trim() : '';
+  let note = providedNote === undefined ? (noteInput ? noteInput.value.trim() : '') : String(providedNote || '').trim();
   if (action === 'reject' && !note) {
-    document.getElementById('applicationsMessage').textContent = 'Rejection requires a reason.';
-    return;
+    const answer = window.prompt('Reason for declining this application:');
+    if (answer === null) return;
+    note = answer.trim();
+    if (!note) {
+      document.getElementById('applicationsMessage').textContent = 'Rejection requires a reason.';
+      return;
+    }
   }
   try {
     const response = await fetch('/api/apply/' + encodeURIComponent(appId), {
@@ -1267,45 +1751,27 @@ async function reviewApplication(appId, action) {
       : action === 'reject'
         ? 'Application declined.'
         : 'Additional information requested.';
-    document.getElementById('applicationsMessage').textContent = data.message || successMessage;
-    document.getElementById('applicationsMessage').style.color = 'var(--success)';
-    await fetchApplications();
-  } catch (err) {
-    document.getElementById('applicationsMessage').textContent = err.message || 'Unable to review application.';
-    document.getElementById('applicationsMessage').style.color = 'var(--danger)';
-  }
-}
-
-async function downloadReport(format) {
-  const note = document.getElementById('storeReportNote');
-  try {
-    maybeRedirectToLoginIfNoToken();
-    const qs = new URLSearchParams({ format });
-    if (reportFrom) qs.set('from', reportFrom);
-    if (reportTo) qs.set('to', reportTo);
-    const endpoint = REPORT_ENDPOINT[reportType] || 'summary';
-    const url = `/reports/${reportScope}/${endpoint}?${qs.toString()}`;
-    const response = await fetch(url, { headers: getStoreHeaders() });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data.error || 'Unable to download report.');
+    const message = document.getElementById('applicationsMessage');
+    if (message) {
+      message.textContent = data.message || successMessage;
+      message.style.color = 'var(--success)';
     }
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `BMF-${reportScope}-${reportType}-${new Date().toISOString().slice(0, 10)}.${format}`;
-    link.click();
-    URL.revokeObjectURL(blobUrl);
-    note.textContent = 'Report downloaded.';
+    showBmfToast(data.message || successMessage);
+    await Promise.all([fetchApplications(), fetchAdminNotifications()]);
+    refreshBellCount();
   } catch (err) {
-    note.textContent = err.message || 'Unable to download report.';
+    const message = document.getElementById('applicationsMessage');
+    if (message) {
+      message.textContent = err.message || 'Unable to review application.';
+      message.style.color = 'var(--danger)';
+    }
+    showBmfToast(err.message || 'Unable to review application.', 'error');
   }
 }
 
 function getCustomerLoanStats(email) {
   const key = String(email || '').trim().toLowerCase();
-  const loans = portfolioLoans.filter(loan => String(loan.email || '').trim().toLowerCase() === key);
+  const loans = customerLoans.filter(loan => String(loan.email || '').trim().toLowerCase() === key);
   let borrowed = 0;
   let outstanding = 0;
   // Live canonical status of the customer's worst open loan — never a
@@ -1331,24 +1797,31 @@ function renderUsers(users) {
   if (!users.length) {
     const message = allUsers.length
       ? 'No customers match this search.'
-      : 'No customer accounts have been added to this store yet.';
+      : 'No registered customer accounts were returned for this scope.';
     list.innerHTML = `<div class="directory-empty">${message}</div>`;
     return;
   }
 
-  list.innerHTML = users.map((user) => {
+  list.innerHTML = `<table class="admin-table customer-directory-table">
+    <thead><tr><th>ID</th><th>Customer</th><th>Cell Number</th><th>Email</th><th>NRC</th><th>Store</th><th>Loans</th><th>Outstanding</th><th>Status</th><th>Profile</th></tr></thead>
+    <tbody>${users.map((user) => {
     const stats = getCustomerLoanStats(user.email);
     return `
-    <button type="button" class="user-card" data-user-id="${escapeHtml(user.id)}">
-      <h3>${escapeHtml(user.username || 'Unknown user')}</h3>
-      <p class="user-meta">${escapeHtml(user.email || '')}</p>
-      <p class="user-meta">Phone: ${escapeHtml(user.phone || 'N/A')}</p>
-      <p class="user-meta">NRC: ${escapeHtml(user.nrc || 'N/A')} · Joined: ${escapeHtml(formatDate(user.createdAt))}</p>
-      <p class="user-meta">Loans: ${stats.count} · Borrowed: ${formatCurrency(stats.borrowed)} · Outstanding: ${formatCurrency(stats.outstanding)}</p>
-      <p class="user-meta">Status: <strong>${escapeHtml(formatStatus(stats.status))}</strong></p>
-    </button>
+      <tr>
+        <td>${escapeHtml(user.id ?? '—')}</td>
+        <td><strong>${escapeHtml(user.username || 'Unknown user')}</strong>${user.loanOnly ? '<small class="table-subtext">Loan record only</small>' : ''}</td>
+        <td>${escapeHtml(user.phone || '—')}</td>
+        <td>${escapeHtml(user.email || '—')}</td>
+        <td>${escapeHtml(user.nrc || user.nrcNumber || '—')}</td>
+        <td>${escapeHtml(getStoreName(user.storeId) || user.storeId || '—')}</td>
+        <td>${stats.count}</td>
+        <td class="money-cell">${formatCurrency(stats.outstanding)}</td>
+        <td>${escapeHtml(formatStatus(stats.status))}</td>
+        <td><button type="button" class="row-view" data-user-id="${escapeHtml(user.id)}">View</button></td>
+      </tr>
   `;
-  }).join('');
+  }).join('')}</tbody>
+  </table>`;
 }
 
 function escapeHtml(value) {
@@ -1672,8 +2145,9 @@ async function viewUserDetails(userId) {
   document.getElementById('detailFeedback').textContent = '';
 
   try {
-    const response = await fetch(`/loans?email=${encodeURIComponent(user.email)}`, {
-      headers: getStoreHeaders()
+    const loanParams = addAllStoreScope(new URLSearchParams({ email: user.email }));
+    const response = await fetch(`/loans?${loanParams}`, {
+      headers: getCustomerScopeHeaders()
     });
 
     if (!response.ok) {
@@ -1773,18 +2247,19 @@ function closeModal() {
 }
 
 function closeCreateUserModal() {
-  document.getElementById('createUserModal').style.display = 'none';
   document.getElementById('createUserForm').reset();
   document.getElementById('newUserRole').querySelector('option[value="user"]').hidden = false;
   document.getElementById('createUserTitle').textContent = 'Create New User';
+  const returnPage = createUserReturnPage;
   createUserMode = 'customer';
   setCreateUserMessage('');
+  showAdminPage(returnPage);
 }
 
 function closeAnnouncementModal() {
-  document.getElementById('announcementModal').style.display = 'none';
   document.getElementById('announcementForm').reset();
   document.getElementById('announcementFeedback').textContent = '';
+  showAdminPage('portfolioOverview');
 }
 
 async function handleAnnouncementSubmit(event) {
@@ -2152,55 +2627,6 @@ function exportTablePdf(kind) {
   setTimeout(() => win.print(), 300);
 }
 
-// ─── Left ☰ menu navigation (Dashboard / Customers / HR pages) ──────────────
-function setupAdminMenu() {
-  const toggle = document.getElementById('adminMenuBtn');
-  const dropdown = document.getElementById('adminMenuDropdown');
-  if (toggle && dropdown) {
-    toggle.addEventListener('click', event => {
-      event.stopPropagation();
-      dropdown.classList.toggle('active');
-    });
-    window.addEventListener('click', event => {
-      if (!dropdown.contains(event.target) && event.target !== toggle) {
-        dropdown.classList.remove('active');
-      }
-    });
-  }
-  document.getElementById('adminMenuDashboard')?.addEventListener('click', () => {
-    dropdown.classList.remove('active');
-    showDashboard();
-  });
-  document.getElementById('adminMenuCustomers')?.addEventListener('click', () => {
-    dropdown.classList.remove('active');
-    showCustomersView();
-  });
-  document.getElementById('adminMenuApplications')?.addEventListener('click', () => {
-    dropdown.classList.remove('active');
-    showApplicationsView();
-  });
-  document.getElementById('adminMenuHr')?.addEventListener('click', () => {
-    dropdown.classList.remove('active');
-    showHrView();
-  });
-  document.getElementById('customersBackBtn')?.addEventListener('click', showDashboard);
-  document.getElementById('hrBackBtn')?.addEventListener('click', showDashboard);
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') dropdown?.classList.remove('active');
-  });
-}
-
-function setActiveAdminMenu(activeId) {
-  ['adminMenuDashboard', 'adminMenuCustomers', 'adminMenuApplications', 'adminMenuHr'].forEach(id => {
-    const button = document.getElementById(id);
-    if (!button) return;
-    const active = id === activeId;
-    button.classList.toggle('is-active', active);
-    if (active) button.setAttribute('aria-current', 'page');
-    else button.removeAttribute('aria-current');
-  });
-}
-
 // ─── HR / Employee Securities ───────────────────────────────────────────────
 let hrEmployees = [];
 
@@ -2241,6 +2667,7 @@ async function fetchHrEmployees() {
         ? 'Your admin session expired. Please sign in again.'
         : err.message || 'Unable to load employee records.';
     list.innerHTML = `<div class="directory-empty" role="status">${escapeHtml(message)}</div>`;
+    renderDirectoryPagination('hrPagination', 1, 0, 'hr');
     if (summary) summary.textContent = err.status === 403 ? 'Employee security details are restricted to authorized HR roles.' : 'Employee details could not be loaded.';
     setHrMessage(err.status === 401 ? message : '', err.status !== 401);
     if (err.status === 401) {
@@ -2261,13 +2688,31 @@ const HR_ROLE_LABELS = { admin: 'Main admin', franchise_admin: 'Franchise Employ
 function renderHrEmployees() {
   const list = document.getElementById('hrEmployeeList');
   const summary = document.getElementById('hrEmployeeCount');
+  if (!list) return;
   if (!hrEmployees.length) {
     if (summary) summary.textContent = '0 staff accounts';
     list.innerHTML = '<div class="directory-empty">No employee accounts are configured for this store.</div>';
+    renderDirectoryPagination('hrPagination', 1, 0, 'hr');
     return;
   }
-  if (summary) summary.textContent = `${hrEmployees.length} staff accounts`;
-  list.innerHTML = hrEmployees.map(emp => {
+  const term = (document.getElementById('hrSearch')?.value || '').trim().toLowerCase();
+  const role = document.getElementById('hrRoleFilter')?.value || '';
+  const from = document.getElementById('hrDateFrom')?.value || '';
+  const to = document.getElementById('hrDateTo')?.value || '';
+  const filtered = hrEmployees.filter(emp => {
+    const textMatches = !term || [emp.username, emp.email, emp.phone, emp.nrc, emp.id, emp.storeId]
+      .some(value => String(value || '').toLowerCase().includes(term));
+    return textMatches && (!role || emp.role === role) && dateMatchesRange(emp.createdAt, from, to);
+  });
+  const page = getDirectoryPage(filtered, hrDirectoryPage);
+  hrDirectoryPage = page.currentPage;
+  if (summary) summary.textContent = `${filtered.length} of ${hrEmployees.length} staff accounts match the filters · page ${page.currentPage} of ${page.pageCount}.`;
+  if (!filtered.length) {
+    list.innerHTML = '<div class="directory-empty" role="status">No staff accounts match these filters.</div>';
+    renderDirectoryPagination('hrPagination', page.currentPage, 0, 'hr');
+    return;
+  }
+  list.innerHTML = page.items.map(emp => {
     const restrictedNotify = Array.isArray(emp.restrictions) && emp.restrictions.includes('notifyAll');
     const roleLabel = HR_ROLE_LABELS[emp.role] || formatStatus(emp.role);
     const deviceCount = Number(emp.trustedDeviceCount || 0);
@@ -2303,6 +2748,7 @@ function renderHrEmployees() {
       </div>
     </article>`;
   }).join('');
+  renderDirectoryPagination('hrPagination', page.currentPage, filtered.length, 'hr');
 }
 
 function openEditEmployee(id) {
@@ -2497,7 +2943,6 @@ async function handleAddLoanSubmit(event) {
   }
 }
 
-document.getElementById('modeBtn').addEventListener('click', toggleTheme);
 document.querySelectorAll('[data-close-modal]').forEach(button => {
   button.addEventListener('click', () => {
     const modalId = button.dataset.closeModal;
@@ -2534,66 +2979,12 @@ document.getElementById('backToStores').addEventListener('click', () => {
   showStoreSelection();
 });
 document.getElementById('logoutBtn').addEventListener('click', logoutAdmin);
-document.getElementById('backToStoresDashboard').addEventListener('click', () => {
-  if (BMF_STORES.length < 2) return;
-  localStorage.removeItem('adminStore');
-  showStoreSelection();
-});
 document.getElementById('createUserBtn').addEventListener('click', () => {
   openCreateUserModal('customer');
 });
 document.getElementById('announcementBtn').addEventListener('click', () => {
-  document.getElementById('announcementModal').style.display = 'block';
+  showAdminPage('announcementView');
 });
-document.querySelectorAll('[data-report-format]').forEach(button => {
-  button.addEventListener('click', () => downloadReport(button.dataset.reportFormat));
-});
-
-// ─── Report panel: scope / type / period / refresh ──────────────────────────
-const reportScopeEl = document.getElementById('reportScope');
-const reportFromEl = document.getElementById('reportFrom');
-const reportToEl = document.getElementById('reportTo');
-const refreshReportBtn = document.getElementById('refreshReportBtn');
-
-// Hide franchise-level scope for non-admin roles
-const role = localStorage.getItem('userRole') || '';
-if (reportScopeEl) {
-  const allOption = reportScopeEl.querySelector('option[value="all"]');
-  if (allOption && role !== 'admin' && role !== 'franchise_admin') {
-    allOption.hidden = true;
-    if (reportScope === 'all') reportScope = 'buraza';
-  }
-  reportScopeEl.addEventListener('change', () => {
-    reportScope = reportScopeEl.value;
-    fetchReportData();
-  });
-}
-
-document.querySelectorAll('[data-report-type]').forEach(button => {
-  button.addEventListener('click', () => {
-    reportType = button.dataset.reportType;
-    document.querySelectorAll('[data-report-type]').forEach(b => {
-      b.classList.toggle('active', b === button);
-    });
-    fetchReportData();
-  });
-});
-
-if (reportFromEl) {
-  reportFromEl.addEventListener('change', () => {
-    reportFrom = reportFromEl.value;
-    fetchReportData();
-  });
-}
-if (reportToEl) {
-  reportToEl.addEventListener('change', () => {
-    reportTo = reportToEl.value;
-    fetchReportData();
-  });
-}
-if (refreshReportBtn) {
-  refreshReportBtn.addEventListener('click', () => runRefresh(refreshReportBtn, fetchReportData));
-}
 document.querySelectorAll('[data-feedback-filter]').forEach(button => {
   button.addEventListener('click', () => {
     activeFeedbackFilter = button.dataset.feedbackFilter || 'all';
@@ -2629,8 +3020,14 @@ document.getElementById('userList').addEventListener('click', event => {
 });
 
 // ─── HR / menu event wiring ─────────────────────────────────────────────────
-setupAdminMenu();
 document.getElementById('hrRefreshBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchHrEmployees));
+['hrSearch', 'hrRoleFilter', 'hrDateFrom', 'hrDateTo'].forEach(id => {
+  const control = document.getElementById(id);
+  control?.addEventListener(id === 'hrSearch' ? 'input' : 'change', () => {
+    hrDirectoryPage = 1;
+    renderHrEmployees();
+  });
+});
 document.getElementById('hrCreateBtn')?.addEventListener('click', () => {
   openCreateUserModal('hr');
 });
@@ -2727,13 +3124,24 @@ document.getElementById('modalBody').addEventListener('submit', event => {
   if (form) submitPayment(event, form);
 });
 function applyUserFilterAndSort() {
-  const term = (document.getElementById('userSearch')?.value || '').toLowerCase();
+  const term = (document.getElementById('userSearch')?.value || '').trim().toLowerCase();
   const sortBy = document.getElementById('userSort')?.value || 'name';
+  const dateBasis = document.getElementById('customerDateBasis')?.value || 'loan';
+  const from = document.getElementById('userDateFrom')?.value || '';
+  const to = document.getElementById('userDateTo')?.value || '';
   let filtered = allUsers.filter((user) => {
-    const username = (user.username || '').toLowerCase();
-    const email = (user.email || '').toLowerCase();
-    const phone = String(user.phone || '').toLowerCase();
-    return username.includes(term) || email.includes(term) || phone.includes(term);
+    const email = String(user.email || '').trim().toLowerCase();
+    const relatedLoans = customerLoans.filter(loan => String(loan.email || '').trim().toLowerCase() === email);
+    const fields = [user.username, user.email, user.phone, user.nrc, user.nrcNumber, user.id];
+    const loanMatches = relatedLoans.some(loan =>
+      [loan.receiptNumber, loan.id, loan.product, loan.status]
+        .some(value => String(value || '').toLowerCase().includes(term))
+    );
+    const textMatches = !term || loanMatches || fields.some(value => String(value || '').toLowerCase().includes(term));
+    const dateMatches = dateBasis === 'registered'
+      ? dateMatchesRange(user.createdAt || user.registeredAt, from, to)
+      : (!from && !to) || relatedLoans.some(loan => dateMatchesRange(loan.createdAt || loan.requestedAt, from, to));
+    return textMatches && dateMatches;
   });
   if (sortBy === 'loans') {
     filtered = filtered.slice().sort((a, b) => getCustomerLoanStats(b.email).count - getCustomerLoanStats(a.email).count);
@@ -2742,22 +3150,88 @@ function applyUserFilterAndSort() {
   } else {
     filtered = filtered.slice().sort((a, b) => String(a.username || '').localeCompare(String(b.username || '')));
   }
-  renderUsers(filtered);
+  const page = getDirectoryPage(filtered, customerDirectoryPage, CUSTOMER_DIRECTORY_PAGE_SIZE);
+  customerDirectoryPage = page.currentPage;
+  renderUsers(page.items);
+  renderDirectoryPagination('customerPagination', customerDirectoryPage, filtered.length, 'customers', CUSTOMER_DIRECTORY_PAGE_SIZE);
+  const status = document.getElementById('customerDirectoryStatus');
+  const resultCount = document.getElementById('customerResultCount');
+  if (resultCount) resultCount.textContent = `${filtered.length} customer records`;
+  if (status && usersLoaded) {
+    status.textContent = customerLoansError
+      ? `${filtered.length} customer${filtered.length === 1 ? '' : 's'} match the filters. Loan totals unavailable: ${customerLoansError}`
+      : `${filtered.length} customer${filtered.length === 1 ? '' : 's'} match the filters · page ${customerDirectoryPage} of ${page.pageCount}.`;
+  }
 }
-document.getElementById('userSearch').addEventListener('input', applyUserFilterAndSort);
-document.getElementById('userSort')?.addEventListener('change', applyUserFilterAndSort);
+document.getElementById('userSearch').addEventListener('input', () => {
+  customerDirectoryPage = 1;
+  applyUserFilterAndSort();
+});
+document.getElementById('userSort')?.addEventListener('change', () => {
+  customerDirectoryPage = 1;
+  applyUserFilterAndSort();
+});
+['customerDateBasis', 'userDateFrom', 'userDateTo'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', () => {
+    customerDirectoryPage = 1;
+    applyUserFilterAndSort();
+  });
+});
 document.getElementById('refreshCustomerDirectory')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchUsers));
 document.getElementById('refreshRequestsBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchNewRequests));
 document.getElementById('refreshPortfolioBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchNewRequests));
 document.getElementById('adminDashboard')?.addEventListener('click', event => {
-  const button = event.target.closest('[data-admin-jump]');
-  if (button) document.getElementById(button.dataset.adminJump)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const navButton = event.target.closest('.admin-nav-item');
+  if (navButton) {
+    const pageId = navButton.dataset.adminPage;
+    const action = navButton.dataset.dashboardAction;
+    if (pageId) {
+      if (pageId === 'portfolioOverview') showDashboard();
+      else if (pageId === 'customersView') showCustomersView();
+      else if (pageId === 'hrView') showHrView();
+      else if (pageId === 'applicationsView') showApplicationsView();
+      else if (pageId === 'createUserView') openCreateUserModal('customer');
+      else if (pageId === 'inviteView') openInviteModal();
+      else showAdminPage(pageId);
+    } else if (action) {
+      const actions = {
+        'switch-store': () => {
+          if (BMF_STORES.length > 1) {
+            localStorage.removeItem('adminStore');
+            showStoreSelection();
+          }
+        },
+        logout: () => document.getElementById('logoutBtn')?.click()
+      };
+      actions[action]?.();
+    }
+  }
+
+  const jumpButton = event.target.closest('[data-admin-jump]');
+  if (jumpButton) showAdminPage(jumpButton.dataset.adminJump);
 });
 document.getElementById('jumpCustomersBtn')?.addEventListener('click', showCustomersView);
-document.getElementById('adminDashboardSearch')?.addEventListener('input', renderPortfolioOverview);
+document.getElementById('loanStatusFilter')?.addEventListener('change', () => {
+  loanTablePage = 1;
+  renderPortfolioOverview();
+});
+document.getElementById('allLoansViewBtn')?.addEventListener('click', () => showAdminPage('allLoansView'));
+document.getElementById('loanTablePagination')?.addEventListener('click', event => {
+  const button = event.target.closest('[data-loan-page]');
+  if (!button || button.disabled) return;
+  const page = Number(button.dataset.loanPage);
+  if (!Number.isInteger(page) || page < 1) return;
+  loanTablePage = page;
+  renderPortfolioOverview();
+});
+document.querySelectorAll('[data-collection-range]').forEach(button => {
+  button.addEventListener('click', () => {
+    activeCollectionRange = button.dataset.collectionRange;
+    renderPortfolioOverview();
+  });
+});
 document.getElementById('dailyReportQuickBtn')?.addEventListener('click', () => {
-  reportType = 'daily';
-  downloadReport('xlsx');
+  pullReport('daily-cashbook', 'xlsx');
 });
 document.getElementById('adminLoanTable')?.addEventListener('click', event => {
   const notifyButton = event.target.closest('[data-notify-loan]');
@@ -2768,6 +3242,58 @@ document.getElementById('adminLoanTable')?.addEventListener('click', event => {
   const userButton = event.target.closest('[data-user-id]');
   if (userButton?.dataset.userId) viewUserDetails(userButton.dataset.userId);
 });
+['allLoansList', 'overdueLoansList', 'defaultersLoansList'].forEach(id => {
+  document.getElementById(id)?.addEventListener('click', event => {
+    const notifyButton = event.target.closest('[data-notify-loan]');
+    if (notifyButton) {
+      sendOverdueNotice(notifyButton.dataset.notifyLoan);
+      return;
+    }
+    const userButton = event.target.closest('[data-user-id]');
+    if (userButton?.dataset.userId) viewUserDetails(userButton.dataset.userId);
+  });
+});
+['allLoansSearch', 'allLoansStatus', 'allLoansFrom', 'allLoansTo'].forEach(id => {
+  const control = document.getElementById(id);
+  control?.addEventListener(id === 'allLoansSearch' ? 'input' : 'change', () => {
+    loanDirectoryPages.allLoansView = 1;
+    renderLoanDirectory('allLoansView');
+  });
+});
+['overdueSearch', 'overdueFrom', 'overdueTo'].forEach(id => {
+  const control = document.getElementById(id);
+  control?.addEventListener(id === 'overdueSearch' ? 'input' : 'change', () => {
+    loanDirectoryPages.overdueView = 1;
+    renderLoanDirectory('overdueView');
+  });
+});
+['defaultersSearch', 'defaultersFrom', 'defaultersTo'].forEach(id => {
+  const control = document.getElementById(id);
+  control?.addEventListener(id === 'defaultersSearch' ? 'input' : 'change', () => {
+    loanDirectoryPages.defaultersView = 1;
+    renderLoanDirectory('defaultersView');
+  });
+});
+['paymentsSearch', 'paymentsFrom', 'paymentsTo'].forEach(id => {
+  const control = document.getElementById(id);
+  control?.addEventListener(id === 'paymentsSearch' ? 'input' : 'change', () => {
+    paymentDirectoryPage = 1;
+    renderPaymentsView();
+  });
+});
+document.getElementById('refreshPaymentsBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchPayments));
+document.getElementById('refreshAllLoansBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, async () => {
+  await fetchCustomerLoans();
+  renderLoanDirectory('allLoansView');
+}));
+document.getElementById('refreshOverdueBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, async () => {
+  await fetchCustomerLoans();
+  renderLoanDirectory('overdueView');
+}));
+document.getElementById('refreshDefaultersBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, async () => {
+  await fetchCustomerLoans();
+  renderLoanDirectory('defaultersView');
+}));
 document.getElementById('adminNotificationBtn')?.addEventListener('click', async event => {
   event.stopPropagation();
   const menu = document.getElementById('adminNotificationMenu');
@@ -2784,6 +3310,23 @@ document.addEventListener('click', event => {
   }
 });
 document.getElementById('adminNotificationList')?.addEventListener('click', event => {
+  const applicationAction = event.target.closest('[data-notification-application-action]');
+  if (applicationAction) {
+    const applicationId = applicationAction.dataset.applicationId;
+    const action = applicationAction.dataset.notificationApplicationAction;
+    if (action === 'view') {
+      const notification = adminNotifications.find(item =>
+        item.type === 'application-request' && String(item.applicationId) === String(applicationId)
+      );
+      if (notification) markAdminNotificationRead(notification.id);
+      document.getElementById('adminNotificationMenu')?.classList.add('hidden');
+      showApplicationsView(applicationId);
+      return;
+    }
+    document.getElementById('adminNotificationMenu')?.classList.add('hidden');
+    reviewApplication(applicationId, action);
+    return;
+  }
   const review = event.target.closest('[data-notification-open-loan]');
   if (!review) return;
   const loan = portfolioLoans.find(item => String(item.id) === String(review.dataset.notificationOpenLoan));
@@ -2792,6 +3335,10 @@ document.getElementById('adminNotificationList')?.addEventListener('click', even
   if (customer) viewUserDetails(customer.id);
   else document.getElementById('requestQueue')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   document.getElementById('adminNotificationMenu')?.classList.add('hidden');
+});
+document.getElementById('viewAllNotifications')?.addEventListener('click', () => {
+  showAllAdminNotifications = !showAllAdminNotifications;
+  renderAdminNotifications();
 });
 document.getElementById('markAllNotificationsRead')?.addEventListener('click', async () => {
   const unread = adminNotifications.filter(item => !item.readAt);
@@ -2808,13 +3355,13 @@ document.getElementById('newRequestsList').addEventListener('click', event => {
 function openInviteModal() {
   document.getElementById('inviteLinkResult').textContent = '';
   document.getElementById('inviteFeedback').textContent = '';
-  document.getElementById('inviteModal').style.display = 'block';
+  showAdminPage('inviteView');
   fetchInvites();
 }
 
 function closeInviteModal() {
-  document.getElementById('inviteModal').style.display = 'none';
   document.getElementById('inviteForm').reset();
+  showAdminPage('portfolioOverview');
 }
 
 async function handleInviteSubmit(event) {
@@ -2903,17 +3450,42 @@ document.getElementById('applicationsList')?.addEventListener('click', event => 
 });
 
 document.getElementById('applicationsRefreshBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchApplications));
-document.getElementById('applicationsBackBtn')?.addEventListener('click', showDashboard);
+['applicationSearch', 'applicationStatusFilter', 'applicationDateFrom', 'applicationDateTo'].forEach(id => {
+  const control = document.getElementById(id);
+  control?.addEventListener(id === 'applicationSearch' ? 'input' : 'change', () => {
+    applicationDirectoryPage = 1;
+    renderApplications();
+  });
+});
+document.querySelectorAll('.directory-pagination').forEach(nav => {
+  nav.addEventListener('click', event => {
+    const button = event.target.closest('[data-directory-page]');
+    if (!button || button.disabled) return;
+    const page = Number(button.dataset.page);
+    if (!Number.isInteger(page) || page < 1) return;
+    if (button.dataset.directoryPage === 'customers') {
+      customerDirectoryPage = page;
+      applyUserFilterAndSort();
+    } else if (button.dataset.directoryPage === 'hr') {
+      hrDirectoryPage = page;
+      renderHrEmployees();
+    } else if (button.dataset.directoryPage === 'applications') {
+      applicationDirectoryPage = page;
+      renderApplications();
+    } else if (button.dataset.directoryPage === 'payments') {
+      paymentDirectoryPage = page;
+      renderPaymentsView();
+    } else if (['allLoansView', 'overdueView', 'defaultersView'].includes(button.dataset.directoryPage)) {
+      loanDirectoryPages[button.dataset.directoryPage] = page;
+      renderLoanDirectory(button.dataset.directoryPage);
+    }
+  });
+});
 
 window.onload = () => {
-  const savedMode = localStorage.getItem('mode') === 'light' ? 'light' : 'dark';
-  applyTheme(savedMode);
+  applyTheme('dark');
   restoreSession();
 };
-
-window.addEventListener('storage', event => {
-  if (event.key === 'mode') applyTheme(event.newValue === 'light' ? 'light' : 'dark');
-});
 
 window.closeModal = closeModal;
 window.closeCreateUserModal = closeCreateUserModal;

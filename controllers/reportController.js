@@ -12,6 +12,8 @@ const { buildTrackingSheet, persistTracking } = require('./reportTracking');
 const R = require('../services/bmfReports');
 const X = require('../services/bmfExcel');
 const P = require('../services/bmfPdf');
+const PromptReports = require('../services/bmfPromptReports');
+const PromptExcel = require('../services/bmfPromptExcel');
 
 const USERS_FILE = dataStore.paths.users;
 const LOANS_FILE = dataStore.paths.loans;
@@ -1196,8 +1198,191 @@ function getTrackingSheet(req, res) {
   }
 }
 
+function isPromptReportType(type) {
+  return Boolean(PromptReports.canonicalReportType(type));
+}
+
+function promptReportRows(type, report) {
+  switch (type) {
+    case 'how-risky': return { rows: report.parRows };
+    case 'who-owes': return { rows: report.agingRows };
+    case 'full-history': return { statement: report.statement };
+    case 'all-loans': return { rows: report.disbursements };
+    case 'schedule': return { schedule: report.schedule };
+    case 'collection': return { rows: report.collections };
+    case 'problem-loans': return { rows: report.defaults };
+    case 'daily-cashbook': return { cashbook: report.cashbook };
+    case 'officer-scorecard': return { rows: report.officers };
+    default: return {};
+  }
+}
+
+function buildPromptPdfSections(type, report) {
+  const money = value => value == null
+    ? 'Not recorded'
+    : `K ${Number(value).toLocaleString('en-ZM', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const percent = value => value == null ? 'Not available' : `${(Number(value) * 100).toFixed(1)}%`;
+  switch (type) {
+    case 'how-risky':
+      return [{
+        title: 'PORTFOLIO AT RISK',
+        headers: ['Loan ID', 'Borrower', 'Officer', 'Principal', 'Outstanding', 'Days Late', 'Risk Bucket', 'Reserve'],
+        rows: report.parRows.map(row => [
+          row.loanId, row.borrower, row.officer, money(row.principal), money(row.outstanding),
+          row.daysOverdue, row.riskBucket, money(row.reserve)
+        ])
+      }];
+    case 'who-owes':
+      return [{
+        title: 'ARREARS BY AGING BUCKET',
+        headers: ['Loan ID', 'Borrower', 'Current', '1–7 days', '8–30 days', '31–60 days', '61–90 days', '91–180 days', 'Over 180 days', 'Total Arrears'],
+        rows: report.agingRows.map(row => [
+          row.loanId, row.borrower, ...row.buckets.map(money), money(row.arrears)
+        ])
+      }];
+    case 'all-loans':
+      return [{
+        title: 'DISBURSEMENT REGISTER',
+        headers: ['Date', 'Loan ID', 'Borrower', 'Officer', 'Purpose', 'Principal', 'Total Payable', 'Due Date'],
+        rows: report.disbursements.map(row => [
+          row.date, row.loanId, row.borrower, row.officer, row.purpose,
+          money(row.principal), money(row.total), row.dueDate
+        ])
+      }];
+    case 'schedule': {
+      const schedule = report.schedule;
+      return [{
+        title: `REPAYMENT SCHEDULE — ${schedule.loanId}`,
+        text: `Principal: ${money(schedule.principal)} · Interest: ${money(schedule.interest)} · Total payable: ${money(schedule.total)} · Installments: ${schedule.installmentCount || 'Not recorded'}`,
+        headers: ['#', 'Due Date', 'Amount Due', 'Amount Paid', 'Date Paid', 'Status'],
+        rows: schedule.installments.map((item, index) => [
+          index + 1,
+          item.dueDate || item.dueAt || item.date || '',
+          money(item.amountDue ?? item.dueAmount ?? item.amount),
+          money(item.amountPaid ?? item.paidAmount),
+          item.datePaid || item.paidAt || '',
+          item.status || 'Not recorded'
+        ]),
+        emptyText: 'No installment schedule has been recorded for this loan.'
+      }];
+    }
+    case 'collection':
+      return [{
+        title: 'COLLECTION EFFICIENCY',
+        headers: ['Officer', 'Branch', 'Active Loans', 'Portfolio', 'Amount Due', 'Collected', 'Collection Rate', 'Rating'],
+        rows: report.collections.map(row => [
+          row.officer, row.branch, row.activeLoans, money(row.portfolio), money(row.amountDue),
+          money(row.amountCollected), percent(row.collectionRate), row.rating
+        ])
+      }];
+    case 'problem-loans':
+      return [{
+        title: 'DEFAULT REGISTER',
+        headers: ['Loan ID', 'Borrower', 'Principal', 'Outstanding at Default', 'Written Off', 'Recovered', 'Net Loss', 'Status'],
+        rows: report.defaults.map(row => [
+          row.loanId, row.borrower, money(row.principal), money(row.outstandingAtDefault),
+          row.writtenOffDate, money(row.recovered), money(row.netLoss), row.status
+        ])
+      }];
+    case 'daily-cashbook':
+      return [{
+        title: 'RECORDED CASHBOOK TRANSACTIONS',
+        text: `Recorded receipts: ${money(report.cashbook.received / 100)} · Disbursements: ${money(report.cashbook.disbursed / 100)} · External cash balance: not recorded`,
+        headers: ['Date', 'Loan ID', 'Borrower', 'Receipt', 'Officer', 'Received', 'Disbursed', 'Net Movement', 'Running Movement'],
+        rows: report.cashbook.entries.map(row => [
+          row.date, row.loanId, row.borrower, row.receipt, row.officer,
+          money(row.received), money(row.disbursed), money(row.net), money(row.running)
+        ])
+      }];
+    case 'officer-scorecard':
+      return [{
+        title: 'OFFICER SCORECARD',
+        headers: ['Officer', 'Branch', 'Portfolio', 'Collected This Month', 'PAR > 30 Days', 'Defaults', 'Collection Rate', 'Client Visits'],
+        rows: report.officers.map(row => [
+          row.officer, row.branch, money(row.portfolioValue), money(row.collectedThisMonth),
+          percent(row.par30), row.defaults, percent(row.collectionRate),
+          row.clientVisits == null ? 'Not recorded' : row.clientVisits
+        ])
+      }];
+    default:
+      return [];
+  }
+}
+
+async function dispatchPromptReport(req, res, format) {
+  const type = PromptReports.canonicalReportType(req.params.type);
+  if (!type) return res.status(400).json({ error: `Unknown report type: ${req.params.type}` });
+  const scope = String(req.query.scope || getRequestedStoreId(req)).trim().toLowerCase();
+  if (!isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required for this report scope.' });
+
+  const { from, to } = req.query;
+  const loanId = String(req.query.loanId || '').trim();
+  const officer = String(req.query.officer || '').trim();
+  if (['full-history', 'schedule'].includes(type) && !loanId) {
+    return res.status(400).json({ error: 'loanId query parameter is required for this report.' });
+  }
+  try {
+    const allLoans = readArray(LOANS_FILE);
+    const scopedLoans = allLoans.filter(loan => scope === 'all' || getRecordStoreId(loan) === scope);
+    const scopedUsers = readArray(USERS_FILE)
+      .filter(user => scope === 'all' || getRecordStoreId(user) === scope);
+    const report = PromptReports.buildReportData({
+      loans: scopedLoans,
+      users: scopedUsers,
+      from: String(from || '').trim(),
+      to: String(to || '').trim(),
+      officer,
+      loanId,
+      today: new Date().toISOString().slice(0, 10),
+      generatedAt: new Date().toISOString()
+    });
+    const generatedDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const selectedLoanId = report.statement?.loanId || report.schedule?.loanId || loanId;
+    const filename = PromptReports.filenameFor(type, format, generatedDate, selectedLoanId);
+
+    if (format === 'xlsx') {
+      const workbook = PromptExcel.buildPromptWorkbook(report);
+      const buffer = await workbook.xlsx.writeBuffer();
+      return sendTypedXlsx(res, buffer, filename.replace(/\.xlsx$/i, ''));
+    }
+    if (format === 'pdf') {
+      if (type === 'full-history') {
+        const pdf = await P.statementPdf(report.statement, report.today);
+        return sendTypedPdf(res, pdf, filename.replace(/\.pdf$/i, ''));
+      }
+      const sections = buildPromptPdfSections(type, report);
+      const pdf = await P.businessPdf(sections, {
+        title: PromptReports.reportConfig(type).title,
+        date: report.today
+      });
+      return sendTypedPdf(res, pdf, filename.replace(/\.pdf$/i, ''));
+    }
+
+    return res.json({
+      type,
+      title: PromptReports.reportConfig(type).title,
+      scope,
+      generatedAt: report.generatedAt,
+      period: { from: report.from || null, to: report.to || null, asOf: report.today },
+      note: report.note,
+      ...promptReportRows(type, report)
+    });
+  } catch (err) {
+    if (err instanceof PromptReports.ReportDataError) {
+      logError(`[REPORT ERROR] ${err.loanId ? `Loan ${err.loanId}: ` : ''}${err.message}`);
+      return res.status(err.status || 422).json({ error: err.message });
+    }
+    logBreakage('reportController.js', 'dispatchPromptReport', err, 'VERSION 3 REPORT FAILED');
+    if (!res.headersSent) return res.status(503).json({ error: 'Report is temporarily unavailable.' });
+  }
+}
+
 // BMF typed-report handlers (GET /reports/:type)
 function getTypedReport(req, res) {
+  if (isPromptReportType(req.params.type)) {
+    const format = String(req.query.format || '').toLowerCase();
+    return dispatchPromptReport(req, res, format);
+  }
   try {
     const type = req.params.type;
     const scope = req.query.scope || 'buraza';
@@ -1274,6 +1459,7 @@ function getTypedReport(req, res) {
 
 // Typed-report Excel export
 async function getTypedReportExcel(req, res) {
+  if (isPromptReportType(req.params.type)) return dispatchPromptReport(req, res, 'xlsx');
   try {
     const type = req.params.type;
     const scope = req.query.scope || 'buraza';
@@ -1387,6 +1573,7 @@ async function getTypedReportExcel(req, res) {
 
 // Typed-report PDF export
 async function getTypedReportPdf(req, res) {
+  if (isPromptReportType(req.params.type)) return dispatchPromptReport(req, res, 'pdf');
   try {
     const type = req.params.type;
     const scope = req.query.scope || 'buraza';
@@ -1527,6 +1714,7 @@ module.exports = {
   getTypedReport,
   getTypedReportExcel,
   getTypedReportPdf,
+  isPromptReportType,
   sendTypedXlsx,
   sendTypedPdf
 };

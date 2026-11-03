@@ -173,8 +173,14 @@ app.get('/quick-screen', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'quick-screen.html'));
 });
 
-// Public loan application submissions do not require a device token.
-app.post('/api/apply', applyRouter);
+// Public loan application submissions do not require a device token. Mount the
+// router under its prefix so its POST / handler sees the trimmed path; an
+// app.post('/api/apply', router) route leaves /api/apply visible to the router,
+// which falls through to deviceAuth.
+app.use('/api/apply', (req, res, next) => {
+  if (req.method !== 'POST') return next();
+  return applyRouter(req, res, next);
+});
 
 app.use(deviceAuth);
 app.use(logAccess);

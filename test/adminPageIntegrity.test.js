@@ -26,6 +26,10 @@ test('admin.html is structurally intact (not corrupted or truncated)', () => {
 });
 
 test('every id bound by admin.js exists in admin.html', () => {
+  const allIds = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+  const duplicateIds = [...new Set(allIds.filter((id, index) => allIds.indexOf(id) !== index))];
+  assert.deepEqual(duplicateIds, [], `admin.html contains duplicate ids: ${duplicateIds.join(', ')}`);
+
   const ids = new Set();
 
   // document.getElementById('someId') — literal targets
@@ -52,8 +56,12 @@ test('every data-attribute selector used by admin.js exists in admin.html', () =
     attrs.add(match[1]);
   }
   assert.ok(attrs.size > 0, 'expected data-attribute selectors in admin.js');
-  const missing = [...attrs].filter((attr) => !html.includes(attr));
+  const generatedByReportLibrary = new Set(['data-report-action']);
+  const missing = [...attrs].filter((attr) =>
+    !html.includes(attr) && !generatedByReportLibrary.has(attr)
+  );
   assert.deepEqual(missing, [], `admin.html is missing data attributes used by admin.js: ${missing.join(', ')}`);
+  assert.match(js, /data-report-action data-report-type=.*data-report-format=/);
 });
 
 test('customer cards render before unrelated report, feedback, and loan requests finish', () => {
@@ -76,11 +84,13 @@ test('HR employee loading has a timeout and a visible timeout message', () => {
 });
 
 test('public Quick Screen submission stays public while application review is device-authenticated', () => {
-  const publicSubmission = server.indexOf("app.post('/api/apply', applyRouter)");
+  const publicSubmission = server.indexOf("app.use('/api/apply', (req, res, next) =>");
   const deviceAuth = server.indexOf('app.use(deviceAuth)');
   const protectedApplications = server.indexOf("app.use('/api/apply', applyRouter)", deviceAuth);
   assert.ok(publicSubmission >= 0 && publicSubmission < deviceAuth, 'Quick Screen submissions must be mounted before deviceAuth');
   assert.ok(protectedApplications > deviceAuth, 'application reads and reviews must be mounted after deviceAuth');
+  assert.match(server.slice(publicSubmission, deviceAuth), /if \(req\.method !== 'POST'\) return next\(\)/);
+  assert.match(server.slice(publicSubmission, deviceAuth), /return applyRouter\(req, res, next\)/);
 });
 
 test('Quick Screen application cards use the application API field names', () => {
@@ -90,6 +100,55 @@ test('Quick Screen application cards use the application API field names', () =>
   for (const field of ['app.amount', 'app.tenureWeeks', 'app.product', 'app.nrcNumber', 'app.collateralFront', 'app.collateralBack']) {
     assert.ok(render.includes(field), `application cards must render ${field}`);
   }
+});
+
+test('admin directories expose wired filters, bounded paging, and application bell actions', () => {
+  for (const id of [
+    'userDateFrom', 'userDateTo', 'customerDateBasis', 'customerPagination',
+    'hrSearch', 'hrRoleFilter', 'hrDateFrom', 'hrDateTo', 'hrPagination',
+    'applicationSearch', 'applicationStatusFilter', 'applicationDateFrom',
+    'applicationDateTo', 'applicationsPagination'
+  ]) {
+    assert.ok(html.includes(`id="${id}"`), `${id} must exist in the admin page`);
+  }
+  assert.match(js, /function getDirectoryPage\(items, page, pageSize/);
+  assert.match(js, /data-notification-application-action="approve"/);
+  assert.match(js, /data-notification-application-action="reject"/);
+  assert.match(js, /data-notification-application-action="view"/);
+  assert.match(js, /function dateMatchesRange\(value, from, to\)/);
+});
+
+test('admin dashboard controls are present, wired, and remain dark without shared theme preferences', () => {
+  for (const id of [
+    'adminSidebar', 'portfolioOverview', 'portfolioKpis', 'collectionsChart',
+    'loanManagementPanel', 'loanStatusFilter', 'loanTablePagination',
+    'loyalBorrowersPanel', 'portfolioReports', 'allLoansView', 'customersView',
+    'paymentsView', 'overdueView', 'defaultersView', 'hrView', 'applicationsView',
+    'announcementView', 'inviteView', 'createUserView', 'serverSettingsView'
+  ]) {
+    assert.ok(html.includes(`id="${id}"`), `${id} must exist in the dashboard`);
+  }
+  for (const attribute of [
+    'data-admin-page', 'data-dashboard-action', 'data-collection-range'
+  ]) {
+    assert.ok(html.includes(attribute), `${attribute} dashboard controls must exist`);
+  }
+  assert.match(js, /function setDashboardNavActive\(activeButton\)/);
+  assert.match(js, /function showReportsView\(\)/);
+  assert.match(js, /showAdminPage\('portfolioReports'\)/);
+  assert.doesNotMatch(html, /id="adminMenuReports"/);
+  assert.match(js, /data-admin-page/);
+  const pageTargets = [...html.matchAll(/data-admin-page="([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(new Set(pageTargets).size, pageTargets.length, 'each sidebar page target must be unique');
+  for (const pageId of pageTargets) {
+    assert.match(html, new RegExp(`<section id="${pageId}" class="[^"]*admin-page`),
+      `${pageId} must resolve to a standalone admin page`);
+  }
+  assert.match(js, /data-loan-page/);
+  assert.match(js, /activeCollectionRange = button\.dataset\.collectionRange/);
+  assert.match(js, /applyTheme\('dark'\)/);
+  assert.doesNotMatch(js, /getElementById\(['"]modeBtn['"]\)/);
+  assert.doesNotMatch(js, /localStorage\.getItem\(['"]mode['"]\)/);
 });
 
 test('all public HTML pages are non-trivial and start with a doctype', () => {

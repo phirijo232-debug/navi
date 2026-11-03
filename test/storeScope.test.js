@@ -11,6 +11,7 @@ const { getLoans } = require('../controllers/loanController');
 const { getFeedback } = require('../controllers/feedbackController');
 const { updateLoanStatus } = require('../controllers/loanController');
 const { createAdminUser } = require('../controllers/authController');
+const emailService = require('../middleware/email');
 
 const USERS_FILE = require('../middleware/dataStore').paths.users;
 const LOANS_FILE = require('../middleware/dataStore').paths.loans;
@@ -161,25 +162,46 @@ test('BMF store admins only receive BMF loans and customer feedback', () => {
   }
 });
 
-test('franchise admins cannot alter BMF loan decisions through the API', async () => {
-  const original = fs.readFileSync(LOANS_FILE, 'utf8');
+test('main admin can decide BMF loans while other-store franchise admins remain scoped', async t => {
+  const notificationsFile = require('../middleware/dataStore').paths.notifications;
+  const files = [LOANS_FILE, notificationsFile];
+  const originals = files.map(file => fs.readFileSync(file, 'utf8'));
+  const sendEmail = t.mock.method(emailService, 'sendCustomerEmail', async () => ({ ok: true }));
   fs.writeFileSync(LOANS_FILE, JSON.stringify([
-    { id: 88, email: 'borrower@example.test', storeId: 'buraza', status: 'pending', outstanding: 100 }
+    {
+      id: 88, email: 'borrower@example.test', storeId: 'buraza', status: 'pending',
+      amount: 100, interestAmount: 10, totalRepayment: 110, outstanding: 110,
+      dueDate: '2099-01-01', tenureWeeks: 1, createdAt: new Date().toISOString(), payments: []
+    }
   ]));
 
   try {
-    const req = {
+    const adminResponse = responseRecorder();
+    await updateLoanStatus({
       params: { id: '88' },
       body: { action: 'approve', reason: 'Test' },
-      authUser: { email: 'franchise@example.test', role: 'admin' },
-      headers: {}
-    };
-    const res = responseRecorder();
-    await updateLoanStatus(req, res);
-    assert.equal(res.statusCode, 403);
+      authUser: { email: 'jophiri223@gmail.com', role: 'admin' },
+      headers: { 'x-business-unit': 'buraza' }
+    }, adminResponse);
+    assert.equal(adminResponse.statusCode, 200);
+    assert.equal(JSON.parse(fs.readFileSync(LOANS_FILE, 'utf8'))[0].status, 'active');
+    assert.ok(sendEmail.mock.calls.length > 0);
+
+    fs.writeFileSync(LOANS_FILE, JSON.stringify([
+      { id: 89, email: 'borrower@example.test', storeId: 'buraza', status: 'pending', outstanding: 100 }
+    ]));
+    const scopedResponse = responseRecorder();
+    await updateLoanStatus({
+      params: { id: '89' },
+      body: { action: 'approve', reason: 'Test' },
+      authUser: { email: 'franchise@example.test', role: 'franchise_admin', storeId: 'other-store' },
+      headers: { 'x-business-unit': 'other-store' }
+    }, scopedResponse);
+    assert.equal(scopedResponse.statusCode, 403);
     assert.equal(JSON.parse(fs.readFileSync(LOANS_FILE, 'utf8'))[0].status, 'pending');
   } finally {
-    fs.writeFileSync(LOANS_FILE, original);
+    sendEmail.mock.restore();
+    files.forEach((file, index) => fs.writeFileSync(file, originals[index]));
   }
 });
 

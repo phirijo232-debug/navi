@@ -5,6 +5,7 @@ const {
   getApprovalDeadline,
   filterLoansByTimeframe,
   generateLoanReceiptId,
+  generatePaymentReceiptId,
   normalizeStatus,
   deriveLoanStatus,
   summarizeStore,
@@ -35,7 +36,15 @@ test('receipt ids use the BMF-YYYYMMDD-XXXX format and never collide (Task 1)', 
   const used = new Set(['BMF-20260501-0001']);
   const id = generateLoanReceiptId(used, new Date('2026-05-01T00:00:00Z'));
   assert.match(id, /^BMF-20260501-\d{4}$/);
-  assert.notEqual(id, 'BMF-20260501-0001');
+  assert.equal(id, 'BMF-20260501-0002');
+  assert.equal(generateLoanReceiptId(used, new Date('2026-05-01T00:00:00Z')), 'BMF-20260501-0003');
+  assert.equal(generateLoanReceiptId(used, new Date('2026-05-02T00:00:00Z')), 'BMF-20260502-0001');
+});
+
+test('payment receipt IDs use an independent sequential PAY series', () => {
+  const used = new Set(['PAY-20260501-0004']);
+  assert.equal(generatePaymentReceiptId(used, new Date('2026-05-01T00:00:00Z')), 'PAY-20260501-0005');
+  assert.equal(generatePaymentReceiptId(used, new Date('2026-05-02T00:00:00Z')), 'PAY-20260502-0001');
 });
 
 test('legacy statuses normalise onto the BMF lifecycle', () => {
@@ -120,4 +129,3 @@ test('filterLoansByTimeframe only includes records within the selected window', 
   const filtered = filterLoansByTimeframe(loans, '30');
   assert.deepEqual(filtered.map(loan => loan.id), [1]);
 });
-

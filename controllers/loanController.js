@@ -162,8 +162,8 @@ function decidePaymentSubmission(req, res) {
 }
 
 // ─── Receipt IDs (Task 1) ────────────────────────────────────────────────────
-// Loan receipts:   BMF-YYYYMMDD-XXXX  (creation date + 4 random digits)
-// Payment receipts: PAY-YYYYMMDD-XXXX (payment date + 4 random digits)
+// Loan receipts:   BMF-YYYYMMDD-XXXX (creation date + daily sequence)
+// Payment receipts: PAY-YYYYMMDD-XXXX (payment date + separate daily sequence)
 // Generated once when the request/payment is made; unique across the store.
 
 const LOAN_RECEIPT_PREFIX = 'BMF';
@@ -177,26 +177,30 @@ function compactDate(date = new Date()) {
   return `${y}${m}${day}`;
 }
 
-function randomBlock() {
-  return String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+function generateSequentialReceiptId(prefix, existingIds, date) {
+  const stamp = compactDate(date);
+  const start = `${prefix}-${stamp}-`;
+  const suffixPattern = new RegExp(`^${prefix}-${stamp}-(\\d+)$`);
+  const highest = [...existingIds].reduce((max, value) => {
+    const match = String(value).match(suffixPattern);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  let sequence = highest + 1;
+  let receipt = `${start}${String(sequence).padStart(4, '0')}`;
+  while (existingIds.has(receipt)) {
+    sequence += 1;
+    receipt = `${start}${String(sequence).padStart(4, '0')}`;
+  }
+  existingIds.add(receipt);
+  return receipt;
 }
 
 function generateLoanReceiptId(existingIds = new Set(), date = new Date()) {
-  const stamp = compactDate(date);
-  let id;
-  do {
-    id = `${LOAN_RECEIPT_PREFIX}-${stamp}-${randomBlock()}`;
-  } while (existingIds.has(id));
-  return id;
+  return generateSequentialReceiptId(LOAN_RECEIPT_PREFIX, existingIds, date);
 }
 
 function generatePaymentReceiptId(existingIds = new Set(), date = new Date()) {
-  const stamp = compactDate(date);
-  let id;
-  do {
-    id = `${PAYMENT_RECEIPT_PREFIX}-${stamp}-${randomBlock()}`;
-  } while (existingIds.has(id));
-  return id;
+  return generateSequentialReceiptId(PAYMENT_RECEIPT_PREFIX, existingIds, date);
 }
 
 // Task 2 — canonical payment modes (BMF repayment sheet options).
@@ -384,9 +388,22 @@ function accrueAllGrace(today = new Date().toISOString().slice(0, 10)) {
   const loans = getLoansData();
   let changedCount = 0;
   loans.forEach(loan => {
-    const before = `${Number(loan.graceAccrued || 0)}|${loan.graceLastAccrual || ''}`;
+    const before = [
+      Number(loan.graceAccrued || 0),
+      loan.graceLastAccrual || '',
+      Number(loan.totalRepayment || 0),
+      Number(loan.outstanding || 0),
+      Number(loan.interestOutstanding || 0)
+    ].join('|');
     applyGraceAccrual(loan, today);
-    const after = `${Number(loan.graceAccrued || 0)}|${loan.graceLastAccrual || ''}`;
+    if (Number(loan.graceAccrued || 0) > 0) rebuildPaymentLedger(loan);
+    const after = [
+      Number(loan.graceAccrued || 0),
+      loan.graceLastAccrual || '',
+      Number(loan.totalRepayment || 0),
+      Number(loan.outstanding || 0),
+      Number(loan.interestOutstanding || 0)
+    ].join('|');
     if (before !== after) changedCount += 1;
   });
   if (changedCount) saveLoansData(loans);
@@ -405,7 +422,7 @@ function sumPayments(loan) {
  * Payments are applied interest-first (as is standard in micro-finance),
  * then against principal.
  */
-function rebuildPaymentLedger(loan) {
+function rebuildPaymentLedger(loan, existingPaymentIds = new Set()) {
   const payments = Array.isArray(loan.payments) ? loan.payments : [];
   // totalRepayment is authoritative; fall back to amount, then to the recorded
   // outstanding so legacy rows without computed totals still reconcile.
@@ -425,7 +442,8 @@ function rebuildPaymentLedger(loan) {
 
     running = payment.balanceAfter;
     payment.paymentReceiptId = payment.paymentReceiptId ||
-      generatePaymentReceiptId(undefined, payment.paymentDate || payment.date || new Date());
+      generatePaymentReceiptId(existingPaymentIds, payment.paymentDate || payment.date || new Date());
+    existingPaymentIds.add(String(payment.paymentReceiptId));
     payment.receiptNumber = payment.receiptNumber || payment.paymentReceiptId;
     payment.recordedBy = payment.recordedBy || loan.updatedBy || loan.reviewedBy || 'system';
     payment.paymentDate = payment.paymentDate || payment.date || loan.createdAt || null;
@@ -469,10 +487,15 @@ function getLoansData() {
 /** Loans enriched for reading: receipts backfilled, ledgers rebuilt, status derived. */
 function getEnrichedLoans(today = new Date().toISOString().slice(0, 10)) {
   const loans = getLoansData();
+  const existingPaymentIds = new Set(loans.flatMap(loan =>
+    (Array.isArray(loan.payments) ? loan.payments : [])
+      .map(payment => String(payment.paymentReceiptId || ''))
+      .filter(Boolean)
+  ));
   return loans.map(loan => {
     const copy = { ...loan, payments: (loan.payments || []).map(p => ({ ...p })) };
     applyGraceAccrual(copy, today); // read-only view: un-persisted accrual re-derives identically
-    rebuildPaymentLedger(copy);
+    rebuildPaymentLedger(copy, existingPaymentIds);
     return {
       ...copy,
       businessStatus: deriveLoanStatus(copy, today),
@@ -485,6 +508,11 @@ function getEnrichedLoans(today = new Date().toISOString().slice(0, 10)) {
 function migrateLoans() {
   const loans = getLoansData();
   let receiptsChanged = ensureReceiptNumbers(loans);
+  const existingPaymentIds = new Set(loans.flatMap(loan =>
+    (Array.isArray(loan.payments) ? loan.payments : [])
+      .map(payment => String(payment.paymentReceiptId || ''))
+      .filter(Boolean)
+  ));
 
   let changed = receiptsChanged;
   loans.forEach(loan => {
@@ -493,7 +521,7 @@ function migrateLoans() {
       changed = true;
     }
     const before = JSON.stringify(loan.payments || []);
-    rebuildPaymentLedger(loan);
+    rebuildPaymentLedger(loan, existingPaymentIds);
     if (JSON.stringify(loan.payments || []) !== before) changed = true;
     const live = deriveLoanStatus(loan);
     if (!['pending', 'declined', 'paid'].includes(live) &&
@@ -980,10 +1008,8 @@ function getLoanById(req, res) {
 
 async function updateLoanStatus(req, res) {
   try {
-    // Loan DECISIONS stay restricted to the assigned store admin (tested
-    // franchise-scoping policy); payments/notifications use isAdminRole instead.
-    if (req.authUser?.role !== 'store_admin' && req.authUser?.role !== 'franchise_admin') {
-      return res.status(403).json({ error: 'Loan decisions are restricted to the assigned store admin or franchise admin.' });
+    if (!isAdminRole(req.authUser?.role)) {
+      return res.status(403).json({ error: 'BMF admin access is required to make loan decisions.' });
     }
     const id = Number(req.params.id);
     const { action, amount, collateralGrade, collateralVerified, nextPayment, reason, graceUntil } = req.body;
@@ -1192,7 +1218,7 @@ function recordPayment(req, res) {
       loans[index].status = 'paid';
       loans[index].settledAt = recordedAt;
     }
-    recordStatusHistory(loans[index], loans[index].status, `Payment of ${formatCurrency(payment.amount)} recorded.`, req.authUser?.email || 'admin', 'admin', balanceBefore, balanceAfter);
+    recordStatusHistory(loans[index], loans[index].status, `Payment of ${formatCurrency(payment.amount)} recorded.`, req.authUser?.email || 'admin', 'admin', balanceBefore, payment.balanceAfter);
     loans[index].updatedAt = recordedAt;
 
     saveLoansData(loans);

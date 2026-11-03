@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 const http = require('node:http');
+const dataStore = require('../middleware/dataStore');
 const routes = require('../routes');
 
 function get(server, pathname) {
@@ -20,6 +21,7 @@ function get(server, pathname) {
 }
 
 test('report export route keeps scoped and typed exports distinct', async t => {
+  t.mock.method(dataStore, 'readJson', () => []);
   const app = express();
   app.use((req, res, next) => {
     req.authUser = { role: 'admin', email: 'admin@example.test' };

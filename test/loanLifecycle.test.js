@@ -10,6 +10,9 @@ const path = require('path');
 const {
   deriveLoanStatus,
   applyGraceAccrual,
+  accrueAllGrace,
+  getLoansData,
+  saveLoansData,
   parseDateInput,
   rebuildPaymentLedger
 } = require('../controllers/loanController');
@@ -72,6 +75,38 @@ test('grace penalty is capped at 50% of the original principal', () => {
   applyGraceAccrual(loan, '2026-09-02'); // pin base
   applyGraceAccrual(loan, '2026-11-30'); // far beyond the 50% cap
   assert.equal(loan.graceAccrued, 500); // 50% x 1000
+});
+
+test('grace sweep persists outstanding and interest after accrued penalties', () => {
+  const originalLoans = getLoansData();
+  try {
+    saveLoansData([{
+      id: 5,
+      receiptNumber: 'BMF-20261010-5557',
+      status: 'defaulted',
+      amount: 50,
+      interestAmount: 26.79,
+      totalRepayment: 76.79,
+      outstanding: 58,
+      interestOutstanding: 8,
+      graceAccrued: 18.79,
+      graceAccrualBase: 58,
+      graceAccrualStart: '2026-10-15',
+      graceLastAccrual: '2026-11-02',
+      dueDate: '2026-10-17',
+      payments: []
+    }]);
+
+    assert.deepEqual(accrueAllGrace('2026-11-02'), { changed: 1, total: 1 });
+    const [reconciled] = getLoansData();
+    assert.equal(reconciled.totalRepayment, 76.79);
+    assert.equal(reconciled.outstanding, 76.79);
+    assert.equal(reconciled.interestOutstanding, 26.79);
+    assert.equal(reconciled.paidTotal, 0);
+    assert.deepEqual(accrueAllGrace('2026-11-02'), { changed: 0, total: 1 });
+  } finally {
+    saveLoansData(originalLoans);
+  }
 });
 
 test('liquidated and paid loans never accrue grace', () => {

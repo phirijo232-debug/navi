@@ -2,13 +2,17 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { logError, logBreakage } = require('../middleware/logger');
 const { sendCustomerEmail } = require('../middleware/email');
 const config = require('../config');
 const dataStore = require('../middleware/dataStore');
+const { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, isAdminRole } = require('../middleware/storeScope');
 const { upload } = require('../controllers/loanController');
 
 const APPLICATIONS_FILE = dataStore.paths.applications || path.join(dataStore.DATA_DIR, 'applications.json');
+const NOTIFICATIONS_FILE = dataStore.paths.notifications;
+const USERS_FILE = dataStore.paths.users;
 
 function ensureApplicationsFile() {
   try {
@@ -40,6 +44,66 @@ function generateApplicationId() {
   const yyyymmdd = now.toISOString().slice(0, 10).replace(/-/g, '');
   const random = Math.floor(1000 + Math.random() * 9000);
   return `QS-${yyyymmdd}-${random}`;
+}
+
+function ensureApplicationNotifications(applications) {
+  const users = dataStore.readJson(USERS_FILE, [], Array.isArray);
+  const notifications = dataStore.readJson(NOTIFICATIONS_FILE, [], Array.isArray);
+  let changed = false;
+  const applicationsById = new Map(applications.map(application => [
+    String(application.applicationId || application.id),
+    application
+  ]));
+
+  notifications.forEach(notification => {
+    if (notification.type !== 'application-request') return;
+    const application = applicationsById.get(String(notification.applicationId || ''));
+    if (!application) return;
+    const status = String(application.status || '').toLowerCase();
+    if (notification.applicationStatus !== status) {
+      notification.applicationStatus = status;
+      changed = true;
+    }
+    if (status !== 'pending' && !notification.readAt) {
+      notification.readAt = application.reviewedAt || application.updatedAt || new Date().toISOString();
+      changed = true;
+    }
+  });
+
+  applications.forEach(application => {
+    if (String(application.status || '').toLowerCase() !== 'pending') return;
+    const storeId = getRecordStoreId(application);
+    const recipients = users.filter(user =>
+      isAdminRole(user.role) &&
+      canAccessStore({ authUser: user, headers: { 'x-business-unit': storeId } }, storeId)
+    );
+    recipients.forEach(user => {
+      const email = String(user.email || '').trim().toLowerCase();
+      if (!email || notifications.some(notification =>
+        notification.type === 'application-request' &&
+        String(notification.applicationId) === String(application.applicationId || application.id) &&
+        String(notification.recipientEmail || '').toLowerCase() === email
+      )) return;
+
+      notifications.push({
+        id: crypto.randomUUID(),
+        kind: 'in-app',
+        recipientEmail: email,
+        type: 'application-request',
+        message: `New Quick Screen application from ${application.fullName || 'an applicant'}.`,
+        applicationId: application.applicationId || application.id,
+        applicantName: application.fullName || '',
+        amount: Number(application.amount) || 0,
+        applicationStatus: String(application.status || '').toLowerCase(),
+        storeId,
+        createdAt: application.createdAt || new Date().toISOString(),
+        readAt: null
+      });
+      changed = true;
+    });
+  });
+
+  if (changed) dataStore.writeJson(NOTIFICATIONS_FILE, notifications);
 }
 
 router.post('/', upload.fields([
@@ -94,6 +158,7 @@ router.post('/', upload.fields([
       urgency: urgency || 'standard',
       agreedToTerms: agreedToTerms === 'true' || agreedToTerms === true,
       status: 'pending',
+      storeId: config.DEFAULT_STORE_ID,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       nrcFront: nrcFrontFile ? nrcFrontFile.filename : null,
@@ -104,6 +169,11 @@ router.post('/', upload.fields([
 
     apps.push(application);
     await writeApplications(apps);
+    try {
+      ensureApplicationNotifications(apps);
+    } catch (notificationErr) {
+      logError(`APPLICATION NOTIFICATION CREATE FAILED for ${application.applicationId}: ${notificationErr.message}`);
+    }
 
     const weeklyRates = { 1: 0.10, 2: 0.16, 3: 0.24, 4: 0.32 };
     const rate = weeklyRates[application.tenureWeeks] ?? 0.10;
@@ -160,19 +230,39 @@ router.get('/mine', (req, res) => {
 
 router.get('/', (req, res) => {
   try {
-    if (!req.authUser || (req.authUser.role !== 'admin' && req.authUser.role !== 'store_admin' && req.authUser.role !== 'franchise_admin')) {
+    if (!isAdminRole(req.authUser?.role)) {
       return res.status(403).json({ error: 'Admin access required.' });
     }
 
     const apps = readApplications();
-    // Support ?status=pending filter for bell badge
+    const storeId = getRequestedStoreId(req);
+    if (!canAccessStore(req, storeId)) {
+      return res.status(403).json({ error: 'Access to this store is not allowed.' });
+    }
+    const scopedApps = apps.filter(application =>
+      storeId === 'all' || getRecordStoreId(application) === storeId
+    );
+    try {
+      ensureApplicationNotifications(scopedApps);
+    } catch (notificationErr) {
+      logError(`APPLICATION NOTIFICATION SYNC FAILED: ${notificationErr.message}`);
+      if (req.query.notificationsOnly === 'true') {
+        return res.status(503).json({ error: 'Application notifications are temporarily unavailable.' });
+      }
+    }
+    if (req.query.notificationsOnly === 'true') {
+      return res.json({
+        pendingCount: scopedApps.filter(application => String(application.status || '').toLowerCase() === 'pending').length
+      });
+    }
+    // Support callers that need the full pending-application list.
     if (req.query.status) {
-      const filtered = apps.filter(a => String(a.status || '').toLowerCase() === String(req.query.status).toLowerCase());
+      const filtered = scopedApps.filter(a => String(a.status || '').toLowerCase() === String(req.query.status).toLowerCase());
       filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       return res.json({ applications: filtered, count: filtered.length });
     }
-    apps.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    return res.json({ applications: apps, count: apps.length });
+    scopedApps.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return res.json({ applications: scopedApps, count: scopedApps.length });
   } catch (err) {
     logError(`APPLICATIONS LIST FAILED: ${err.message}`);
     return res.status(503).json({ error: 'Unable to load applications.' });
@@ -199,6 +289,9 @@ router.patch('/:id', async (req, res) => {
     }
 
     const app = apps[index];
+    if (!canAccessRecord(req, app)) {
+      return res.status(403).json({ error: 'Access to this application is not allowed.' });
+    }
     app.status = action === 'approve' ? 'approved' : (action === 'reject' ? 'declined' : 'info_requested');
     app.reviewedAt = new Date().toISOString();
     app.reviewedBy = req.authUser.email;
@@ -207,6 +300,11 @@ router.patch('/:id', async (req, res) => {
 
     apps[index] = app;
     await writeApplications(apps);
+    try {
+      ensureApplicationNotifications(apps);
+    } catch (notificationErr) {
+      logError(`APPLICATION NOTIFICATION UPDATE FAILED for ${app.applicationId}: ${notificationErr.message}`);
+    }
 
     if (action === 'approve') {
       try {
