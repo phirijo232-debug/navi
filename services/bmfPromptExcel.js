@@ -55,6 +55,13 @@ function dateSerial(value) {
   return date instanceof Date ? (date.getTime() - Date.UTC(1899, 11, 30)) / 86400000 : value;
 }
 
+function dateLabel(value) {
+  const date = dateValue(value);
+  return date instanceof Date
+    ? date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })
+    : value;
+}
+
 function makeHeader(ws, title, subtitle, report, columnCount = 13) {
   const lastColumn = String.fromCharCode(64 + columnCount);
   ws.mergeCells(`A1:${lastColumn}1`);
@@ -65,8 +72,8 @@ function makeHeader(ws, title, subtitle, report, columnCount = 13) {
   setValue(ws.getCell('A2'), title.toUpperCase(), { fill: C.navy, bold: true, size: 13 });
   ws.mergeCells(`A3:${lastColumn}3`);
   const period = report.from || report.to
-    ? `Period: ${report.from || 'Beginning'} to ${report.to || 'Current'}`
-    : `As at ${report.today}`;
+    ? `Period: ${report.from ? dateLabel(report.from) : 'Beginning'} to ${report.to ? dateLabel(report.to) : 'Current'}`
+    : `As at ${dateLabel(report.today)}`;
   setValue(ws.getCell('A3'), `${subtitle} · ${period} · Generated ${report.generatedAt}`, {
     fill: C.card, color: C.muted, italic: true
   });

@@ -19,12 +19,24 @@ function newDoc(landscape) {
   return doc;
 }
 
-function header(doc, title, dateStr) {
+function formatPdfDate(value) {
+  const text = String(value || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return String(value || '');
+  const date = new Date(`${text}T00:00:00Z`);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+}
+
+function header(doc, title, dateStr, period) {
   doc.font('Helvetica-Bold').fontSize(13).text('BURAZA MICRO FINANCE (BMF)', { align: 'center' });
   doc.font('Helvetica').fontSize(10).text('Pryme Vertex Holdings', { align: 'center' });
   doc.moveDown(0.3);
   doc.font('Helvetica-Bold').fontSize(12).text(title, { align: 'center' });
-  doc.font('Helvetica').fontSize(9).text(`Date: ${dateStr}`, { align: 'center' });
+  const periodLabel = period && (period.from || period.to)
+    ? `Period: ${period.from ? formatPdfDate(period.from) : 'Beginning'} to ${period.to ? formatPdfDate(period.to) : 'Current'} · As at ${formatPdfDate(dateStr)}`
+    : `As at: ${formatPdfDate(dateStr)}`;
+  doc.font('Helvetica').fontSize(9).text(periodLabel, { align: 'center' });
   doc.moveDown(0.5);
   doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
   doc.moveDown(0.5);
@@ -34,9 +46,13 @@ function footerAll(doc) {
   const pages = doc.bufferedPageRange().count;
   for (let i = 0; i < pages; i += 1) {
     doc.switchToPage(i);
-    const y = doc.page.height - 36;
+    const y = doc.page.height - doc.page.margins.bottom - 12;
     doc.font('Helvetica').fontSize(8).fillColor('#555555')
-      .text(`CONFIDENTIAL — page ${i + 1} of ${pages}`, doc.page.margins.left, y, { align: 'center', width: doc.page.width - doc.page.margins.left - doc.page.margins.right });
+      .text(`CONFIDENTIAL — page ${i + 1} of ${pages}`, doc.page.margins.left, y, {
+        align: 'center',
+        width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
+        lineBreak: false
+      });
     doc.fillColor('#000000');
   }
 }
@@ -50,16 +66,22 @@ function table(doc, headers, rows, opts = {}) {
   const drawRow = (cells, bold, shade) => {
     const h = 16;
     if (doc.y + h > doc.page.height - doc.page.margins.bottom - 10) doc.addPage();
+    const rowY = doc.y;
     let x = doc.page.margins.left;
-    if (shade) { doc.save().fillColor('#F2F2F2').rect(x, doc.y, totalW, h).fill().restore(); }
+    if (shade) { doc.save().fillColor('#F2F2F2').rect(x, rowY, totalW, h).fill().restore(); }
     cells.forEach((v, i) => {
-      doc.save().rect(x, doc.y, cols[i], h).stroke();
+      doc.save().rect(x, rowY, cols[i], h).stroke();
       doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5)
-        .text(String(v == null ? '' : v), x + 3, doc.y + 3, { width: cols[i] - 6, height: h - 6, ellipsis: true });
+        .text(String(v == null ? '' : v), x + 3, rowY + 3, {
+          width: cols[i] - 6,
+          height: h - 6,
+          ellipsis: true,
+          lineBreak: false
+        });
       doc.restore();
       x += cols[i];
     });
-    doc.y += h;
+    doc.y = rowY + h;
   };
   drawRow(headers, true, false);
   if (!rows.length) {
@@ -79,7 +101,7 @@ function businessPdf(sections, opts = {}) {
       doc.on('data', c => chunks.push(c));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
-      header(doc, opts.title || 'BMF BUSINESS REPORT', opts.date || new Date().toISOString().slice(0, 10));
+      header(doc, opts.title || 'BMF BUSINESS REPORT', opts.date || new Date().toISOString().slice(0, 10), opts.period);
       sections.forEach(s => {
         doc.font('Helvetica-Bold').fontSize(11).text(s.title);
         doc.moveDown(0.3);

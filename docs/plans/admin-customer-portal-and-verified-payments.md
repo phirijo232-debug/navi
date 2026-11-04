@@ -21,6 +21,7 @@ Skin (admin/customer pages, styles, shared feedback), Brain (loan/payment/notifi
 - [x] (2026-11-03) Simplify the customer Payments/Support screen by removing its nested menu bar while keeping payment history, verified payment submission, due dates, and inquiries accessible.
 - [x] Bind the expected balance to the selected loan’s current server-provided outstanding balance and keep it read-only; ensure submission authorization and balance checks remain server authoritative.
 - [x] Keep analytics charts off the customer portal; correct the miswired inquiry/payment form handlers and add regression coverage.
+- [ ] Fix modal close behavior consistently across customer/admin dialogs, including close button, backdrop, and Escape.
 
 ## Decision Log
 - 2026-10-16: Treat both pasted prompts as design references, not API contracts. Keep current route names and exact AGENTS role gates unless a new route is required for the payment feature.

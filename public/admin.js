@@ -17,9 +17,9 @@ let customTimeframeTo = '';
 const REPORT_LIBRARY = [
   { type: 'how-risky', title: 'How Risky Are Our Loans?', description: 'Shows which loans are overdue and by how long', source: 'par', filenamePrefix: 'bmf_how_risky' },
   { type: 'who-owes', title: 'Who Owes What and How Late?', description: 'Lists every borrower\'s arrears in time buckets', source: 'aging', filenamePrefix: 'bmf_who_owes' },
-  { type: 'full-history', title: 'One Borrower\'s Full History', description: 'Every payment made and still owed for one loan', source: 'statement', filenamePrefix: 'bmf_full_history', borrowerSearch: true },
+  { type: 'full-history', title: 'One Borrower\'s Full History', description: 'Every payment made and still owed for one loan', source: 'statement', filenamePrefix: 'bmf_full_history', borrowerSearch: true, periodFilter: false },
   { type: 'all-loans', title: 'All Loans We Gave Out This Period', description: 'Every loan issued in a date range', source: 'disbursements', filenamePrefix: 'bmf_all_loans' },
-  { type: 'schedule', title: 'Payment Schedule Per Loan', description: 'Instalment-by-instalment plan for one loan', source: 'schedule', filenamePrefix: 'bmf_schedule', borrowerSearch: true },
+  { type: 'schedule', title: 'Payment Schedule Per Loan', description: 'Instalment-by-instalment plan for one loan', source: 'schedule', filenamePrefix: 'bmf_schedule', borrowerSearch: true, periodFilter: false },
   { type: 'collection', title: 'How Well Is Money Being Collected?', description: 'Officer performance vs CGAP target', source: 'collection', filenamePrefix: 'bmf_collection' },
   { type: 'problem-loans', title: 'Problem Loans & Write-Offs', description: 'Every defaulted loan and net loss', source: 'defaults', filenamePrefix: 'bmf_problem_loans' },
   { type: 'daily-cashbook', title: 'Daily Money In and Out', description: 'Cashbook — every receipt and disbursement', source: 'cashbook', filenamePrefix: 'bmf_daily_cashbook' },
@@ -132,21 +132,27 @@ function renderReportLibrary() {
       <h3>${escapeHtml(report.title)}</h3>
       <p>${escapeHtml(report.description)}</p>
       <div class="report-fields">
-        <label>
-          <span>From</span>
-          <input type="date" data-report-from>
-        </label>
-        <label>
-          <span>To</span>
-          <input type="date" data-report-to>
-        </label>
-        <label class="wide">
-          <span>Officer</span>
-          <select data-report-officer>
-            <option value="">All officers</option>
-            ${officerOptions.map(option => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join('')}
-          </select>
-        </label>
+        ${report.periodFilter === false
+          ? `<p class="report-period-note">${report.type === 'schedule'
+            ? 'Includes all scheduled installments for the selected loan; date filters do not apply.'
+            : 'Includes the selected loan\'s complete payment history; date filters do not apply.'}</p>`
+          : `
+            <label>
+              <span>From</span>
+              <input type="date" data-report-from>
+            </label>
+            <label>
+              <span>To</span>
+              <input type="date" data-report-to>
+            </label>
+            <label class="wide">
+              <span>Officer</span>
+              <select data-report-officer>
+                <option value="">All officers</option>
+                ${officerOptions.map(option => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join('')}
+              </select>
+            </label>
+          `}
         ${report.borrowerSearch ? `
           <label class="wide">
             <span>Borrower search</span>
@@ -164,7 +170,7 @@ function renderReportLibrary() {
 
   list.querySelectorAll('[data-report-action]').forEach(button => {
     button.addEventListener('click', async () => {
-      const { reportType, format } = button.dataset;
+      const { reportType, reportFormat: format } = button.dataset;
       const card = button.closest('[data-report-card]');
       if (!card) return;
       const from = card.querySelector('[data-report-from]')?.value || '';
@@ -177,6 +183,10 @@ function renderReportLibrary() {
 }
 
 async function pullReport(reportType, format, params = {}) {
+  if (!['xlsx', 'pdf'].includes(format)) {
+    showBmfToast('Choose Excel or PDF before generating the report.', 'error');
+    return;
+  }
   const config = getReportConfig(reportType);
   const sourceType = config.source || reportType;
   const qs = new URLSearchParams({ format });
@@ -223,6 +233,15 @@ async function pullReport(reportType, format, params = {}) {
       return;
     }
 
+    const contentType = (res.headers.get('Content-Type') || '').toLowerCase();
+    const expectedContentType = format === 'pdf'
+      ? 'application/pdf'
+      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    if (!contentType.includes(expectedContentType)) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `The server returned ${contentType || 'an unknown format'} instead of ${format.toUpperCase()}.`);
+    }
+
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -249,6 +268,12 @@ function applyTheme(theme) {
   document.body.classList.remove('dark', 'light');
   document.documentElement.classList.add(activeTheme);
   document.body.classList.add(activeTheme);
+  const toggle = document.getElementById('adminThemeToggle');
+  if (toggle) {
+    const nextTheme = activeTheme === 'light' ? 'dark' : 'light';
+    toggle.textContent = `Use ${nextTheme} theme`;
+    toggle.setAttribute('aria-label', `Switch to ${nextTheme} theme`);
+  }
 }
 
 function showAuthScreen() {
@@ -3100,8 +3125,24 @@ document.querySelectorAll('[data-close-modal]').forEach(button => {
     if (modalId === 'editEmployeeModal') closeEditEmployeeModal();
   });
 });
+document.querySelectorAll('.modal').forEach(modal => {
+  modal.addEventListener('click', event => {
+    if (event.target === modal) modal.querySelector('[data-close-modal]')?.click();
+  });
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  const openModals = [...document.querySelectorAll('.modal')]
+    .filter(modal => !modal.hidden && getComputedStyle(modal).display !== 'none');
+  openModals[openModals.length - 1]?.querySelector('[data-close-modal]')?.click();
+});
 document.querySelectorAll('[data-store]').forEach(button => {
   button.addEventListener('click', () => enterStore(button.dataset.store));
+});
+document.getElementById('adminThemeToggle')?.addEventListener('click', () => {
+  const theme = document.body.classList.contains('light') ? 'dark' : 'light';
+  localStorage.setItem('adminTheme', theme);
+  applyTheme(theme);
 });
 document.getElementById('adminLoginForm').addEventListener('submit', handleAdminLogin);
 document.getElementById('adminOtpForm').addEventListener('submit', handleAdminOtp);
@@ -3662,7 +3703,7 @@ document.querySelectorAll('.directory-pagination').forEach(nav => {
 });
 
 window.onload = () => {
-  applyTheme('dark');
+  applyTheme(localStorage.getItem('adminTheme') === 'light' ? 'light' : 'dark');
   restoreSession();
 };
 

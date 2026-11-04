@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script>document.documentElement.classList.add('dark');</script>
+  <script>document.documentElement.classList.add(localStorage.getItem('adminTheme') === 'light' ? 'light' : 'dark');</script>
   <title>PrymeBMF Admin — Dashboard</title>
   <link rel="stylesheet" href="style.css?v=20261103-custom-chart-timeframe">
   <style>
@@ -459,7 +459,7 @@
   </style>
 </head>
 <body>
-  <script>document.body.classList.add('dark');</script>
+  <script>document.body.classList.add(localStorage.getItem('adminTheme') === 'light' ? 'light' : 'dark');</script>
   <div id="bmfToast" class="bmf-toast" role="status" aria-live="polite"></div>
   <div class="admin-shell">
     <header class="brand-header"><a class="brand-mark" href="index.html">PrymeBMF Admin</a><span class="store-context" id="storeContext"></span></header>
@@ -526,6 +526,7 @@
         <div class="admin-brand"><strong>BMF</strong><span>· Admin</span><small>Buraza Micro Finance</small></div>
         <label class="admin-search-wrap"><span aria-hidden="true">Find:</span><input id="adminDashboardSearch" type="search" placeholder="Loans, borrowers, receipts..." aria-label="Search dashboard"></label>
         <div class="admin-user-controls">
+          <button id="adminThemeToggle" type="button" class="toggle-mode admin-mode-btn" aria-label="Switch to light theme">Use light theme</button>
           <div class="notification-anchor"><button id="adminNotificationBtn" type="button" aria-label="Notifications" aria-expanded="false">&#128276;<span id="adminNotificationCount" class="notification-count hidden">0</span></button><section id="adminNotificationMenu" class="notification-menu hidden" aria-label="Notifications"><header><strong>Notifications</strong><button id="markAllNotificationsRead" type="button">Mark all read</button></header><div id="adminNotificationList"></div><footer><button id="viewAllNotifications" type="button">View all notifications</button></footer></section></div>
           <span id="adminAvatar" class="admin-avatar">BM</span><span id="adminDisplayName" class="admin-display-name">Admin</span>
         </div>

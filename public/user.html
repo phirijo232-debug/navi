@@ -4,9 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PrymeBMF — My Account</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="style.css?v=20261017-shared-theme-refresh">
   <style>
     body.customer-portal { background:#0d1117; color:#e6edf3; }
@@ -41,7 +38,7 @@
     @media(max-width:650px) { .customer-portal .dashboard{padding:12px}.customer-portal .portal-kpis,.customer-portal .overview-grid{grid-template-columns:1fr}.customer-portal .welcome-card{align-items:flex-start;flex-direction:column}.customer-portal .request-field-grid{grid-template-columns:1fr} }
 
     /*── PrymeBMF — BMF Master Fidelity skin ─────────────────── */
-    *, *::before, *::after, html, body { font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif; }
+    *, *::before, *::after, html, body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; }
     .customer-portal .standing-badge.warn { color:#d29922; border-color:#9e6a03; }
     .customer-portal .standing-badge.alert { color:#f85149; border-color:#da3633; }
 
@@ -103,32 +100,142 @@
     }
     .customer-portal .record-payment-btn:hover { background: #3b93f9; }
 
-    /* Support sub-list */
-    .customer-portal .support-sub-list {
-      list-style: none;
-      padding: 0;
-      margin: 16px 0 0;
-      border-top: 1px solid #30363d;
-      padding-top: 16px;
+    body.customer-portal {
+      --portal-bg:#0d1117;
+      --portal-card:#161b22;
+      --portal-surface:#1c2128;
+      --portal-border:#30363d;
+      --portal-text:#e6edf3;
+      --portal-muted:#8b949e;
+      background:var(--portal-bg);
+      color:var(--portal-text);
     }
-    .customer-portal .support-sub-list li {
-      margin: 8px 0;
+    body.customer-portal.light {
+      --portal-bg:#f3f6fa;
+      --portal-card:#fff;
+      --portal-surface:#eef2f7;
+      --portal-border:#d0d7de;
+      --portal-text:#1f2937;
+      --portal-muted:#596579;
     }
-    .customer-portal .support-sub-list .support-link {
-      background: transparent;
-      border: 1px solid #30363d;
-      color: #8b949e;
-      border-radius: 7px;
-      padding: 10px 16px;
-      width: 100%;
-      text-align: left;
-      cursor: pointer;
-      font-size: 14px;
+    .customer-portal .portal-topbar {
+      position:sticky;
+      top:0;
+      z-index:25;
+      display:flex;
+      align-items:center;
+      gap:20px;
+      min-height:64px;
+      padding:8px clamp(12px,2vw,22px) 8px 82px;
+      background:var(--portal-card);
+      border-bottom:1px solid var(--portal-border);
     }
-    .customer-portal .support-sub-list .support-link:hover {
-      background: #1c2128;
-      color: #e6edf3;
-      border-color: #484f58;
+    .customer-portal .portal-identity { display:flex; align-items:baseline; gap:8px; flex:none; white-space:nowrap; }
+    .customer-portal .portal-identity strong { color:#2f81f7; font-size:18px; }
+    .customer-portal .portal-identity span { color:var(--portal-muted); font-size:14px; }
+    .customer-portal .portal-topbar .loan-tabs {
+      flex:1;
+      min-width:0;
+      justify-content:flex-start;
+      gap:8px;
+      margin:0;
+      padding:0;
+      overflow-x:auto;
+      border:0;
+      scrollbar-width:thin;
+    }
+    .customer-portal .portal-topbar .loan-tab { flex:none; padding:10px 15px; color:var(--portal-muted); }
+    .customer-portal .portal-topbar .loan-tab.active { color:#fff; }
+    .customer-portal .portal-user-controls { display:flex; align-items:center; gap:10px; flex:none; white-space:nowrap; }
+    .customer-portal .portal-avatar { display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#2f81f7; color:#fff; font-size:12px; font-weight:700; }
+    .customer-portal .portal-user-name { max-width:150px; overflow:hidden; text-overflow:ellipsis; font-size:14px; font-weight:600; }
+    body.customer-portal #modeBtn { position:static; top:auto; right:auto; z-index:auto; width:auto !important; padding:8px 12px; border-radius:7px; font-size:12px; }
+    .customer-portal .dashboard { padding:18px clamp(12px, 1.5vw, 22px) 32px; }
+    .customer-portal .screen-section { scroll-margin-top:78px; }
+    .customer-portal .welcome-card,.customer-portal .board-card,.customer-portal .loan-summary-card,.customer-portal .panel {
+      background:var(--portal-card);
+      border-color:var(--portal-border);
+      color:var(--portal-text);
+    }
+    .customer-portal .welcome-card p,.customer-portal .loan-meta,.customer-portal .portal-kpis h3,
+    .customer-portal .portal-kpis .summary-label,.customer-portal .support-page-heading p,
+    .customer-portal .support-panel-heading p { color:var(--portal-muted); }
+    .customer-portal .portal-kpis .loan-summary-card { min-height:126px; border-top:4px solid #2f81f7; }
+    .customer-portal .portal-kpis .loan-summary-card:nth-child(2) { border-top-color:#d29922; }
+    .customer-portal .portal-kpis .loan-summary-card:nth-child(3) { border-top-color:#3fb950; }
+    .customer-portal .summary-inline-card { background:var(--portal-surface); border-color:var(--portal-border); color:var(--portal-text); }
+    .customer-portal .loan-list { margin:0; }
+    .customer-portal .loan-card { background:var(--portal-card); border-color:var(--portal-border); }
+    .customer-portal .loan-card:hover { border-color:#2f81f7; transform:translateY(-1px); }
+    .customer-portal .loan-card-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .customer-portal .loan-card-identity { display:grid; gap:4px; min-width:0; }
+    .customer-portal .loan-receipt { color:#2f81f7; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:12px; }
+    .customer-portal .loan-card-heading strong { color:var(--portal-text); font-size:16px; }
+    .customer-portal .loan-progress-meta { display:flex; justify-content:space-between; gap:12px; margin-top:12px; color:var(--portal-muted); font-size:12px; }
+    .customer-portal .loan-progress { height:7px; overflow:hidden; margin-top:6px; border-radius:999px; background:var(--portal-surface); }
+    .customer-portal .loan-progress > span { display:block; height:100%; border-radius:inherit; background:#3fb950; }
+    .customer-portal .loan-card[data-loan-status="paid"] .loan-progress > span { background:#2f81f7; }
+    .customer-portal .support-page-heading { display:flex; align-items:center; justify-content:space-between; gap:14px; margin:4px 0 12px; }
+    .customer-portal .support-page-heading .toggle-mode { width:auto; max-width:none; padding:8px 12px; }
+    .customer-portal .support-page-heading h2,.customer-portal .support-panel-heading h3 { margin:0 0 4px; }
+    .customer-portal .support-page-heading p,.customer-portal .support-panel-heading p { margin:0; }
+    .customer-portal .support-tabs { display:flex; gap:8px; overflow-x:auto; padding:8px 0 14px; border-bottom:1px solid var(--portal-border); }
+    .customer-portal .support-tab {
+      flex:none;
+      min-height:40px;
+      padding:9px 15px;
+      border:1px solid var(--portal-border);
+      border-radius:7px;
+      background:var(--portal-surface);
+      color:var(--portal-muted);
+      font:inherit;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .customer-portal .support-tab:hover { border-color:#2f81f7; color:var(--portal-text); }
+    .customer-portal .support-tab.active { border-color:#2f81f7; background:rgba(47,129,247,.16); color:#2f81f7; font-weight:700; }
+    .customer-portal .support-panel { margin-top:16px; padding:20px; border:1px solid var(--portal-border); border-radius:10px; background:var(--portal-card); }
+    .customer-portal .support-panel[hidden] { display:none !important; }
+    .customer-portal .support-panel-heading { margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--portal-border); }
+    .customer-portal .support-form { display:grid; width:100%; max-width:none; gap:14px; margin:0; }
+    .customer-portal .support-form .request-field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .customer-portal .support-form .field-label { min-width:0; margin:0; }
+    .customer-portal .support-form .auth-input { width:100%; box-sizing:border-box; }
+    .customer-portal .support-form > .enter-btn { width:auto; min-width:165px; justify-self:start; }
+    .customer-portal .payment-balance-output { display:flex; align-items:center; padding:11px 12px; font-weight:700; }
+    .customer-portal .payment-history-ranges { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0; }
+    .customer-portal .payment-summary-grid { grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:16px; }
+    .customer-portal .payment-summary-grid .summary-inline-card { border-top:3px solid #3fb950; }
+    .customer-portal .payment-summary-grid .summary-inline-card:nth-child(2) { border-top-color:#2f81f7; }
+    .customer-portal .payment-summary-grid .summary-inline-card:nth-child(3) { border-top-color:#d29922; }
+    .customer-portal .payment-summary-grid .summary-inline-card p { margin:6px 0; font-size:22px; font-weight:700; }
+    .customer-portal .payment-summary-grid .summary-inline-card:first-child p { color:#3fb950; }
+    .customer-portal .support-history { margin-top:26px; }
+    .customer-portal .support-message:empty { display:none; }
+    .customer-portal .support-message { margin:12px 0 0; }
+    .customer-portal .customer-payment-table { color:var(--portal-text); }
+    .customer-portal .customer-payment-table th { background:var(--portal-surface); color:var(--portal-muted); text-transform:uppercase; letter-spacing:.04em; }
+    .customer-portal .customer-payment-table td { border-color:var(--portal-border); }
+    .customer-portal .modal { z-index:1100; background:rgba(5,9,14,.82); backdrop-filter:blur(3px); }
+    .customer-portal .modal-content { width:min(620px, calc(100vw - 24px)); max-height:90vh; overflow-y:auto; background:var(--portal-card); border:1px solid var(--portal-border); color:var(--portal-text); }
+    .customer-portal .modal-close { display:grid; place-items:center; width:40px; height:40px; border:1px solid var(--portal-border); border-radius:8px; background:var(--portal-surface); color:var(--portal-text); font:inherit; font-size:24px; line-height:1; }
+    .customer-portal .modal-close:hover,.customer-portal .modal-close:focus-visible { border-color:#2f81f7; outline:2px solid rgba(47,129,247,.35); outline-offset:2px; }
+    body.customer-portal.light .standing-badge { color:#15803d; border-color:#86c99b; }
+    body.customer-portal.light .support-tab.active { color:#0758bd; }
+    body.customer-portal.light .portal-topbar { box-shadow:0 2px 8px rgba(31,41,55,.06); }
+    @media(max-width:900px) {
+      .customer-portal .portal-topbar { flex-wrap:wrap; gap:8px 16px; }
+      .customer-portal .portal-topbar .loan-tabs { order:3; flex-basis:100%; }
+      .customer-portal .portal-user-controls { margin-left:auto; }
+    }
+    @media(max-width:650px) {
+      .customer-portal .portal-topbar { padding:8px 10px 8px 72px; }
+      .customer-portal .portal-user-name { display:none; }
+      .customer-portal .portal-topbar .loan-tabs { gap:4px; }
+      .customer-portal .portal-topbar .loan-tab { padding:9px 11px; font-size:12px; }
+      .customer-portal .support-panel { padding:14px; }
+      .customer-portal .support-form .request-field-grid,.customer-portal .payment-summary-grid { grid-template-columns:1fr; }
+      .customer-portal .support-page-heading { align-items:flex-start; }
     }
   </style>
 </head>
@@ -137,25 +244,27 @@
   <button class="menu-toggle" id="menuBtn">⋮</button>
   <div class="dropdown-menu" id="menuDropdown">
     <button class="menu-action" data-view="loans">Loans</button>
-    <button class="menu-action" data-view="payments">Record Payment</button>
-    <button class="menu-action" data-view="support">Support</button>
+    <button class="menu-action" data-view="payments">Payments &amp; Support</button>
+    <button class="menu-action" data-view="reports">Reports</button>
     <button id="logoutBtn">Logout</button>
   </div>
-  <button class="toggle-mode" id="modeBtn">Switch Mode</button>
 
-  <div class="dashboard">
-    <div class="dash-header">
-      <h1 class="brand animated-text">PrymeBMF</h1>
-    </div>
-
-    <div class="loan-tabs">
+  <header class="portal-topbar">
+    <div class="portal-identity"><strong>BMF</strong><span>My Account</span></div>
+    <nav class="loan-tabs" aria-label="Account navigation">
       <button class="loan-tab active" data-tab="summary">Loan Summary</button>
       <button class="loan-tab" data-tab="loans">My Loans</button>
       <button class="loan-tab" data-tab="request">New Request</button>
-      <button class="loan-tab" data-tab="payments">Record Payment &amp; Support</button>
-      <button class="loan-tab" data-tab="reports">Reports</button>
+      <button class="loan-tab" data-tab="payments">Payments &amp; Support</button>
+    </nav>
+    <div class="portal-user-controls">
+      <span class="portal-avatar" id="portalAvatar" aria-hidden="true">BM</span>
+      <span class="portal-user-name" id="portalUserName">User</span>
+      <button class="toggle-mode" id="modeBtn" type="button" aria-label="Switch portal color theme">Switch Mode</button>
     </div>
+  </header>
 
+  <div class="dashboard">
     <div class="screen-sections">
       <div id="summarySection" class="screen-section active">
         <div class="welcome-card">
@@ -221,49 +330,63 @@
       </div>
 
       <div id="paymentsSection" class="screen-section hidden">
-        <div class="board-card">
-          <h2>Record Payment &amp; Support</h2>
-          <div class="section-heading"><p>Review your payment history, submit proof for a loan, or contact BMF.</p><button type="button" class="toggle-mode" id="refreshSupportBtn">Refresh</button></div>
-          <p id="supportMessage" class="message-text" role="status"></p>
-          <section aria-labelledby="paymentHistoryHeading">
-          <h3 id="paymentHistoryHeading">Payment History</h3>
-          <div class="overview-grid" id="paymentSummary"></div>
-          <div class="table-scroll"><table class="customer-payment-table"><thead><tr><th>Date</th><th>Loan</th><th>Amount</th><th>Method</th><th>Receipt</th><th>Proof</th></tr></thead><tbody id="customerPaymentHistory"></tbody></table></div>
-          </section>
-          <section aria-labelledby="recordPaymentHeading">
-            <h3 id="recordPaymentHeading">Record Payment</h3>
-            <p>Select a loan to see its current outstanding balance. BMF verifies the balance again when reviewing your payment.</p>
-            <form id="customerRecordPaymentForm" class="auth-form">
-              <div class="request-field-grid two-up">
-                <label class="field-label">Loan<select id="recordPaymentLoanId" class="auth-input" required><option value="">Choose a loan...</option></select></label>
-                <div class="field-label">Current outstanding balance<output id="recordPaymentExpectedBalance" class="auth-input payment-balance-output" aria-live="polite">Choose a loan</output></div>
-              </div>
-              <div class="request-field-grid two-up">
-                <label class="field-label">Amount paid (K)<input id="recordPaymentAmount" class="auth-input" type="number" min="0.01" step="0.01" required placeholder="Amount you paid"></label>
-                <label class="field-label">Transaction reference<input id="recordPaymentReference" class="auth-input" required minlength="4" maxlength="64" placeholder="Reference from your transfer receipt"></label>
-              </div>
-              <div class="request-field-grid two-up">
-                <label class="field-label">Transfer method<select id="recordPaymentMode" class="auth-input" required><option value="">Select method...</option><option>Airtel Money</option><option>MTN MoMo</option><option>Bank Transfer</option></select></label>
-                <label class="field-label">Payment proof<input id="recordPaymentProof" class="auth-input" type="file" accept="image/jpeg,image/png,image/webp" required></label>
-              </div>
-              <label class="field-label">Notes (optional)<textarea id="recordPaymentNotes" class="auth-input" rows="3" placeholder="Any notes for the payment team."></textarea></label>
-              <button class="enter-btn" type="submit" id="recordPaymentSubmitBtn">Submit Payment for Review</button>
-            </form>
-          </section>
-          <section aria-labelledby="customerDueHeading"><h3 id="customerDueHeading">Due Schedule</h3><div id="customerDueSchedule"></div></section>
-          <section aria-labelledby="customerInquiryHeading">
-            <h3 id="customerInquiryHeading">Submit an Inquiry</h3>
-            <form id="customerInquiryForm" class="auth-form">
-              <div class="request-field-grid two-up">
-                <label class="field-label">Inquiry type<select id="inquiryType" class="auth-input" required><option value="">Select type...</option><option>Payment not recorded</option><option>Balance discrepancy</option><option>Loan status query</option><option>Extension request</option><option>Receipt request</option><option>Other</option></select></label>
-                <label class="field-label">Related loan (optional)<select id="inquiryLoanId" class="auth-input"><option value="">Choose a loan...</option></select></label>
-              </div>
-              <label class="field-label">Details<textarea id="inquiryDetails" class="auth-input" rows="4" required placeholder="Tell us how we can help."></textarea></label>
-              <button class="enter-btn" type="submit" id="submitInquiryBtn">Submit Inquiry</button>
-            </form>
-            <h3>Previous Inquiries</h3><div id="customerInquiryHistory"><p>Loading inquiries...</p></div>
-          </section>
+        <header class="support-page-heading">
+          <div><h2>Payments &amp; Support</h2><p>All your payment records and account inquiries in one place.</p></div>
+          <button type="button" class="toggle-mode" id="refreshSupportBtn">Refresh</button>
+        </header>
+        <div class="support-tabs" role="tablist" aria-label="Payments and support sections">
+          <button type="button" class="support-tab active" id="paymentHistoryTab" role="tab" aria-selected="true" aria-controls="paymentHistoryPanel" data-support-tab="payment-history">💰 Payment History</button>
+          <button type="button" class="support-tab" id="inquiriesTab" role="tab" aria-selected="false" aria-controls="inquiriesPanel" data-support-tab="inquiries">💬 Inquiries</button>
+          <button type="button" class="support-tab" id="recordPaymentTab" role="tab" aria-selected="false" aria-controls="recordPaymentPanel" data-support-tab="record-payment">💸 Record Payment</button>
+          <button type="button" class="support-tab" id="dueScheduleTab" role="tab" aria-selected="false" aria-controls="dueSchedulePanel" data-support-tab="due-schedule">🗓 Due Schedule</button>
         </div>
+        <p id="supportMessage" class="message-text support-message" role="status" aria-live="polite"></p>
+        <section class="support-panel" id="paymentHistoryPanel" role="tabpanel" aria-labelledby="paymentHistoryTab" data-support-panel="payment-history">
+          <div class="support-panel-heading"><h3>Payment History</h3><p>Review payments recorded and confirmed on your account.</p></div>
+          <div class="overview-grid payment-summary-grid" id="paymentSummary"></div>
+          <div class="payment-history-ranges" role="group" aria-label="Payment history date range">
+            <button type="button" class="loan-filter active" data-payment-range="all" aria-pressed="true">All time</button>
+            <button type="button" class="loan-filter" data-payment-range="today" aria-pressed="false">Today</button>
+            <button type="button" class="loan-filter" data-payment-range="7" aria-pressed="false">Last 7 days</button>
+            <button type="button" class="loan-filter" data-payment-range="month" aria-pressed="false">This month</button>
+          </div>
+          <div class="table-scroll"><table class="customer-payment-table"><thead><tr><th>Receipt No.</th><th>Loan ID</th><th>Amount Paid</th><th>Balance After</th><th>Date</th><th>Received By</th><th>Status</th></tr></thead><tbody id="customerPaymentHistory"></tbody></table></div>
+        </section>
+        <section class="support-panel" id="inquiriesPanel" role="tabpanel" aria-labelledby="inquiriesTab" data-support-panel="inquiries" hidden>
+          <div class="support-panel-heading"><h3>Submit an Inquiry</h3><p>Ask a question about your loan or report a payment or balance issue.</p></div>
+          <form id="customerInquiryForm" class="auth-form support-form">
+            <div class="request-field-grid two-up">
+              <label class="field-label">Inquiry type<select id="inquiryType" class="auth-input" required><option value="">Select type...</option><option>Payment not recorded</option><option>Balance discrepancy</option><option>Loan status query</option><option>Extension request</option><option>Receipt request</option><option>Other</option></select></label>
+              <label class="field-label">Related loan (optional)<select id="inquiryLoanId" class="auth-input"><option value="">Choose a loan...</option></select></label>
+            </div>
+            <label class="field-label">Message<textarea id="inquiryDetails" class="auth-input" rows="5" required placeholder="Describe how we can help..."></textarea></label>
+            <button class="enter-btn" type="submit" id="submitInquiryBtn">Send Inquiry</button>
+          </form>
+          <div class="support-history"><h3>Previous Inquiries</h3><div id="customerInquiryHistory"><p>Loading inquiries...</p></div></div>
+        </section>
+        <section class="support-panel" id="recordPaymentPanel" role="tabpanel" aria-labelledby="recordPaymentTab" data-support-panel="record-payment" hidden>
+          <div class="support-panel-heading"><h3>Record a Payment</h3><p>Submit your transfer receipt. Your balance updates after BMF verifies and approves the payment.</p></div>
+          <form id="customerRecordPaymentForm" class="auth-form support-form">
+            <div class="request-field-grid two-up">
+              <label class="field-label">Loan<select id="recordPaymentLoanId" class="auth-input" required><option value="">Choose a loan...</option></select></label>
+              <div class="field-label">Current outstanding balance<output id="recordPaymentExpectedBalance" class="auth-input payment-balance-output" aria-live="polite">Choose a loan</output></div>
+            </div>
+            <div class="request-field-grid two-up">
+              <label class="field-label">Amount paid (K)<input id="recordPaymentAmount" class="auth-input" type="number" min="0.01" step="0.01" required placeholder="Amount you paid"></label>
+              <label class="field-label">Transaction reference<input id="recordPaymentReference" class="auth-input" required minlength="4" maxlength="64" placeholder="Reference from your transfer receipt"></label>
+            </div>
+            <div class="request-field-grid two-up">
+              <label class="field-label">Transfer method<select id="recordPaymentMode" class="auth-input" required><option value="">Select method...</option><option>Airtel Money</option><option>MTN MoMo</option><option>Bank Transfer</option></select></label>
+              <label class="field-label">Payment proof<input id="recordPaymentProof" class="auth-input" type="file" accept="image/jpeg,image/png,image/webp" required></label>
+            </div>
+            <label class="field-label">Notes (optional)<textarea id="recordPaymentNotes" class="auth-input" rows="3" placeholder="Any notes for the payment team."></textarea></label>
+            <button class="enter-btn" type="submit" id="recordPaymentSubmitBtn">Submit Payment for Review</button>
+          </form>
+        </section>
+        <section class="support-panel" id="dueSchedulePanel" role="tabpanel" aria-labelledby="dueScheduleTab" data-support-panel="due-schedule" hidden>
+          <div class="support-panel-heading"><h3>Upcoming Due Dates</h3><p>Keep track of outstanding balances and scheduled due dates.</p></div>
+          <div id="customerDueSchedule"></div>
+        </section>
       </div>
 
       <div id="reportsSection" class="screen-section hidden">
@@ -426,10 +549,11 @@
     }
 
     function applyTheme(theme) {
+      const activeTheme = theme === 'light' ? 'light' : 'dark';
       document.documentElement.classList.remove('dark', 'light');
       document.body.classList.remove('dark', 'light');
-      document.documentElement.classList.add(theme);
-      document.body.classList.add(theme);
+      document.documentElement.classList.add(activeTheme);
+      document.body.classList.add(activeTheme);
     }
 
     document.getElementById('modeBtn').addEventListener('click', function() {
@@ -442,6 +566,10 @@
     const username = localStorage.getItem('username') || 'User';
     const userEmail = localStorage.getItem('userEmail');
     const userRole = localStorage.getItem('userRole') || 'user';
+    const portalDisplayName = username.split('@')[0];
+    const portalInitials = portalDisplayName.trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'BM';
+    document.getElementById('portalUserName').textContent = portalDisplayName;
+    document.getElementById('portalAvatar').textContent = portalInitials;
     const isNewSignup = localStorage.getItem('newSignup') === 'true';
     const justCreated = isNewSignup; // naming clarity for first-time flow
 
@@ -676,6 +804,25 @@
     let allLoans = [];
     let currentLoanFilter = 'all';
     let currentHistoryFilter = 'all';
+    let activeSupportPanel = 'payment-history';
+    let paymentHistoryRange = 'all';
+
+    function setSupportPanel(panelKey, { persist = true } = {}) {
+      const validPanel = ['payment-history', 'inquiries', 'record-payment', 'due-schedule'].includes(panelKey)
+        ? panelKey
+        : 'payment-history';
+      activeSupportPanel = validPanel;
+      document.querySelectorAll('[data-support-tab]').forEach(button => {
+        const active = button.dataset.supportTab === validPanel;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+        button.tabIndex = active ? 0 : -1;
+      });
+      document.querySelectorAll('[data-support-panel]').forEach(panel => {
+        panel.hidden = panel.dataset.supportPanel !== validPanel;
+      });
+      if (persist) localStorage.setItem('lastSupportPanel', validPanel);
+    }
 
     function setOverviewSection(sectionKey) {
       document.querySelectorAll('.screen-section').forEach(section => {
@@ -722,6 +869,10 @@
       }
       if (tab === 'payments') { renderPaymentOverview(); loadCustomerSupport(); }
       if (tab === 'reports') loadCustomerReport();
+      if (tab === 'payments') {
+        const savedPanel = localStorage.getItem('lastSupportPanel') || activeSupportPanel;
+        setSupportPanel(savedPanel, { persist: false });
+      }
     }
 
     function showRequestLockBox() {
@@ -752,38 +903,44 @@
       const container = document.getElementById('paymentSummary');
       if (!container) return;
 
-      const active = allLoans.filter(loan => ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan)));
-      const settled = allLoans.filter(loan => loanStatusOf(loan) === 'paid');
-      const totalActive = active.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
-      const totalSettled = settled.reduce((sum, loan) => sum + (Number(loan.totalRepayment) || Number(loan.amount) || 0), 0);
-      const totalPaid = allLoans.reduce((sum, loan) => sum + (Number(loan.paidTotal) || 0), 0);
+      const entries = allLoans.flatMap(loan => (Array.isArray(loan.payments) ? loan.payments : [])
+        .map(payment => ({ loan, payment, date: new Date(payment.paymentDate || payment.date || '') })))
+        .sort((a, b) => b.date - a.date);
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const month = today.slice(0, 7);
+      const visibleEntries = entries.filter(({ payment, date }) => {
+        const rawDate = String(payment.paymentDate || payment.date || '').slice(0, 10);
+        if (paymentHistoryRange === 'today') return rawDate === today;
+        if (paymentHistoryRange === '7') return !Number.isNaN(date.getTime()) && date >= new Date(now.getTime() - 7 * 86400000);
+        if (paymentHistoryRange === 'month') return rawDate.startsWith(month);
+        return true;
+      });
+      const totalPaid = visibleEntries.reduce((sum, { payment }) => sum + (Number(payment.amount) || 0), 0);
+      const lastPayment = visibleEntries[0]?.payment;
+      const lastPaymentLabel = lastPayment
+        ? formatDateDisplay(lastPayment.paymentDate || lastPayment.date)
+        : '—';
 
       container.innerHTML = `
         <div class="summary-inline-card">
-          <h3>Paid so far</h3>
-          <p>${allLoans.filter(loan => (Number(loan.paidTotal) || 0) > 0).length}</p>
-          <span>${formatKwacha(totalPaid)}</span>
+          <h3>Total paid</h3>
+          <p>${formatKwacha(totalPaid)}</p>
+          <span>For selected period</span>
         </div>
         <div class="summary-inline-card">
-          <h3>Active loans</h3>
-          <p>${active.length}</p>
-          <span>${formatKwacha(totalActive)}</span>
+          <h3>Last payment</h3>
+          <p>${escapeHtml(lastPaymentLabel)}</p>
+          <span>${lastPayment ? `${formatKwacha(lastPayment.amount)} received` : 'No payment recorded'}</span>
         </div>
         <div class="summary-inline-card">
-          <h3>Settled</h3>
-          <p>${settled.length}</p>
-          <span>${formatKwacha(totalSettled)}</span>
-        </div>
-        <div class="summary-inline-card">
-          <h3>Total to pay</h3>
-          <p>${active.length + settled.length}</p>
-          <span>${formatKwacha(totalActive + totalSettled)}</span>
+          <h3>Payments made</h3>
+          <p>${visibleEntries.length}</p>
+          <span>Recorded on your account</span>
         </div>
       `;
       const history = document.getElementById('customerPaymentHistory');
-      const payments = allLoans.flatMap(loan => (Array.isArray(loan.payments) ? loan.payments : []).map(payment => ({ loan, payment })))
-        .sort((a, b) => new Date(b.payment.paymentDate || b.payment.date || 0) - new Date(a.payment.paymentDate || a.payment.date || 0));
-      if (history) history.innerHTML = payments.length ? payments.map(({ loan, payment }) => `<tr><td>${escapeHtml(formatDateDisplay(payment.paymentDate || payment.date))}</td><td>${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</td><td>${formatKwacha(payment.amount)}</td><td>${escapeHtml(payment.mode || 'Payment')}</td><td>${escapeHtml(payment.paymentReceiptId || payment.receiptNumber || '—')}</td><td>${payment.screenshot ? `<a href="#" data-upload-filename="${escapeHtml(payment.screenshot)}">View proof</a>` : '—'}</td></tr>`).join('') : '<tr><td colspan="6">No payments recorded yet.</td></tr>';
+      if (history) history.innerHTML = visibleEntries.length ? visibleEntries.map(({ loan, payment }) => `<tr><td>${escapeHtml(payment.paymentReceiptId || payment.receiptNumber || '—')}</td><td>${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</td><td class="payment-amount-cell">${formatKwacha(payment.amount)}</td><td>${payment.balanceAfter == null ? '—' : formatKwacha(payment.balanceAfter)}</td><td>${escapeHtml(formatDateDisplay(payment.paymentDate || payment.date))}</td><td>${escapeHtml(payment.recordedBy || '—')}</td><td><span class="loan-badge paid">${escapeHtml(formatStatusLabel(payment.status || 'confirmed'))}</span></td></tr>`).join('') : '<tr><td colspan="7">No payments recorded in this period.</td></tr>';
     }
 
     async function loadCustomerReport() {
@@ -977,24 +1134,30 @@
       });
 
       loanList.innerHTML = filtered.length
-        ? filtered.map(loan => `
-            <li class="loan-card" title="Product: ${escapeHtml(loan.product || 'Loan')}\nRequested: ${formatKwacha(loan.amount)}\nInterest: ${formatKwacha(loan.interestAmount || 0)}\nTotal: ${formatKwacha(loan.totalRepayment || loan.amount || 0)}\nTenure: ${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'}\nUrgency: ${formatStatusLabel(loan.urgency || 'standard')}\nDue: ${formatDateDisplay(loan.dueDate)}\nDecision: ${escapeHtml(loan.adminReason || 'No decision reason yet.') }" onclick="openLoanDetails(${Number(loan.id)})">
+        ? filtered.map(loan => {
+          const total = Number(loan.totalRepayment || loan.amount || 0);
+          const outstanding = Math.max(0, Number(loan.outstanding) || 0);
+          const paid = Math.min(total, Math.max(0, Number(loan.paidTotal ?? total - outstanding) || 0));
+          const progress = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
+          const status = loanStatusOf(loan);
+          return `
+            <li class="loan-card" data-loan-status="${escapeHtml(status)}" data-loan-id="${Number(loan.id)}" title="Product: ${escapeHtml(loan.product || 'Loan')}\nRequested: ${formatKwacha(loan.amount)}\nInterest: ${formatKwacha(loan.interestAmount || 0)}\nTotal: ${formatKwacha(loan.totalRepayment || loan.amount || 0)}\nTenure: ${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'}\nUrgency: ${formatStatusLabel(loan.urgency || 'standard')}\nDue: ${formatDateDisplay(loan.dueDate)}\nDecision: ${escapeHtml(loan.adminReason || 'No decision reason yet.') }">
               <div class="loan-card-heading">
-                <strong>${escapeHtml(loan.product)}</strong>
-                <span class="loan-badge ${loanStatusOf(loan)}">${formatStatusLabel(loanStatusOf(loan)).toUpperCase()}</span>
+                <div class="loan-card-identity"><span class="loan-receipt">${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</span><strong>${escapeHtml(loan.product || 'Loan')}</strong></div>
+                <span class="loan-badge ${status}">${formatStatusLabel(status).toUpperCase()}</span>
               </div>
-              ${['active', 'grace', 'defaulted', 'in_progress', 'started'].includes(loanStatusOf(loan)) ? `<div class="loan-action"><button class="btn-secondary" onclick="event.stopPropagation(); openRecordPayment(${loan.id})">Record Payment</button></div>` : ''}
-              <div class="loan-meta">
-                Amount: ${formatKwacha(loan.amount)} • Paid: ${formatKwacha(loan.paidTotal || 0)} • Balance: ${formatKwacha(loan.outstanding)}
+              <div class="loan-meta loan-facts">
+                Amount: <strong>${formatKwacha(loan.amount)}</strong> · Interest: <strong>${formatKwacha(loan.interestAmount || 0)}</strong> · Total: <strong>${formatKwacha(total)}</strong> · Requested: <strong>${formatDateDisplay(loan.createdAt)}</strong> · Tenure: <strong>${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'}</strong> · Urgency: <strong>${formatStatusLabel(loan.urgency || 'standard')}</strong>
               </div>
+              <div class="loan-progress-meta"><span>Repaid: ${formatKwacha(paid)}</span><span>Balance: ${formatKwacha(outstanding)}</span></div>
+              <div class="loan-progress" role="progressbar" aria-label="Loan repayment progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><span style="width:${progress}%"></span></div>
+              ${['active', 'grace', 'defaulted', 'in_progress', 'started'].includes(status) && outstanding > 0 ? `<div class="loan-action"><button type="button" class="record-payment-btn" data-record-payment="${Number(loan.id)}">Record Payment</button></div>` : ''}
               <div class="loan-meta">
-                Requested: ${formatDateDisplay(loan.createdAt || loan.dueDate)} • Interest: ${formatKwacha(loan.interestAmount || 0)} • Total: ${formatKwacha(loan.totalRepayment || loan.amount || 0)}
-              </div>
-              <div class="loan-meta">
-                Tenure: ${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'} • Urgency: ${formatStatusLabel(loan.urgency || 'standard')}
+                Due: ${formatDateDisplay(loan.dueDate)}
               </div>
             </li>
-          `).join('')
+          `;
+        }).join('')
         : '<li class="loan-empty">No loans found for this category.</li>';
     }
 
@@ -1054,8 +1217,17 @@
 
     function openRecordPayment(loanId) {
       const loan = allLoans.find(l => Number(l.id) === Number(loanId));
-      if (!loan) return;
-      openLoanDetails(Number(loanId));
+      if (!loan || !['active', 'grace', 'defaulted'].includes(loanStatusOf(loan)) || Number(loan.outstanding) <= 0) {
+        showBmfToast('This loan is not eligible for a payment submission.', 'error');
+        return;
+      }
+      setActiveLoanTab('payments');
+      populateSupportLoanOptions();
+      const loanSelect = document.getElementById('recordPaymentLoanId');
+      if (loanSelect) loanSelect.value = String(loan.id);
+      updateRecordPaymentBalance();
+      setSupportPanel('record-payment');
+      document.getElementById('paymentsSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function updateStandingBadge(loans) {
@@ -1219,8 +1391,35 @@
       btn.addEventListener('click', () => setActiveLoanTab(btn.dataset.tab));
     });
 
+    document.querySelectorAll('[data-support-tab]').forEach(button => {
+      button.addEventListener('click', () => setSupportPanel(button.dataset.supportTab));
+    });
+    document.querySelectorAll('[data-payment-range]').forEach(button => {
+      button.addEventListener('click', () => {
+        paymentHistoryRange = button.dataset.paymentRange;
+        document.querySelectorAll('[data-payment-range]').forEach(option => {
+          const active = option === button;
+          option.classList.toggle('active', active);
+          option.setAttribute('aria-pressed', String(active));
+        });
+        renderPaymentOverview();
+      });
+    });
+
     document.querySelectorAll('.loan-filter').forEach(btn => {
       btn.addEventListener('click', () => setLoanFilter(btn.dataset.filter));
+    });
+
+    document.getElementById('loan-list')?.addEventListener('click', event => {
+      const paymentButton = event.target.closest('[data-record-payment]');
+      if (paymentButton) {
+        event.preventDefault();
+        event.stopPropagation();
+        openRecordPayment(Number(paymentButton.dataset.recordPayment));
+        return;
+      }
+      const loanCard = event.target.closest('[data-loan-id]');
+      if (loanCard) openLoanDetails(Number(loanCard.dataset.loanId));
     });
 
     document.querySelectorAll('.history-filter').forEach(btn => {
@@ -1354,7 +1553,7 @@
 
         if (view === 'loans') { setActiveLoanTab('loans'); }
         if (view === 'payments') { setOverviewSection('payments'); }
-        if (view === 'support') { setOverviewSection('payments'); }
+        if (view === 'reports') { setOverviewSection('reports'); }
         if (menu) menu.classList.remove('active');
       });
     });
@@ -1386,8 +1585,20 @@
     // Loan Details modal
     function closeLoanModal() {
       const m = document.getElementById('loanModal');
-      if (m) m.classList.remove('active');
+      if (!m) return;
+      m.classList.remove('active');
+      m.setAttribute('aria-hidden', 'true');
     }
+
+    const loanModal = document.getElementById('loanModal');
+    const loanModalCloseButton = loanModal?.querySelector('[data-modal-close="loanModal"]');
+    loanModalCloseButton?.addEventListener('click', closeLoanModal);
+    loanModal?.addEventListener('click', event => {
+      if (event.target === loanModal) closeLoanModal();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && loanModal?.classList.contains('active')) closeLoanModal();
+    });
 
     async function submitLoanDecision(action, loanId) {
       const reasonField = document.getElementById('adminDecisionReason');
@@ -1454,7 +1665,10 @@
         document.getElementById('adminDecisionReason').value = loan.adminReason || '';
 
         adminBox.hidden = !hasAdminAccess;
-        document.getElementById('loanModal').classList.add('active');
+        const modal = document.getElementById('loanModal');
+        modal.classList.add('active');
+        modal.setAttribute('aria-hidden', 'false');
+        loanModalCloseButton?.focus();
       } catch (err) {
         console.warn('Could not load loan details', err);
       }
@@ -1470,9 +1684,9 @@
     });
   </script>
   <!-- Loan Details Modal -->
-  <div id="loanModal" class="modal">
+  <div id="loanModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modalLoanProduct">
     <div class="modal-content">
-      <button class="modal-close" onclick="closeLoanModal()">×</button>
+      <button type="button" class="modal-close" data-modal-close="loanModal" aria-label="Close loan details">×</button>
       <h3 id="modalLoanProduct">Loan</h3>
       <div class="modal-grid">
         <p><strong>Requested by:</strong> <span id="modalLoanBorrower">-</span></p>

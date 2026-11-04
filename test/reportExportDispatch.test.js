@@ -39,4 +39,12 @@ test('report export route keeps scoped and typed exports distinct', async t => {
   const typed = await get(server, '/reports/daily/export?scope=buraza');
   assert.equal(typed.status, 200);
   assert.match(typed.contentType, /spreadsheetml/);
+
+  const typedPdf = await get(server, '/reports/daily/export?scope=buraza&format=pdf');
+  assert.equal(typedPdf.status, 200);
+  assert.match(typedPdf.contentType, /application\/pdf/);
+
+  const invalidTypedFormat = await get(server, '/reports/daily/export?scope=buraza&format=invalid');
+  assert.equal(invalidTypedFormat.status, 400);
+  assert.match(invalidTypedFormat.body, /Export format must be xlsx or pdf/);
 });

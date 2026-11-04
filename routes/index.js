@@ -40,6 +40,19 @@ const {
 const { healthRateLimiter, getServerMode, setServerMode, isFranchiseManager } = require('../middleware/security');
 const { signUpload } = require('../controllers/fileController');
 
+function dispatchReportExport(req, res, next) {
+  const normalizedType = String(req.params.type).toLowerCase().replace(/_/g, '-');
+  const isTypedReport = isPromptReportType(req.params.type)
+    || config.REPORTS.REPORT_TYPES.includes(req.params.type)
+    || config.REPORTS.REPORT_TYPES.includes(normalizedType);
+  if (!isTypedReport) return exportReport(req, res, next);
+
+  const format = String(req.query.format || 'xlsx').toLowerCase();
+  if (format === 'pdf') return getTypedReportPdf(req, res, next);
+  if (format === 'xlsx' || format === 'excel') return getTypedReportExcel(req, res, next);
+  return res.status(400).json({ error: 'Export format must be xlsx or pdf.' });
+}
+
 router.get('/', (req, res) => res.send('Navi Server is running!'));
 
 router.get('/status', getStatus);
@@ -60,21 +73,11 @@ router.get('/reports/analytics/tracking/export', exportTrackingSheet);
 // /api alias matches the admin-panel report prompt and keeps the legacy /reports
 // routes working for existing clients.
 router.get('/api/reports/:type', getTypedReport);
-router.get('/api/reports/:type/export', (req, res, next) => {
-  if (isPromptReportType(req.params.type) || config.REPORTS.REPORT_TYPES.includes(req.params.type) || config.REPORTS.REPORT_TYPES.includes(String(req.params.type).toLowerCase().replace(/_/g, '-'))) {
-    return getTypedReportExcel(req, res, next);
-  }
-  return exportReport(req, res, next);
-});
+router.get('/api/reports/:type/export', dispatchReportExport);
 router.get('/api/reports/:type/pdf', getTypedReportPdf);
 // Flat typed-report routes (static, must come before :scope dynamic routes)
 router.get('/reports/:type', getTypedReport);
-router.get('/reports/:type/export', (req, res, next) => {
-  if (isPromptReportType(req.params.type) || config.REPORTS.REPORT_TYPES.includes(req.params.type) || config.REPORTS.REPORT_TYPES.includes(String(req.params.type).toLowerCase().replace(/_/g, '-'))) {
-    return getTypedReportExcel(req, res, next);
-  }
-  return exportReport(req, res, next);
-});
+router.get('/reports/:type/export', dispatchReportExport);
 router.get('/reports/:type/pdf', getTypedReportPdf);
 
 router.get('/reports/:scope/summary', getReportSummary);

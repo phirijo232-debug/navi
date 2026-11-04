@@ -62,6 +62,14 @@ test('every data-attribute selector used by admin.js exists in admin.html', () =
   );
   assert.deepEqual(missing, [], `admin.html is missing data attributes used by admin.js: ${missing.join(', ')}`);
   assert.match(js, /data-report-action data-report-type=.*data-report-format=/);
+  assert.match(js, /reportFormat:\s*format\s*}\s*=\s*button\.dataset/);
+  assert.match(js, /if \(!\['xlsx', 'pdf'\]\.includes\(format\)\)/);
+  assert.match(js, /expectedContentType = format === 'pdf'/);
+  assert.match(js, /instead of \$\{format\.toUpperCase\(\)\}/);
+  assert.match(js, /type: 'full-history'.*periodFilter: false/);
+  assert.match(js, /type: 'schedule'.*periodFilter: false/);
+  assert.match(js, /Includes the selected loan.*date filters do not apply/);
+  assert.doesNotMatch(js, /const\s*\{\s*reportType,\s*format\s*\}\s*=\s*button\.dataset/);
 });
 
 test('customer cards render before unrelated report, feedback, and loan requests finish', () => {
@@ -124,7 +132,7 @@ test('admin directories expose wired filters, bounded paging, and application be
   assert.match(js, /function dateMatchesRange\(value, from, to\)/);
 });
 
-test('admin dashboard controls are present, wired, and remain dark without shared theme preferences', () => {
+test('admin dashboard controls are wired and persist an admin-only theme preference', () => {
   for (const id of [
     'adminSidebar', 'portfolioOverview', 'portfolioKpis', 'collectionsChart',
     'collectionCustomRange', 'collectionRangeFrom', 'collectionRangeTo',
@@ -159,9 +167,23 @@ test('admin dashboard controls are present, wired, and remain dark without share
   assert.match(js, /The start date must be on or before the end date/);
   assert.match(js, /The end date cannot be in the future/);
   assert.match(js, /applyCollectionRange/);
-  assert.match(js, /applyTheme\('dark'\)/);
+  assert.match(html, /id="adminThemeToggle"[^>]*>Use light theme/);
+  assert.match(html, /body\.light \.panel/);
+  assert.match(js, /getElementById\('adminThemeToggle'\)\?\.addEventListener\('click'/);
+  assert.match(js, /localStorage\.setItem\('adminTheme', theme\)/);
+  assert.match(js, /applyTheme\(localStorage\.getItem\('adminTheme'\) === 'light' \? 'light' : 'dark'\)/);
   assert.doesNotMatch(js, /getElementById\(['"]modeBtn['"]\)/);
   assert.doesNotMatch(js, /localStorage\.getItem\(['"]mode['"]\)/);
+});
+
+test('admin dialogs close from their close buttons, backdrop, and Escape key', () => {
+  for (const id of ['userModal', 'editEmployeeModal', 'addLoanModal']) {
+    assert.match(html, new RegExp(`id="${id}" class="modal"[\\s\\S]*?data-close-modal="${id}"`));
+  }
+  assert.match(js, /document\.querySelectorAll\('\.modal'\)\.forEach\(modal => \{\s*modal\.addEventListener\('click'/);
+  assert.match(js, /if \(event\.target === modal\) modal\.querySelector\('\[data-close-modal\]'\)\?\.click\(\)/);
+  assert.match(js, /document\.addEventListener\('keydown', event => \{\s*if \(event\.key !== 'Escape'\) return/);
+  assert.match(js, /openModals\[openModals\.length - 1\]\?\.querySelector\('\[data-close-modal\]'\)\?\.click\(\)/);
 });
 
 test('all public HTML pages are non-trivial and start with a doctype', () => {

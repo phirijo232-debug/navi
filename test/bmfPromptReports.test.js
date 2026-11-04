@@ -5,7 +5,8 @@ const assert = require('node:assert/strict');
 const ExcelJS = require('exceljs');
 const Reports = require('../services/bmfPromptReports');
 const { buildPromptWorkbook } = require('../services/bmfPromptExcel');
-const { businessPdf, statementPdf } = require('../services/bmfPdf');
+const Pdf = require('../services/bmfPdf');
+const { businessPdf, statementPdf } = Pdf;
 const dataStore = require('../middleware/dataStore');
 const {
   getTypedReport,
@@ -113,6 +114,13 @@ test('Version 3 borrower statement PDF is exactly two A4 pages', async () => {
 });
 
 test('business PDF buffers every page before adding page-number footers', async () => {
+  const onePage = await businessPdf([{
+    title: 'Single-page report',
+    headers: ['Date', 'Amount'],
+    rows: [['03/05/2026', 'K 100.00']]
+  }]);
+  assert.equal((onePage.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length, 1);
+
   const rows = Array.from({ length: 100 }, (_, index) => [index + 1, `Collection record ${index + 1}`]);
   const pdf = await businessPdf([{
     title: 'Multi-page report',
@@ -209,6 +217,130 @@ test('typed-report exports return the complete workbook and two-page selected-lo
   assert.equal(pdfResponse.statusCode, 200);
   assert.match(pdfResponse.headers['Content-Disposition'], /bmf_full_history_BMF-20260401-0017_\d{8}\.pdf/);
   assert.equal((pdfText.match(/\/Type\s*\/Page\b/g) || []).length, 2);
+});
+
+test('all nine Version 3 report cards return real XLSX and report-specific PDF files for the selected period', async t => {
+  const defaulted = {
+    id: 18,
+    receiptNumber: 'BMF-20260410-0018',
+    email: 'defaulted@example.test',
+    username: 'Defaulted Borrower',
+    storeId: 'buraza',
+    status: 'defaulted',
+    amount: 100,
+    interestAmount: 10,
+    totalRepayment: 110,
+    outstanding: 110,
+    approvedAt: '2026-04-10',
+    dueDate: '2026-04-17',
+    verifiedOverdueAt: '2026-04-25',
+    outstandingAtDefault: 110,
+    payments: []
+  };
+  const loans = [loanFixture(), defaulted];
+  const users = [
+    { email: 'borrower@example.test', username: 'Test Borrower', storeId: 'buraza' },
+    { email: 'defaulted@example.test', username: 'Defaulted Borrower', storeId: 'buraza' }
+  ];
+  t.mock.method(dataStore, 'readJson', file => file === dataStore.paths.loans ? loans : users);
+  const sourceTypes = [
+    ['par', 'PAR Report'],
+    ['aging', 'Aging Schedule'],
+    ['statement', 'Loan Statement'],
+    ['disbursements', 'Disbursement Register'],
+    ['schedule', 'Repayment Schedule'],
+    ['collection', 'Collection Efficiency'],
+    ['defaults', 'Default Register'],
+    ['cashbook', 'Cash Collections'],
+    ['officers', 'Officer Scorecard']
+  ];
+  const baseQuery = { scope: 'buraza', from: '2026-04-01', to: '2026-05-03' };
+  const baseRequest = {
+    headers: { 'x-business-unit': 'buraza' },
+    authUser: { role: 'admin', storeId: 'buraza', email: 'admin@example.test' }
+  };
+  const createResponse = () => ({
+    statusCode: 200,
+    headers: {},
+    body: null,
+    status(code) { this.statusCode = code; return this; },
+    setHeader(name, value) { this.headers[name] = value; return this; },
+    send(body) { this.body = Buffer.from(body); return this; },
+    json(body) { this.body = body; return this; }
+  });
+
+  for (const [type, sheetName] of sourceTypes) {
+    const reportQuery = ['statement', 'schedule'].includes(type)
+      ? { ...baseQuery, loanId: '17' }
+      : baseQuery;
+    const workbookResponse = createResponse();
+    await getTypedReport({
+      ...baseRequest,
+      params: { type },
+      query: { ...reportQuery, format: 'xlsx' }
+    }, workbookResponse);
+
+    assert.equal(workbookResponse.statusCode, 200, `${type} XLSX should succeed`);
+    assert.match(workbookResponse.headers['Content-Type'], /spreadsheetml/);
+    assert.match(workbookResponse.headers['Content-Disposition'], new RegExp(`bmf_.*\\.xlsx`));
+    assert.equal(workbookResponse.body.subarray(0, 2).toString(), 'PK');
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(workbookResponse.body);
+    assert.equal(workbook.worksheets.length, 10, `${type} Excel should contain the complete workbook`);
+    const reportSheet = workbook.getWorksheet(sheetName);
+    assert.ok(reportSheet, `${type} Excel should contain ${sheetName}`);
+    const titleCell = ['statement', 'schedule'].includes(type) ? 'A1' : 'A2';
+    assert.ok(
+      String(reportSheet.getCell(titleCell).value || '').trim().length > 10,
+      `${type} workbook should contain a readable report title`
+    );
+    if (!['statement', 'schedule'].includes(type)) {
+      assert.match(String(reportSheet.getCell('A3').value), /01\/04\/2026.*03\/05\/2026/);
+    }
+
+    const pdfResponse = createResponse();
+    await getTypedReport({
+      ...baseRequest,
+      params: { type },
+      query: { ...reportQuery, format: 'pdf' }
+    }, pdfResponse);
+    assert.equal(pdfResponse.statusCode, 200, `${type} PDF should succeed`);
+    assert.match(pdfResponse.headers['Content-Type'], /application\/pdf/);
+    assert.match(pdfResponse.headers['Content-Disposition'], new RegExp(`\\.pdf`));
+    assert.equal(pdfResponse.body.subarray(0, 5).toString(), '%PDF-');
+    const pdfText = pdfResponse.body.toString('latin1');
+    const pageCount = (pdfText.match(/\/Type\s*\/Page\b/g) || []).length;
+    assert.ok(pageCount >= 1, `${type} PDF should contain at least one page`);
+    if (type === 'statement') assert.equal(pageCount, 2);
+    else assert.ok(pageCount <= 3, `${type} PDF should not create blank overflow pages (${pageCount})`);
+  }
+});
+
+test('PDF report heading receives and displays the selected range', async t => {
+  const loans = [loanFixture()];
+  t.mock.method(dataStore, 'readJson', file => file === dataStore.paths.loans ? loans : []);
+  let pdfOptions;
+  t.mock.method(Pdf, 'businessPdf', async (sections, options) => {
+    pdfOptions = options;
+    return Buffer.from('%PDF-1.4 test');
+  });
+  const response = {
+    statusCode: 200,
+    headers: {},
+    status(code) { this.statusCode = code; return this; },
+    setHeader() {},
+    send(body) { this.body = body; return this; },
+    json(body) { this.body = body; return this; }
+  };
+
+  await getTypedReport({
+    params: { type: 'par' },
+    query: { scope: 'buraza', from: '2026-04-01', to: '2026-05-03', format: 'pdf' },
+    headers: { 'x-business-unit': 'buraza' },
+    authUser: { role: 'admin', storeId: 'buraza' }
+  }, response);
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(pdfOptions.period, { from: '2026-04-01', to: '2026-05-03' });
 });
 
 test('typed-report export returns 422 and no file when a live loan ledger fails validation', async t => {

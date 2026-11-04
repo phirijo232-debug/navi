@@ -1353,7 +1353,8 @@ async function dispatchPromptReport(req, res, format) {
       const sections = buildPromptPdfSections(type, report);
       const pdf = await P.businessPdf(sections, {
         title: PromptReports.reportConfig(type).title,
-        date: report.today
+        date: report.today,
+        period: { from: report.from, to: report.to }
       });
       return sendTypedPdf(res, pdf, filename.replace(/\.pdf$/i, ''));
     }
