@@ -40,6 +40,8 @@ let portfolioRefreshTimer = null;
 let bellRefreshTimer = null;
 let adminNotifications = [];
 let activeCollectionRange = '1M';
+let customCollectionFrom = '';
+let customCollectionTo = '';
 let loanTablePage = 1;
 const LOAN_TABLE_PAGE_SIZE = 10;
 let usersLoaded = false;
@@ -1223,7 +1225,15 @@ function renderPortfolioOverview() {
   const monthPayments = payments.filter(item => item.date >= monthStart && dashboardDateKey(item.date) <= todayKey);
   const collectedMonth = monthPayments.reduce((sum, item) => sum + (Number(item.payment.amount) || 0), 0);
   const monthLabel = document.getElementById('collectionMonthLabel');
-  if (monthLabel) monthLabel.textContent = `Last ${activeCollectionRange === '7D' ? 7 : activeCollectionRange === '1M' ? 30 : activeCollectionRange === '3M' ? 90 : 365} days`;
+  const customRangePanel = document.getElementById('collectionCustomRange');
+  const customFromInput = document.getElementById('collectionRangeFrom');
+  const customToInput = document.getElementById('collectionRangeTo');
+  if (customRangePanel) customRangePanel.hidden = activeCollectionRange !== 'CUSTOM';
+  if (customFromInput && customFromInput.value !== customCollectionFrom) customFromInput.value = customCollectionFrom;
+  if (customToInput && customToInput.value !== customCollectionTo) customToInput.value = customCollectionTo;
+  const todayDateValue = dashboardDateKey(now);
+  if (customFromInput) customFromInput.max = todayDateValue;
+  if (customToInput) customToInput.max = todayDateValue;
 
   const sparkDays = Array.from({ length: 14 }, (_, index) => {
     const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13 + index);
@@ -1268,31 +1278,59 @@ function renderPortfolioOverview() {
     </article>
   `).join('');
 
-  const rangeDays = { '7D': 7, '1M': 30, '3M': 90, '1Y': 365 }[activeCollectionRange] || 30;
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - rangeDays + 1);
-  const dates = Array.from({ length: rangeDays }, (_, index) =>
-    new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate() + index)
+  const isCustomRange = activeCollectionRange === 'CUSTOM';
+  const customStart = isCustomRange && customCollectionFrom ? new Date(`${customCollectionFrom}T00:00:00`) : null;
+  const customEnd = isCustomRange && customCollectionTo ? new Date(`${customCollectionTo}T00:00:00`) : null;
+  const customRangeValid = Boolean(customStart && customEnd &&
+    !Number.isNaN(customStart.getTime()) && !Number.isNaN(customEnd.getTime()) &&
+    customStart <= customEnd && customEnd <= new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+  const presetDays = { '7D': 7, '1M': 30, '3M': 90, '1Y': 365 }[activeCollectionRange] || 30;
+  const rangeDays = customRangeValid
+    ? Math.floor((Date.UTC(customEnd.getFullYear(), customEnd.getMonth(), customEnd.getDate()) -
+      Date.UTC(customStart.getFullYear(), customStart.getMonth(), customStart.getDate())) / 86400000) + 1
+    : isCustomRange ? 30 : presetDays;
+  const firstDay = customRangeValid
+    ? customStart
+    : new Date(now.getFullYear(), now.getMonth(), now.getDate() - rangeDays + 1);
+  const lastDay = customRangeValid
+    ? customEnd
+    : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const rangeEnd = new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate() + 1).getTime();
+  const bucketDays = Math.max(1, Math.ceil(rangeDays / 365));
+  const bucketCount = Math.ceil(rangeDays / bucketDays);
+  const dates = Array.from({ length: bucketCount }, (_, index) =>
+    new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate() + index * bucketDays)
   );
-  const rangeStart = firstDay.getTime();
-  const rangeEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+  const getBucketIndex = value => {
+    const date = parseDashboardDate(value);
+    if (!date || date < firstDay || date >= rangeEnd) return -1;
+    const dayOffset = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) -
+      Date.UTC(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate())) / 86400000);
+    return Math.floor(dayOffset / bucketDays);
+  };
+  if (monthLabel) {
+    monthLabel.textContent = customRangeValid
+      ? `${formatDate(firstDay)} – ${formatDate(lastDay)}`
+      : isCustomRange ? 'Choose a custom date range' : `Last ${rangeDays} days`;
+  }
   const chartPayments = new Map();
   payments.forEach(item => {
-    if (item.date.getTime() < rangeStart || item.date.getTime() >= rangeEnd) return;
-    const key = dashboardDateKey(item.date);
-    chartPayments.set(key, (chartPayments.get(key) || 0) + (Number(item.payment.amount) || 0));
+    const bucket = getBucketIndex(item.date);
+    if (bucket < 0) return;
+    chartPayments.set(bucket, (chartPayments.get(bucket) || 0) + (Number(item.payment.amount) || 0));
   });
   const chartLoans = new Map();
   portfolioLoans.forEach(loan => {
     if (getLoanStatus(loan) === 'pending' || getLoanStatus(loan) === 'declined') return;
     const date = parseDashboardDate(loan.approvedAt);
-    if (!date || date.getTime() < rangeStart || date.getTime() >= rangeEnd) return;
-    const key = dashboardDateKey(date);
-    chartLoans.set(key, (chartLoans.get(key) || 0) + (Number(loan.amount) || 0));
+    const bucket = getBucketIndex(date);
+    if (bucket < 0) return;
+    chartLoans.set(bucket, (chartLoans.get(bucket) || 0) + (Number(loan.amount) || 0));
   });
-  const series = dates.map(date => ({
+  const series = dates.map((date, index) => ({
     date,
-    payments: chartPayments.get(dashboardDateKey(date)) || 0,
-    loans: chartLoans.get(dashboardDateKey(date)) || 0
+    payments: chartPayments.get(index) || 0,
+    loans: chartLoans.get(index) || 0
   }));
   const chartWidth = 1000;
   const chartHeight = 250;
@@ -1321,9 +1359,12 @@ function renderPortfolioOverview() {
   ).join('');
   const tooltips = tickIndexes.map(index => {
     const point = series[index];
-    return `<g><circle cx="${x(index)}" cy="${y(point.payments)}" r="4" fill="#2f81f7"><title>${escapeHtml(formatDate(point.date))} · Payments: ${escapeHtml(formatCurrency(point.payments))} · New loans: ${escapeHtml(formatCurrency(point.loans))}</title></circle><circle cx="${x(index)}" cy="${y(point.loans)}" r="4" fill="#3fb950"><title>${escapeHtml(formatDate(point.date))} · Payments: ${escapeHtml(formatCurrency(point.payments))} · New loans: ${escapeHtml(formatCurrency(point.loans))}</title></circle></g>`;
+    const bucketEnd = new Date(point.date.getFullYear(), point.date.getMonth(), point.date.getDate() + bucketDays - 1);
+    if (bucketEnd > lastDay) bucketEnd.setTime(lastDay.getTime());
+    const periodLabel = bucketDays === 1 ? formatDate(point.date) : `${formatDate(point.date)} – ${formatDate(bucketEnd)}`;
+    return `<g><circle cx="${x(index)}" cy="${y(point.payments)}" r="4" fill="#2f81f7"><title>${escapeHtml(periodLabel)} · Payments: ${escapeHtml(formatCurrency(point.payments))} · New loans: ${escapeHtml(formatCurrency(point.loans))}</title></circle><circle cx="${x(index)}" cy="${y(point.loans)}" r="4" fill="#3fb950"><title>${escapeHtml(periodLabel)} · Payments: ${escapeHtml(formatCurrency(point.payments))} · New loans: ${escapeHtml(formatCurrency(point.loans))}</title></circle></g>`;
   }).join('');
-  chart.innerHTML = `<svg class="collections-svg admin-month-chart" viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="Daily payments received and newly approved loan amounts for the last ${rangeDays} days">
+  const chartSvg = `<svg class="collections-svg admin-month-chart" viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="${bucketDays === 1 ? 'Daily' : `${bucketDays}-day interval`} payments received and newly approved loan amounts from ${formatDate(firstDay)} to ${formatDate(lastDay)}">
     ${grid}${xLabels}
     <path d="${makeArea(paymentPoints)}" fill="#2f81f7" opacity=".1"></path>
     <path d="${makeArea(loanPoints)}" fill="#3fb950" opacity=".1"></path>
@@ -1331,6 +1372,9 @@ function renderPortfolioOverview() {
     <path d="${makeLine(loanPoints)}" fill="none" stroke="#3fb950" stroke-width="3"></path>
     ${tooltips}
   </svg>`;
+  chart.innerHTML = customRangeValid || !isCustomRange
+    ? chartSvg
+    : '<p class="collection-range-prompt">Choose a start and end date, then select Apply to view the custom range.</p>';
   document.querySelectorAll('[data-collection-range]').forEach(button => {
     const selected = button.dataset.collectionRange === activeCollectionRange;
     button.classList.toggle('active', selected);
@@ -3330,8 +3374,40 @@ document.getElementById('loanTablePagination')?.addEventListener('click', event 
 document.querySelectorAll('[data-collection-range]').forEach(button => {
   button.addEventListener('click', () => {
     activeCollectionRange = button.dataset.collectionRange;
+    const error = document.getElementById('collectionRangeError');
+    if (error) error.textContent = '';
     renderPortfolioOverview();
   });
+});
+document.getElementById('collectionRangeFrom')?.addEventListener('change', event => {
+  customCollectionFrom = event.currentTarget.value;
+  document.getElementById('collectionRangeError').textContent = '';
+});
+document.getElementById('collectionRangeTo')?.addEventListener('change', event => {
+  customCollectionTo = event.currentTarget.value;
+  document.getElementById('collectionRangeError').textContent = '';
+});
+document.getElementById('applyCollectionRange')?.addEventListener('click', () => {
+  const error = document.getElementById('collectionRangeError');
+  const start = customCollectionFrom ? new Date(`${customCollectionFrom}T00:00:00`) : null;
+  const end = customCollectionTo ? new Date(`${customCollectionTo}T00:00:00`) : null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    error.textContent = 'Choose both a start date and an end date.';
+    return;
+  }
+  if (start > end) {
+    error.textContent = 'The start date must be on or before the end date.';
+    return;
+  }
+  if (end > today) {
+    error.textContent = 'The end date cannot be in the future.';
+    return;
+  }
+  error.textContent = '';
+  activeCollectionRange = 'CUSTOM';
+  renderPortfolioOverview();
 });
 document.getElementById('dailyReportQuickBtn')?.addEventListener('click', () => {
   pullReport('daily-cashbook', 'xlsx');

@@ -127,6 +127,8 @@ test('admin directories expose wired filters, bounded paging, and application be
 test('admin dashboard controls are present, wired, and remain dark without shared theme preferences', () => {
   for (const id of [
     'adminSidebar', 'portfolioOverview', 'portfolioKpis', 'collectionsChart',
+    'collectionCustomRange', 'collectionRangeFrom', 'collectionRangeTo',
+    'applyCollectionRange', 'collectionRangeError',
     'loanManagementPanel', 'loanStatusFilter', 'loanTablePagination',
     'loyalBorrowersPanel', 'portfolioReports', 'allLoansView', 'customersView',
     'paymentsView', 'overdueView', 'defaultersView', 'hrView', 'applicationsView',
@@ -152,6 +154,11 @@ test('admin dashboard controls are present, wired, and remain dark without share
   }
   assert.match(js, /data-loan-page/);
   assert.match(js, /activeCollectionRange = button\.dataset\.collectionRange/);
+  assert.match(html, /data-collection-range="CUSTOM"[^>]*>Custom<\/button>/);
+  assert.match(js, /getElementById\('applyCollectionRange'\)\?\.addEventListener\('click'/);
+  assert.match(js, /The start date must be on or before the end date/);
+  assert.match(js, /The end date cannot be in the future/);
+  assert.match(js, /applyCollectionRange/);
   assert.match(js, /applyTheme\('dark'\)/);
   assert.doesNotMatch(js, /getElementById\(['"]modeBtn['"]\)/);
   assert.doesNotMatch(js, /localStorage\.getItem\(['"]mode['"]\)/);

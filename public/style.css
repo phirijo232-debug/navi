@@ -2111,6 +2111,11 @@ body:has(#adminDashboard:not(.hidden)) .dashboard-screen { grid-template-columns
 .chart-range-pills button { width:auto; min-width:34px; min-height:30px; padding:5px 8px; border:1px solid #484f58; border-radius:5px; background:#21262d; color:#8b949e; font-size:11px; cursor:pointer; }
 .chart-range-pills button:hover { border-color:#768390; color:#fff; }
 .chart-range-pills button.active { border-color:#2f81f7; background:#2f81f7; color:#fff; }
+.collection-custom-range { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:4px 0 10px; color:#8b949e; font-size:12px; }
+.collection-custom-range[hidden] { display:none; }
+.collection-custom-range label { display:flex; align-items:center; gap:7px; }
+.collection-custom-range input { width:auto; min-width:145px; padding:7px 9px; }
+.collection-range-error { color:#ff9d9d; }
 .chart-legend { display:flex; justify-content:center; gap:22px; padding:7px 0 0; color:#8b949e; font-size:11px; }
 .chart-legend span { display:flex; align-items:center; gap:7px; }
 .chart-legend i { width:8px; height:8px; border-radius:50%; }
