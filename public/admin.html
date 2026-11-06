@@ -322,7 +322,7 @@
     /* Selected customer modal spans the full screen width. */
     #userModal { display: none; align-items: flex-start; justify-content: center; }
     #userModal[aria-hidden="false"] { display: flex; }
-    #userModal .modal-content { width: calc(100vw - 36px); max-width: 1440px; max-height: calc(100vh - 24px); overflow-y: auto; margin: 12px auto; background: var(--bmf-surface, #151b22); opacity: 1; }
+    #userModal .modal-content { width: calc(100vw - 36px); max-width: 1125px; max-height: calc(100vh - 24px); overflow-y: auto; margin: 12px auto; padding: 20px; background: var(--bmf-surface, #151b22); opacity: 1; }
     #userModal .close { z-index: 2; width: 38px; height: 38px; border: 1px solid var(--bmf-border, #30363d); border-radius: 8px; background: var(--bmf-surface, #151b22); color: inherit; }
     .customer-profile-heading, .customer-profile-section { border: 1px solid var(--bmf-border, rgba(255,255,255,.12)); border-radius: 10px; padding: 16px; margin: 12px 0; background: var(--bmf-surface, rgba(255,255,255,.025)); }
     .customer-profile-heading { border-left: 4px solid var(--bmf-blue, #2f81f7); }
@@ -359,6 +359,116 @@
     #applicationsList .application-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 8px; margin: 10px 0; }
     #applicationsList .application-facts > div { min-width: 0; border: 1px solid var(--bmf-border, rgba(255,255,255,.12)); border-radius: 8px; padding: 9px 10px; overflow-wrap: anywhere; }
     #applicationsList .application-facts small { display: block; opacity: .72; margin-bottom: 4px; }
+    #applicationsList .application-facts strong { display:block; min-width:0; overflow-wrap:anywhere; word-break:break-word; }
+    #applicationsList .loan-header { min-width:0; padding:10px 12px; border:1px solid var(--bmf-border,#30363d); border-radius:8px; background:var(--bmf-surface,#151b22); }
+    #applicationsList .loan-header strong { min-width:0; flex:1 1 320px; margin:0 !important; overflow-wrap:anywhere; word-break:break-word; }
+    #applicationsList .application-review-note, #applicationsList .application-document-box, #applicationsList .application-review-actions { min-width:0; margin:10px 0; padding:12px; border:1px solid var(--bmf-border,#30363d); border-radius:8px; background:var(--bmf-surface,#151b22); overflow-wrap:anywhere; }
+    #applicationsList .application-document-box { display:flex; flex-wrap:wrap; gap:8px; }
+    #applicationsList .application-review-actions .button-row { margin:0 !important; }
+    .loan-directory-table { width:100%; min-width:1120px; table-layout:auto; }
+    .loan-directory-table th,.loan-directory-table td { white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+    .loan-directory-table .loan-id-cell { min-width:150px; max-width:180px; white-space:normal; overflow-wrap:anywhere; word-break:break-all; }
+    .loan-directory-table td:nth-child(2) { min-width:190px; }
+    .loan-directory-table td:nth-child(2) strong,.loan-directory-table td:nth-child(2) small { display:block; min-width:0; overflow-wrap:anywhere; word-break:break-word; }
+    .loan-directory-table .money-cell { white-space:nowrap; }
+    .profile-wrap { display:grid; gap:14px; max-width:100%; min-width:0; color:var(--text,#e6edf3); }
+    .profile-card { min-width:0; overflow:hidden; border:1px solid var(--border,#30363d); border-radius:10px; background:var(--panel-bg,#161b22); }
+    .profile-card-header { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; padding:12px 18px; border-bottom:1px solid var(--border,#30363d); background:var(--app-bg,#1c2128); color:var(--muted,#8b949e); font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; overflow-wrap:anywhere; }
+    .profile-card-body { min-width:0; padding:16px 18px; }
+    .profile-customer-heading { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    .profile-avatar { display:grid; place-items:center; flex:0 0 56px; width:56px; height:56px; border:2px solid var(--accent,#2f81f7); border-radius:50%; background:rgba(47,129,247,.12); color:var(--accent,#2f81f7); font-size:20px; font-weight:700; }
+    .profile-customer-name { min-width:0; flex:1 1 180px; }
+    .profile-customer-name h2 { margin:0 0 4px; overflow-wrap:anywhere; font-size:20px; }
+    .profile-customer-name p { margin:0; color:var(--muted,#8b949e); overflow-wrap:anywhere; }
+    .profile-role-chip { padding:4px 10px; border:1px solid var(--accent,#2f81f7); border-radius:20px; background:rgba(47,129,247,.1); color:var(--accent,#2f81f7); letter-spacing:0; text-transform:none; }
+    .profile-actions { display:flex; flex:1 1 260px; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+    .profile-button { min-height:38px; padding:8px 13px; border:1px solid var(--border,#30363d); border-radius:7px; background:transparent; color:var(--text,#e6edf3); cursor:pointer; font:inherit; font-weight:600; }
+    .profile-button.profile-primary { border-color:var(--accent,#2f81f7); background:var(--accent,#2f81f7); color:#fff; }
+    .profile-info-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; min-width:0; }
+    .profile-info-field, .profile-summary-tile { min-width:0; padding:11px 12px; border:1px solid var(--border,#30363d); border-radius:8px; background:var(--app-bg,#1c2128); overflow-wrap:anywhere; }
+    .profile-info-field small, .profile-summary-tile small { display:block; margin-bottom:5px; color:var(--muted,#8b949e); font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
+    .profile-info-field strong { display:block; color:var(--text,#e6edf3); overflow-wrap:anywhere; word-break:break-word; }
+    .profile-info-field .profile-mono { color:var(--accent,#2f81f7); font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .profile-summary-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }
+    .profile-summary-tile strong { display:block; margin:3px 0; color:var(--text,#e6edf3); font-size:20px; line-height:1.2; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+    .profile-summary-tile span { color:var(--muted,#8b949e); font-size:11px; }
+    .tone-blue { color:var(--accent,#2f81f7) !important; }.tone-green { color:var(--success,#3fb950) !important; }.tone-amber { color:var(--warning,#d29922) !important; }.tone-red { color:var(--danger,#f85149) !important; }
+    .profile-notice { padding:12px 14px; border:1px solid var(--warning,#d29922); border-radius:8px; background:rgba(210,153,34,.1); color:var(--warning,#d29922); }
+    .profile-application-card { min-width:0; margin:8px 0; padding:12px; border:1px solid var(--border,#30363d); border-radius:8px; background:var(--app-bg,#1c2128); }
+    .profile-application-card > header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px; }
+    .profile-application-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .profile-application-note, .profile-document-box { margin-top:10px; padding:10px 12px; border:1px solid var(--border,#30363d); border-radius:8px; overflow-wrap:anywhere; }
+    .profile-document-box { display:flex; flex-wrap:wrap; gap:8px; }
+    .profile-loan-history { min-width:0; }
+    .profile-filter-row { display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:10px 16px; border-bottom:1px solid var(--border,#30363d); }
+    .profile-filter-row > strong { margin-right:4px; color:var(--muted,#8b949e); font-size:11px; letter-spacing:.05em; text-transform:uppercase; }
+    .profile-filter-chip { padding:6px 12px; border:1px solid var(--border,#30363d); border-radius:20px; background:transparent; color:var(--muted,#8b949e); cursor:pointer; font:inherit; font-size:12px; }
+    .profile-filter-chip.active { border-color:var(--accent,#2f81f7); background:var(--accent,#2f81f7); color:#fff; }
+    .profile-result-note { padding:10px 16px; color:var(--muted,#8b949e); font-size:12px; }
+    .profile-loan-list { display:grid; gap:12px; }
+    .profile-empty { padding:16px; border:1px dashed var(--border,#30363d); border-radius:8px; text-align:center; color:var(--muted,#8b949e); }
+    .tone-purple { color:#a371f7 !important; }
+    .security-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:12px 0 18px; }
+    .security-metrics article { min-width:0; min-height:94px; padding:16px 18px; border:1px solid var(--border,#30363d); border-radius:10px; background:var(--panel-bg,#161b22); }
+    .security-metrics small { display:block; color:var(--muted,#8b949e); font-size:12px; letter-spacing:.05em; text-transform:uppercase; }
+    .security-metrics strong { display:block; margin-top:7px; color:var(--accent,#2f81f7); font-size:26px; }
+    .security-role-list { display:grid; gap:12px; margin:14px 0; }
+    .security-role-group { min-width:0; overflow:hidden; border:1px solid var(--border,#30363d); border-radius:10px; background:var(--panel-bg,#161b22); }
+    .security-role-group > header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border,#30363d); background:var(--app-bg,#1c2128); }
+    .security-role-group > header strong { font-size:16px; }
+    .security-role-group > header span { color:var(--muted,#8b949e); font-size:13px; }
+    .security-role-members { display:grid; gap:0; }
+    .security-fixed-member { display:grid; gap:3px; padding:12px 16px; border-bottom:1px solid var(--border,#30363d); }
+    .security-fixed-member:last-child { border-bottom:0; }
+    .security-fixed-member span,.security-fixed-member small { color:var(--muted,#8b949e); overflow-wrap:anywhere; }
+    .security-fixed-member small { color:var(--success,#3fb950); }
+    .security-employee-card { min-width:0; padding:14px 16px; border-bottom:1px solid var(--border,#30363d); }
+    .security-employee-card:last-child { border-bottom:0; }
+    .security-employee-card > header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:12px; border-bottom:1px solid var(--border,#30363d); }
+    .security-employee-card > header > div { min-width:0; display:grid; gap:3px; }
+    .security-employee-card > header strong { overflow-wrap:anywhere; }
+    .security-employee-card > header small { color:var(--muted,#8b949e); overflow-wrap:anywhere; }
+    .security-count { flex:none; color:var(--muted,#8b949e); font-size:12px; }
+    .security-permission-list { display:grid; }
+    .security-permission-row { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:48px; padding:8px 4px; border-bottom:1px solid var(--border,#30363d); }
+    .security-switch-wrap { display:flex; align-items:center; gap:8px; color:var(--muted,#8b949e); }
+    .security-switch-wrap input { width:42px; height:24px; accent-color:var(--success,#3fb950); cursor:pointer; }
+    .security-switch-wrap small { width:24px; color:var(--muted,#8b949e); }
+    .security-employee-actions { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; padding-top:12px; }
+    .security-employee-actions label { display:grid; flex:1 1 220px; gap:5px; color:var(--muted,#8b949e); font-size:12px; }
+    .security-employee-actions .modal-input { margin:0; }
+    .security-group-card { min-width:0; margin:8px 0; padding:14px; border:1px solid var(--border,#30363d); border-radius:10px; background:var(--panel-bg,#161b22); }
+    .security-group-permissions { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+    .security-permission-pill { padding:5px 8px; border:1px solid var(--border,#30363d); border-radius:6px; font-size:12px; }
+    .security-permission-pill.is-on { color:var(--success,#3fb950); border-color:rgba(63,185,80,.35); background:rgba(63,185,80,.08); }
+    .security-permission-pill.is-off { color:var(--muted,#8b949e); }
+    .security-empty { margin:0; padding:14px 16px; color:var(--muted,#8b949e); }
+    #userModal .loan-item { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); min-width:0; margin:0; padding:0; overflow:hidden; border:1px solid var(--border,#30363d); border-radius:8px; background:var(--panel-bg,#161b22); }
+    #userModal .loan-header { grid-column:1/-1; min-width:0; margin:0; padding:12px 14px; border-bottom:1px solid var(--border,#30363d); background:var(--app-bg,#1c2128); }
+    #userModal .loan-header strong { min-width:0; overflow-wrap:anywhere; word-break:break-word; }
+    #userModal .loan-item > p { min-width:0; min-height:62px; margin:-1px 0 0 -1px; padding:10px 12px; border:1px solid var(--border,#30363d); background:var(--panel-bg,#161b22); overflow-wrap:anywhere; word-break:break-word; }
+    #userModal .loan-fields { grid-column:1/-1; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:0; margin:0; }
+    #userModal .loan-fields > p { min-width:0; margin:0 -1px -1px 0; padding:10px 12px; border:1px solid var(--border,#30363d); background:var(--panel-bg,#161b22); overflow-wrap:anywhere; word-break:break-word; }
+    #userModal .loan-fields > section { grid-column:1/-1; min-width:0; padding:12px; border:1px solid var(--border,#30363d); background:var(--panel-bg,#161b22); overflow-wrap:anywhere; }
+    #userModal .loan-item > div:has(> a.proof-link), #userModal .loan-item > form.payment-form, #userModal .loan-item > .payment-review-panel,
+    #userModal .loan-item > input.modal-input, #userModal .loan-item > .button-row, #userModal .loan-item > .admin-decision-box { grid-column:1/-1; }
+    #userModal .loan-item > div:has(> a.proof-link) { padding:8px 12px; border-top:1px solid var(--border,#30363d); overflow-wrap:anywhere; }
+    #userModal .loan-item > form.payment-form { margin:0 !important; border:0; border-top:1px solid var(--border,#30363d); border-radius:0; background:var(--panel-bg,#161b22); }
+    #userModal .payment-review-panel { margin:0; padding:12px; border-top:1px solid var(--border,#30363d); }
+    #userModal .payment-review-panel ul, #userModal .loan-fields ul { display:grid; gap:6px; padding:0; list-style:none; }
+    #userModal .payment-review-panel li, #userModal .loan-fields li { min-width:0; padding:9px 10px; border:1px solid var(--border,#30363d); border-radius:6px; background:var(--app-bg,#1c2128); overflow-wrap:anywhere; }
+    #userModal .profile-history-item { display:flex; gap:10px; align-items:flex-start; }
+    #userModal .profile-history-content { min-width:0; overflow-wrap:anywhere; }
+    #userModal .profile-history-content small { display:block; margin-top:3px; color:var(--muted,#8b949e); }
+    #userModal .loan-fields ul { margin:8px 0 0; }
+    #userModal .loan-fields ul li { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+    #userModal .loan-fields ul li .pay-amount { margin-left:auto; color:var(--success,#3fb950); white-space:nowrap; }
+    #userModal .loan-fields ul li .proof-link { margin:0; }
+    #userModal .loan-fields ul li .pay-receipt { color:var(--accent,#2f81f7); font-family:ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
+    #userModal .history-item, #userModal .loan-fields li { min-width:0; }
+    #userModal .profile-empty { padding:16px; border:1px dashed var(--border,#30363d); border-radius:8px; text-align:center; color:var(--muted,#8b949e); }
+    @media(max-width:900px) { .profile-summary-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } .profile-info-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } #userModal .loan-fields { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+    @media(max-width:600px) { .profile-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .profile-info-grid,.profile-application-grid { grid-template-columns:1fr; } #userModal .loan-item { grid-template-columns:repeat(2,minmax(0,1fr)); } #userModal .loan-fields { grid-template-columns:repeat(2,minmax(0,1fr)); } .profile-actions { justify-content:stretch; } .profile-button { flex:1 1 100%; } .security-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .security-role-group > header { align-items:flex-start; flex-direction:column; } }
     @media (max-width: 600px) { #userModal { padding: 8px; } #userModal .modal-content { width: 100%; max-height: calc(100vh - 16px); margin: 0 auto; padding: 18px 14px; } }
     .proof-link { display: inline-block; margin: 4px 8px 4px 0; }
     .announcement-form { max-width: 720px; }
@@ -761,14 +871,20 @@
     <section id="hrView" class="admin-page hidden" aria-labelledby="hrTitle">
       <div class="admin-topbar">
         <div>
-          <h1 id="hrTitle">Employee Securities (HR)</h1>
-          <p class="message-text" style="text-align:left;">Manage admin users, permissions, and store-switch approvals for this store.</p>
+          <h1 id="hrTitle">Security &amp; Permissions</h1>
+          <p class="message-text" style="text-align:left;">Manage employee access for this store. Franchise Admin permissions are fixed.</p>
           <p id="hrEmployeeCount" class="directory-status" aria-live="polite"></p>
         </div>
         <div class="button-row">
           <button type="button" class="toggle-mode" id="hrRefreshBtn" style="max-width: 180px;">Refresh</button>
           <button type="button" class="toggle-mode" id="hrCreateBtn" style="max-width: 200px;">Create admin</button>
         </div>
+      </div>
+      <div class="security-metrics" aria-label="Security overview">
+        <article><small>Total staff</small><strong id="securityMetricStaff">0</strong></article>
+        <article><small>Locked features</small><strong class="tone-amber" id="securityMetricLocked">0</strong></article>
+        <article><small>Pending requests</small><strong class="tone-red" id="securityMetricRequests">0</strong></article>
+        <article><small>Premium customers</small><strong class="tone-purple" id="securityMetricPremium">—</strong></article>
       </div>
       <div class="toolbar" role="search" aria-label="Filter employee directory">
         <input type="search" id="hrSearch" class="search-box" placeholder="Search staff by name, email, phone or NRC..." aria-label="Search staff">
@@ -809,11 +925,7 @@
           <p id="securityGroupMessage" class="message-text" role="status" aria-live="polite"></p>
         </form>
         <div id="securityGroupList" class="directory-empty" role="status">Permission groups will appear here after loading.</div>
-        <div class="toolbar" aria-label="Employee permission group assignments">
-          <select id="securityEmployeeSelect" class="search-box" aria-label="Select employee"></select>
-          <select id="securityEmployeeGroup" class="search-box" aria-label="Select permission group"></select>
-          <button type="button" class="toggle-mode" id="securityAssignGroupBtn" style="max-width:220px;">Assign group</button>
-        </div>
+        <div id="securityEmployeeList" class="security-role-list" aria-live="polite"><div class="directory-empty">Staff security settings will appear here after loading.</div></div>
       </section>
 
       <section class="panel store-section" aria-labelledby="auditLogTitle">

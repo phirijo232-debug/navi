@@ -1844,11 +1844,11 @@ function renderApplications() {
     const nrcNumber = app.nrcNumber || app.nrc || '—';
     const collateralFront = app.collateralFront || app.collateralPhoto;
     const reviewed = app.status !== 'pending' ? `
-      <p><strong>Reviewed:</strong> ${escapeHtml(formatDate(app.reviewedAt))} by ${escapeHtml(app.reviewedBy || '—')}</p>
-      ${app.reviewNote ? `<p><strong>Note:</strong> ${escapeHtml(app.reviewNote)}</p>` : ''}
+      <div class="application-review-note"><p><strong>Reviewed:</strong> ${escapeHtml(formatDate(app.reviewedAt))} by ${escapeHtml(app.reviewedBy || '—')}</p>
+      ${app.reviewNote ? `<p><strong>Review note:</strong> ${escapeHtml(app.reviewNote)}</p>` : ''}</div>
     ` : '';
     const actions = String(app.status || '').toLowerCase() === 'pending' ? `
-      <div class="button-row" style="margin-top:8px;">
+      <div class="application-review-actions"><div class="button-row" style="margin-top:8px;">
         <button class="toggle-mode" type="button" data-app-action="approve" data-app-id="${escapeHtml(app.id)}" style="background:var(--bmf-green);">Approve</button>
         <button class="toggle-mode" type="button" data-app-action="request_info" data-app-id="${escapeHtml(app.id)}" style="background:var(--bmf-amber);">Request Info</button>
         <button class="toggle-mode" type="button" data-app-action="reject" data-app-id="${escapeHtml(app.id)}" style="background:var(--bmf-red);">Reject</button>
@@ -1856,7 +1856,7 @@ function renderApplications() {
       <div style="margin-top:8px;">
         <label for="appNote-${escapeHtml(app.id)}">Review note (optional)</label>
         <input type="text" id="appNote-${escapeHtml(app.id)}" class="modal-input" placeholder="Reason for decision..." maxlength="300">
-      </div>
+      </div></div>
     ` : `<p style="margin-top:8px; opacity:0.7;">Decision already made.</p>`;
     return `
       <article class="panel loan-item" data-application-card="${escapeHtml(app.applicationId || app.id)}" style="margin-top:10px;">
@@ -1873,10 +1873,7 @@ function renderApplications() {
           <div><small>Terms</small><strong>${tenureWeeks} week${tenureWeeks === 1 ? '' : 's'} · ${escapeHtml(formatStatus(app.urgency || 'standard'))}</strong></div>
           <div><small>Submitted</small><strong>${escapeHtml(formatDate(app.createdAt))}</strong></div>
         </div>
-        ${app.nrcFront ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(app.nrcFront)}">View NRC front</a></p>` : ''}
-        ${app.nrcBack ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(app.nrcBack)}">View NRC back</a></p>` : ''}
-        ${collateralFront ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(collateralFront)}">View collateral front</a></p>` : ''}
-        ${app.collateralBack ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(app.collateralBack)}">View collateral back</a></p>` : ''}
+        ${[ ['NRC front', app.nrcFront], ['NRC back', app.nrcBack], ['Collateral front', collateralFront], ['Collateral back', app.collateralBack] ].filter(([, filename]) => filename).length ? `<div class="application-document-box">${[ ['NRC front', app.nrcFront], ['NRC back', app.nrcBack], ['Collateral front', collateralFront], ['Collateral back', app.collateralBack] ].filter(([, filename]) => filename).map(([label, filename]) => `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(filename)}">View ${label}</a>`).join('')}</div>` : ''}
         ${reviewed}
         ${actions}
       </article>
@@ -2055,10 +2052,11 @@ function renderLoanDetails(loan) {
   const canManageStore = ['admin', 'franchise_admin', 'store_admin'].includes(localStorage.getItem('userRole'));
   const history = Array.isArray(loan.statusHistory) && loan.statusHistory.length
     ? loan.statusHistory.map(entry => `
-        <li>
-          <strong>${escapeHtml(formatStatus(entry.status || 'updated'))}</strong>
+        <li class="profile-history-item">
+          <span class="profile-history-dot status-${escapeHtml(String(entry.status || 'updated').toLowerCase())}"></span>
+          <div class="profile-history-content"><strong>${escapeHtml(formatStatus(entry.status || 'updated'))}</strong>
           <div>${escapeHtml(entry.reason || 'No reason provided.')}</div>
-          <small>${escapeHtml(formatDate(entry.updatedAt || loan.updatedAt))}${entry.actor ? ` · by ${escapeHtml(entry.actor)}` : ''}</small>
+          <small>${escapeHtml(formatDate(entry.updatedAt || loan.updatedAt))}${entry.actor ? ` · ${escapeHtml(entry.actor)}` : ''}</small></div>
         </li>
       `).join('')
     : '<li>No status history.</li>';
@@ -2067,10 +2065,13 @@ function renderLoanDetails(loan) {
   // signed URL from /uploads/sign at open time (?token= no longer exists).
   const fileLink = (name) => `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(name)}">`;
   const paymentHistory = loan.masked ? '<li>🔒 Premium customer repayment details are restricted.</li>' : payments.length ? payments.map(payment => `
-    <li>
-      ${formatCurrency(payment.amount)} · ${escapeHtml(payment.mode || 'payment')} · ${escapeHtml(formatDate(payment.date))}
-      ${payment.note ? `<div>${escapeHtml(payment.note)}</div>` : ''}
-      ${payment.screenshot ? `${fileLink(payment.screenshot)}View proof of payment</a>` : '<span>No proof attached</span>'}
+    <li class="profile-payment-row">
+      <span class="pay-receipt">${escapeHtml(payment.paymentReceiptId || 'No receipt attached')}</span>
+      <span class="pay-method">${escapeHtml(payment.mode || 'Payment')}</span>
+      <span class="pay-date">${escapeHtml(formatDate(payment.paymentDate || payment.date))}</span>
+      <span class="profile-payment-note">${escapeHtml(payment.note || 'Payment recorded')}</span>
+      ${payment.screenshot ? `${fileLink(payment.screenshot)}View proof</a>` : ''}
+      <strong class="pay-amount">${money(payment.amount)}</strong>
     </li>
   `).join('') : '<li>No payments recorded.</li>';
   const proofLinks = [
@@ -2102,7 +2103,8 @@ function renderLoanDetails(loan) {
   return `
     <article class="loan-item">
       <div class="loan-header">
-        <strong>${escapeHtml(loan.product || 'Loan')} #${escapeHtml(loan.id)}</strong>
+        <strong>${escapeHtml(loan.receiptNumber || loan.receiptId || loan.id || 'Loan')}</strong>
+        ${loan.collateralDescription ? `<span class="collateral-pill">${escapeHtml(loan.collateralDescription)}${loan.collateralGrade ? ` · <strong>${escapeHtml(formatStatus(loan.collateralGrade))}</strong>` : ''}</span>` : ''}
         <span class="status-tag status-${escapeHtml(status)}">${escapeHtml(status.replace(/_/g, ' ').toUpperCase())}</span>
       </div>
       <p><strong>Amount:</strong> ${money(loan.amount)}</p>
@@ -2247,11 +2249,10 @@ function loanMatchesTimeframe(loan) {
 
 function renderSelectedUser() {
   const modalBody = document.getElementById('modalBody');
+  if (!modalBody || !selectedUser) return;
   const visibleLoans = selectedLoans.filter(loan =>
-    (activeLoanFilter === 'all' || getLoanStatus(loan) === activeLoanFilter) &&
-    loanMatchesTimeframe(loan)
+    (activeLoanFilter === 'all' || getLoanStatus(loan) === activeLoanFilter) && loanMatchesTimeframe(loan)
   );
-
   const canNotifyUser = ['admin', 'franchise_admin', 'store_admin'].includes(localStorage.getItem('userRole') || '');
   const canManagePremium = ['admin', 'franchise_admin'].includes(localStorage.getItem('userRole') || '') && selectedUser.role === 'user';
   const hasMaskedLoans = selectedLoans.some(loan => loan.masked === true);
@@ -2259,71 +2260,48 @@ function renderSelectedUser() {
   const totalOutstanding = selectedLoans.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
   const totalPaid = selectedLoans.reduce((sum, loan) => sum + (loan.paidTotal != null ? (Number(loan.paidTotal) || 0) : Math.max(0, (Number(loan.totalRepayment || loan.amount) || 0) - (Number(loan.outstanding) || 0))), 0);
   const settledCount = selectedLoans.filter(loan => getLoanStatus(loan) === 'paid').length;
-  const field = (label, value) => `<div class="customer-profile-field"><small>${label}</small><strong>${escapeHtml(String(value || 'Not provided'))}</strong></div>`;
-  const applicationHistory = (selectedUser.quickScreenApplications || []).map(application => `
-    <article class="customer-application-summary">
-      <h3>Quick Screen application ${escapeHtml(application.applicationId || application.id || '')}</h3>
-      <p><strong>Status:</strong> ${escapeHtml(formatStatus(application.status || 'pending'))} · <strong>Submitted:</strong> ${escapeHtml(formatDate(application.createdAt))}</p>
-      <p><strong>Product:</strong> ${escapeHtml(application.product || '—')} · <strong>Requested:</strong> ${selectedUser.premiumProtected || application.masked ? 'K ••••••' : formatCurrency(application.amount)}</p>
-      <p><strong>Tenure:</strong> ${escapeHtml(application.tenureWeeks || '—')} week(s) · <strong>Urgency:</strong> ${escapeHtml(formatStatus(application.urgency || 'standard'))}</p>
-      <div class="customer-application-files">
-        ${application.nrcFront ? `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(application.nrcFront)}">View NRC front</a>` : ''}
-        ${application.nrcBack ? `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(application.nrcBack)}">View NRC back</a>` : ''}
-        ${application.collateralFront ? `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(application.collateralFront)}">View collateral front</a>` : ''}
-        ${application.collateralBack ? `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(application.collateralBack)}">View collateral back</a>` : ''}
-      </div>
-    </article>
-  `).join('');
-
-  modalBody.innerHTML = `
-    <header class="customer-profile-heading">
-      <h2 id="customerProfileTitle">${escapeHtml(selectedUser.username || selectedUser.fullName || 'Customer profile')}</h2>
-      <p class="user-meta">${selectedUser.quickScreenApplicant ? 'Quick Screen applicant · not a registered login' : `Customer account · ${escapeHtml(selectedUser.role || 'user')}`}</p>
-      <div class="customer-profile-fields">
-        ${field('Email', selectedUser.email)}${field('Phone', selectedUser.phone)}
-        ${field('NRC', selectedUser.nrcNumber || selectedUser.nrc)}${field('Account status', selectedUser.status || 'Active')}
-        ${field('Store', getStoreName(selectedUser.storeId))}${field('Customer record', selectedUser.quickScreenApplicant ? 'Quick Screen applicant' : 'Registered customer')}
-      </div>
-    </header>
-    <section class="customer-profile-section"><h3>Loan portfolio</h3>
-      <div class="customer-profile-kpis">
-        <div class="customer-profile-kpi"><small>Total loans</small><strong>${selectedLoans.length}</strong></div>
-        <div class="customer-profile-kpi"><small>Total requested</small><strong>${hasMaskedLoans ? 'K ••••••' : formatCurrency(totalRequested)}</strong></div>
-        <div class="customer-profile-kpi"><small>Outstanding</small><strong>${hasMaskedLoans ? 'K ••••••' : formatCurrency(totalOutstanding)}</strong></div>
-        <div class="customer-profile-kpi"><small>Paid</small><strong>${hasMaskedLoans ? 'K ••••••' : formatCurrency(totalPaid)}</strong></div>
-        <div class="customer-profile-kpi"><small>Settled loans</small><strong>${settledCount}</strong></div>
-      </div>
-    </section>
-    ${canManagePremium ? `<section class="customer-profile-section"><h3>Premium protection</h3><p>Premium customer amounts and repayment history are hidden from restricted staff.</p><button type="button" class="toggle-mode" data-premium-toggle>${selectedUser.premiumProtected ? 'Turn off premium protection' : 'Turn on premium protection'}</button></section>` : ''}
-    ${applicationHistory ? `<section class="customer-profile-section customer-application-history"><h3>Quick Screen history</h3>${applicationHistory}</section>` : ''}
-    ${canNotifyUser ? `
-    <div class="button-row" style="margin: 10px 0;">
-      <button class="toggle-mode" type="button" data-notify-user>Notify this customer</button>
-    </div>` : ''}
-    <hr>
-    <h3>Buraza loan history (${selectedLoans.length})</h3>
-    <div class="loan-filters" role="group" aria-label="Filter loans by status">
-      ${LOAN_STATUS_FILTERS.map(status => `
-        <button type="button" class="toggle-mode loan-filter ${activeLoanFilter === status ? 'active' : ''}" data-loan-filter="${status}">${status.replace(/_/g, ' ')}</button>
-      `).join('')}
-    </div>
-    <div class="loan-filters timeframe-filters" role="group" aria-label="Filter loans by time period">
-      ${TIMEFRAME_FILTERS.map(([value, label]) => `
-        <button type="button" class="toggle-mode loan-filter ${activeTimeframeFilter === value ? 'active' : ''}" data-timeframe="${value}">${label}</button>
-      `).join('')}
-    </div>
-    ${activeTimeframeFilter === 'custom' ? `
-    <div class="timeframe-custom">
-      <label for="timeframeFrom">From</label>
-      <input type="date" id="timeframeFrom" class="modal-input" value="${escapeHtml(customTimeframeFrom)}">
-      <label for="timeframeTo">To</label>
-      <input type="date" id="timeframeTo" class="modal-input" value="${escapeHtml(customTimeframeTo)}">
-    </div>` : ''}
-    <p class="timeframe-note">Showing ${visibleLoans.length} of ${selectedLoans.length} loans — grouped by borrowed date; paid loans use their settlement date.</p>
-    <div class="loan-list">
-      ${visibleLoans.length ? visibleLoans.map(renderLoanDetails).join('') : '<p>No loans match the selected filters.</p>'}
-    </div>
-  `;
+  const activeCount = selectedLoans.filter(loan => ['active', 'grace', 'defaulted'].includes(getLoanStatus(loan)) && Number(loan.outstanding || 0) > 0).length;
+  const field = (label, value, valueClass = '') => `<div class="profile-info-field"><small>${label}</small><strong class="${valueClass}">${escapeHtml(String(value || 'Not provided'))}</strong></div>`;
+  const applicationHistory = (selectedUser.quickScreenApplications || []).map(application => {
+    const files = [['NRC front', application.nrcFront], ['NRC back', application.nrcBack], ['Collateral front', application.collateralFront], ['Collateral back', application.collateralBack]].filter(([, filename]) => filename);
+    return `<article class="profile-application-card"><header><strong>Quick Screen application</strong><span class="status-tag status-${escapeHtml(String(application.status || 'pending').toLowerCase())}">${escapeHtml(formatStatus(application.status || 'pending'))}</span></header><div class="profile-info-grid profile-application-grid">
+      ${field('Reference', application.applicationId || application.id || 'Not recorded')}${field('Submitted', formatDate(application.createdAt))}${field('Product / purpose', application.product || application.loanPurpose)}
+      ${field('Requested amount', selectedUser.premiumProtected || application.masked ? 'K ••••••' : formatCurrency(application.amount))}${field('Tenure', application.tenureWeeks ? `${application.tenureWeeks} week(s)` : 'Not provided')}${field('Urgency', formatStatus(application.urgency || 'standard'))}</div>
+      ${application.reviewNote ? `<p class="profile-application-note"><strong>Review note</strong><br>${escapeHtml(application.reviewNote)}</p>` : ''}
+      ${files.length ? `<div class="profile-document-box">${files.map(([label, filename]) => `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(filename)}">View ${label}</a>`).join('')}</div>` : ''}</article>`;
+  }).join('');
+  const initials = String(selectedUser.username || selectedUser.fullName || 'C').trim().split(/\s+/).slice(0, 2).map(part => part[0] || '').join('').toUpperCase();
+  const accountStatus = selectedUser.status || (selectedUser.restricted ? 'Restricted' : 'Active');
+  const roleName = selectedUser.quickScreenApplicant ? 'Quick Screen applicant' : selectedUser.loanOnly ? 'Loan record only' : 'Borrower';
+  const accountCreated = selectedUser.createdAt || selectedUser.registeredAt || selectedUser.joinedAt;
+  const tiles = [
+    ['Total loans', String(selectedLoans.length), 'blue', 'All records'],
+    ['Total borrowed', hasMaskedLoans ? 'K ••••••' : formatCurrency(totalRequested), '', 'Principal requested'],
+    ['Total repaid', hasMaskedLoans ? 'K ••••••' : formatCurrency(totalPaid), 'green', 'Across all loans'],
+    ['Outstanding', hasMaskedLoans ? 'K ••••••' : formatCurrency(totalOutstanding), 'amber', 'Currently owed'],
+    ['Loans paid off', String(settledCount), 'green', 'Fully settled'],
+    ['Active loans', String(activeCount), 'amber', 'Currently running']
+  ];
+  modalBody.innerHTML = `<div class="profile-wrap">
+    <section class="profile-card"><header class="profile-card-header"><span>Customer Profile</span><span class="profile-role-chip">${escapeHtml(roleName)}</span></header>
+      <div class="profile-card-body profile-customer-heading"><div class="profile-avatar" aria-hidden="true">${escapeHtml(initials || 'C')}</div>
+        <div class="profile-customer-name"><h2 id="customerProfileTitle">${escapeHtml(selectedUser.username || selectedUser.fullName || 'Customer profile')}</h2><p>${escapeHtml(selectedUser.email || 'Customer record')}</p></div>
+        <div class="profile-actions">${canNotifyUser ? '<button type="button" class="profile-button profile-primary" data-notify-user>✉ Notify Customer</button>' : ''}
+        ${canManagePremium ? `<button type="button" class="profile-button" data-premium-toggle>${selectedUser.premiumProtected ? 'Disable premium protection' : 'Enable premium protection'}</button>` : ''}</div></div></section>
+    <section class="profile-card"><header class="profile-card-header">Personal Information</header><div class="profile-card-body"><div class="profile-info-grid">
+      ${field('Full name', selectedUser.username || selectedUser.fullName)}${field('Email address', selectedUser.email, 'profile-mono')}${field('Phone number', selectedUser.phone)}${field('National ID (NRC)', selectedUser.nrcNumber || selectedUser.nrc, 'profile-mono')}
+      ${field('Branch / store', getStoreName(selectedUser.storeId))}${field('Member since', accountCreated ? formatDate(accountCreated) : 'Not recorded')}${field('Account status', accountStatus, String(accountStatus).toLowerCase() === 'active' ? 'tone-green' : 'tone-amber')}${field('Customer record', selectedUser.quickScreenApplicant ? 'Quick Screen applicant' : selectedUser.loanOnly ? 'Loan record' : 'Registered customer')}
+    </div></div></section>
+    <section class="profile-card"><header class="profile-card-header">Portfolio Summary</header><div class="profile-card-body"><div class="profile-summary-grid">${tiles.map(([label, value, tone, sub]) => `<div class="profile-summary-tile"><small>${label}</small><strong class="tone-${tone || 'default'}">${value}</strong><span>${sub}</span></div>`).join('')}</div></div></section>
+    ${selectedUser.premiumProtected ? '<div class="profile-notice">Premium protection is enabled for this customer. Restricted staff cannot view their amounts or repayment history.</div>' : ''}
+    ${applicationHistory ? `<section class="profile-card"><header class="profile-card-header">Quick Screen History</header><div class="profile-card-body">${applicationHistory}</div></section>` : ''}
+    <section class="profile-card profile-loan-history"><header class="profile-card-header">Buraza Loan History — ${selectedLoans.length} ${selectedLoans.length === 1 ? 'loan' : 'loans'}</header>
+      <div class="profile-filter-row"><strong>Status</strong>${LOAN_STATUS_FILTERS.map(status => `<button type="button" class="profile-filter-chip ${activeLoanFilter === status ? 'active' : ''}" data-loan-filter="${status}">${status.replace(/_/g, ' ')}</button>`).join('')}</div>
+      <div class="profile-filter-row"><strong>Period</strong>${TIMEFRAME_FILTERS.map(([value, label]) => `<button type="button" class="profile-filter-chip ${activeTimeframeFilter === value ? 'active' : ''}" data-timeframe="${value}">${label}</button>`).join('')}</div>
+      ${activeTimeframeFilter === 'custom' ? `<div class="profile-custom-range"><label for="timeframeFrom">From</label><input type="date" id="timeframeFrom" class="modal-input" value="${escapeHtml(customTimeframeFrom)}"><label for="timeframeTo">To</label><input type="date" id="timeframeTo" class="modal-input" value="${escapeHtml(customTimeframeTo)}"></div>` : ''}
+      <p class="profile-result-note">Showing ${visibleLoans.length} of ${selectedLoans.length} loans. Paid loans use their settlement date.</p>
+      <div class="profile-card-body profile-loan-list">${visibleLoans.length ? visibleLoans.map(renderLoanDetails).join('') : '<div class="profile-empty">No loans match the selected filters.</div>'}</div></section>
+  </div>`;
 }
 
 async function togglePremiumProtection() {
@@ -2941,6 +2919,20 @@ window.fetch = async function featureAwareFetch(input, init) {
 };
 let securityGroups = [];
 let securityEmployees = [];
+let securityPeople = [];
+let securityPendingRequests = 0;
+
+function updateSecurityMetrics() {
+  const staffCount = securityPeople.length;
+  const lockedCount = securityPeople.filter(employee => employee.role === 'store_admin')
+    .reduce((count, employee) => count + Object.values(employee.permissions || {}).filter(allowed => !allowed).length, 0);
+  const set = (id, value) => { const element = document.getElementById(id); if (element) element.textContent = String(value); };
+  set('securityMetricStaff', staffCount);
+  set('securityMetricLocked', lockedCount);
+  set('securityMetricRequests', securityPendingRequests);
+  const premiumCount = Array.isArray(allUsers) ? allUsers.filter(user => user.premiumProtected === true).length : null;
+  set('securityMetricPremium', premiumCount === null ? '—' : premiumCount);
+}
 
 function selectedSecurityStore() {
   const selected = localStorage.getItem('adminStore');
@@ -2957,12 +2949,10 @@ async function fetchSecurityGroups() {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Unable to load permission groups.');
     securityGroups = Array.isArray(data.groups) ? data.groups : [];
-    list.innerHTML = securityGroups.map(group => `<article class="panel" style="margin:8px 0;padding:14px;border:1px solid var(--bmf-border,#30363d);border-radius:10px;">
+    list.innerHTML = securityGroups.map(group => `<article class="security-group-card">
       <div class="admin-topbar"><div><strong>${escapeHtml(group.name)}</strong>${group.builtIn ? ' <span class="status-badge">Built-in · Locked</span>' : ''}<div class="table-subtext">${escapeHtml(group.description || (group.builtIn ? 'System group. Cannot be changed.' : 'Custom staff group.'))}</div></div>${group.builtIn ? '' : `<button type="button" class="toggle-mode" data-security-delete="${escapeHtml(group.id)}">Delete</button>`}</div>
-      <div class="loan-fields">${Object.entries(SECURITY_PERMISSION_LABELS).map(([key, label]) => `<span>${group.permissions?.[key] ? '✓' : '—'} ${escapeHtml(label)}</span>`).join('')}</div>
+      <div class="security-group-permissions">${Object.entries(SECURITY_PERMISSION_LABELS).map(([key, label]) => `<span class="security-permission-pill ${group.permissions?.[key] ? 'is-on' : 'is-off'}">${group.permissions?.[key] ? '✓' : '—'} ${escapeHtml(label)}</span>`).join('')}</div>
     </article>`).join('') || '<div class="directory-empty">No permission groups are available.</div>';
-    const groupSelect = document.getElementById('securityEmployeeGroup');
-    if (groupSelect) groupSelect.innerHTML = '<option value="">No custom group</option>' + securityGroups.filter(group => !group.builtIn).map(group => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)}</option>`).join('');
     await fetchSecurityEmployees();
   } catch (error) {
     list.innerHTML = `<div class="directory-empty" role="status">${escapeHtml(error.message)}</div>`;
@@ -2974,16 +2964,62 @@ async function fetchSecurityEmployees() {
   const response = await fetch(`/admin/security/employees?${params}`, { headers: getStoreHeaders() });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || 'Unable to load employee permission assignments.');
-  securityEmployees = (Array.isArray(data.employees) ? data.employees : []).filter(employee => employee.role === 'store_admin');
-  const select = document.getElementById('securityEmployeeSelect');
-  if (select) select.innerHTML = securityEmployees.map(employee => `<option value="${escapeHtml(employee.id || employee.email)}">${escapeHtml(employee.username || employee.email)} · ${escapeHtml(employee.role)}</option>`).join('') || '<option value="">No staff available</option>';
-  syncEmployeeSecuritySelection();
+  securityPeople = Array.isArray(data.employees) ? data.employees : [];
+  securityEmployees = securityPeople.filter(employee => employee.role === 'store_admin');
+  renderSecurityEmployees();
+  updateSecurityMetrics();
 }
 
-function syncEmployeeSecuritySelection() {
-  const employee = securityEmployees.find(item => String(item.id || item.email) === document.getElementById('securityEmployeeSelect')?.value);
-  const select = document.getElementById('securityEmployeeGroup');
-  if (select && employee) select.value = employee.permissionGroupId || '';
+function renderSecurityEmployees() {
+  const list = document.getElementById('securityEmployeeList');
+  if (!list) return;
+  const displayName = employee => employee.username || employee.email || 'Staff account';
+  const admins = securityPeople.filter(employee => employee.role === 'admin');
+  const franchiseAdmins = securityPeople.filter(employee => employee.role === 'franchise_admin');
+  const storeAdmins = securityPeople.filter(employee => employee.role === 'store_admin');
+  const fixedSection = (title, people, note) => `<section class="security-role-group"><header><strong>${title}</strong><span>${people.length} ${people.length === 1 ? 'member' : 'members'} · Fixed</span></header><div class="security-role-members">${people.length ? people.map(employee => `<article class="security-fixed-member"><strong>${escapeHtml(displayName(employee))}</strong><span>${escapeHtml(employee.email || '')}</span><small>${note}</small></article>`).join('') : '<p class="security-empty">No accounts in this role for the selected store.</p>'}</div></section>`;
+  const customGroups = securityGroups.filter(group => !group.builtIn);
+  const storeSection = `<section class="security-role-group"><header><strong>Store Admins</strong><span>${storeAdmins.length} ${storeAdmins.length === 1 ? 'member' : 'members'}</span></header><div class="security-role-members">${storeAdmins.length ? storeAdmins.map(employee => {
+    const allowed = Object.values(employee.permissions || {}).filter(Boolean).length;
+    return `<article class="security-employee-card" data-security-card="${escapeHtml(employee.id || employee.email)}"><header><div><strong>${escapeHtml(displayName(employee))}</strong><small>${escapeHtml(employee.email || '')} · ${escapeHtml(getStoreName(employee.storeId) || employee.storeId || '')}</small></div><span class="security-count">${allowed}/${Object.keys(SECURITY_PERMISSION_LABELS).length} allowed</span></header>
+      <div class="security-permission-list">${Object.entries(SECURITY_PERMISSION_LABELS).map(([key, label]) => `<label class="security-permission-row"><span>${escapeHtml(label)}</span><span class="security-switch-wrap"><input type="checkbox" data-security-permission="${key}" ${employee.permissions?.[key] ? 'checked' : ''}><small>${employee.permissions?.[key] ? 'On' : 'Off'}</small></span></label>`).join('')}</div>
+      <div class="security-employee-actions"><label>Permission group<select class="modal-input" data-security-group-select><option value="">Default access</option>${customGroups.map(group => `<option value="${escapeHtml(group.id)}" ${employee.permissionGroupId === group.id ? 'selected' : ''}>${escapeHtml(group.name)}</option>`).join('')}</select></label><button type="button" class="enter-btn" data-security-save="${escapeHtml(employee.id || employee.email)}">Save Changes</button></div>
+    </article>`;
+  }).join('') : '<p class="security-empty">No Store Admin accounts are assigned to this store.</p>'}</div></section>`;
+  list.innerHTML = `${fixedSection('Main Admins', admins, 'System permissions are fixed and cannot be edited here.')}${fixedSection('Franchise Admins', franchiseAdmins, 'Built-in Franchise Admin group · fixed and not editable.')}${storeSection}`;
+}
+
+async function saveSecurityEmployee(employeeId) {
+  const card = document.querySelector(`[data-security-card="${CSS.escape(String(employeeId))}"]`);
+  const employee = securityEmployees.find(item => String(item.id || item.email) === String(employeeId));
+  if (!card || !employee) return;
+  const groupId = card.querySelector('[data-security-group-select]')?.value || null;
+  const group = securityGroups.find(item => item.id === groupId && !item.builtIn);
+  const defaults = { bulk_notify: true, generate_invite: true, view_revenue: false, generate_reports: true, create_users: false, view_premium_customers: false, force_loan_close: false };
+  const overrides = { ...(employee.permissionOverrides || {}) };
+  card.querySelectorAll('[data-security-permission]').forEach(input => {
+    const key = input.dataset.securityPermission;
+    const inherited = group?.permissions?.[key] ?? defaults[key] ?? false;
+    if (input.checked === inherited) delete overrides[key];
+    else overrides[key] = input.checked;
+  });
+  const button = card.querySelector('[data-security-save]');
+  if (button) { button.disabled = true; button.textContent = 'Saving…'; }
+  try {
+    const response = await fetch(`/admin/security/employees/${encodeURIComponent(employeeId)}`, {
+      method: 'PATCH', headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ permissionGroupId: groupId, permissionOverrides: overrides })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to save employee permissions.');
+    securityPeople = securityPeople.map(item => String(item.id || item.email) === String(employeeId) ? data.employee : item);
+    securityEmployees = securityPeople.filter(item => item.role === 'store_admin');
+    renderSecurityEmployees();
+    showBmfToast('Security permissions saved.');
+  } catch (error) {
+    showBmfToast(error.message || 'Unable to save employee permissions.', 'error');
+    if (button) { button.disabled = false; button.textContent = 'Save Changes'; }
+  }
 }
 
 async function submitSecurityGroup(event) {
@@ -2999,22 +3035,6 @@ async function submitSecurityGroup(event) {
     if (!response.ok) throw new Error(data.error || 'Unable to create permission group.');
     document.getElementById('securityGroupForm').reset();
     message.textContent = 'Permission group created.';
-    await fetchSecurityGroups();
-  } catch (error) { message.textContent = error.message; }
-}
-
-async function assignSecurityGroup() {
-  const employeeId = document.getElementById('securityEmployeeSelect')?.value;
-  const permissionGroupId = document.getElementById('securityEmployeeGroup')?.value || null;
-  const message = document.getElementById('securityGroupMessage');
-  if (!employeeId) { message.textContent = 'Select a staff member first.'; return; }
-  try {
-    const response = await fetch(`/admin/security/employees/${encodeURIComponent(employeeId)}`, {
-      method: 'PATCH', headers: getStoreHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ permissionGroupId })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Unable to assign permission group.');
-    message.textContent = 'Permission group assigned.';
     await fetchSecurityGroups();
   } catch (error) { message.textContent = error.message; }
 }
@@ -3059,6 +3079,8 @@ async function fetchAccessApprovals() {
     if (!response.ok) throw new Error(data.error || 'Unable to load access requests.');
     const approvals = Array.isArray(data.approvals) ? data.approvals : [];
     const pending = approvals.filter(item => item.status === 'pending');
+    securityPendingRequests = pending.length;
+    updateSecurityMetrics();
     const status = document.getElementById('accessApprovalsStatus');
     if (status) status.textContent = `${pending.length} request${pending.length === 1 ? '' : 's'} awaiting review.`;
     list.innerHTML = approvals.map(item => `<article class="panel" style="margin:8px 0;padding:12px;border:1px solid var(--bmf-border,#30363d);border-radius:10px;">
@@ -3450,11 +3472,19 @@ document.getElementById('securityGroupsRefreshBtn')?.addEventListener('click', e
 document.getElementById('auditLogRefreshBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchAuditLog));
 document.getElementById('accessApprovalsRefreshBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchAccessApprovals));
 document.getElementById('securityGroupForm')?.addEventListener('submit', submitSecurityGroup);
-document.getElementById('securityAssignGroupBtn')?.addEventListener('click', assignSecurityGroup);
-document.getElementById('securityEmployeeSelect')?.addEventListener('change', syncEmployeeSecuritySelection);
 document.getElementById('securityGroupList')?.addEventListener('click', event => {
   const button = event.target.closest('[data-security-delete]');
   if (button) deleteSecurityGroup(button.dataset.securityDelete);
+});
+document.getElementById('securityEmployeeList')?.addEventListener('click', event => {
+  const button = event.target.closest('[data-security-save]');
+  if (button) saveSecurityEmployee(button.dataset.securitySave);
+});
+document.getElementById('securityEmployeeList')?.addEventListener('change', event => {
+  const input = event.target.closest('[data-security-permission]');
+  if (!input) return;
+  const state = input.closest('.security-switch-wrap')?.querySelector('small');
+  if (state) state.textContent = input.checked ? 'On' : 'Off';
 });
 document.getElementById('accessApprovalsList')?.addEventListener('click', event => {
   const button = event.target.closest('[data-approval-decision]');

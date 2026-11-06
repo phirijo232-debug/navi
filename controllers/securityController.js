@@ -93,6 +93,8 @@ function safeEmployee(user, groups) {
     id: user.id, username: user.username, email: user.email, role: user.role,
     storeId: getRecordStoreId(user), permissionGroupId: group?.id || null,
     permissionGroupName: group?.name || null,
+    permissionOverrides: Object.fromEntries(Object.entries(user.permissionOverrides || {})
+      .filter(([key, value]) => PERMISSION_KEYS.includes(key) && typeof value === 'boolean')),
     permissions: Object.fromEntries(PERMISSION_KEYS.map(key => [key, effectivePermissions[key] === true]))
   };
 }

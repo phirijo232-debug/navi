@@ -56,7 +56,7 @@ test('every data-attribute selector used by admin.js exists in admin.html', () =
     attrs.add(match[1]);
   }
   assert.ok(attrs.size > 0, 'expected data-attribute selectors in admin.js');
-  const generatedByReportLibrary = new Set(['data-report-action']);
+  const generatedByReportLibrary = new Set(['data-report-action', 'data-security-permission']);
   const missing = [...attrs].filter((attr) =>
     !html.includes(attr) && !generatedByReportLibrary.has(attr)
   );

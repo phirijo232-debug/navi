@@ -30,6 +30,8 @@ Audit entries are redacted append-only JSONL records with a SHA-256 chain, tampe
 
 All scheduler callbacks run via `setImmediate` with cron error handling. The HTTPS keep-alive is registered after scheduler startup.
 
+The customer profile now follows the supplied layout with bordered personal information, six portfolio tiles, status/period filters, compact loan facts, payment records, and status history. Quick Screen applicant cards now contain their facts, attached documents, and review controls in separate bordered areas. All Loans keeps its table scrollable on narrow screens and wraps long receipt IDs and borrower details instead of overlapping. Security & Permissions now has a live overview, role sections, a fixed read-only Franchise Admin section, per-Store Admin permission switches, custom group assignment, and save controls wired to the existing scoped security endpoint. The screenshots' example names and loan values were not added.
+
 ## Concrete Steps
 1. Add the audit module and integrate it without changing protected middleware dependencies.
 2. Improve `public/admin.js`, `public/admin.html`, and necessary styles for the customer profile, Quick Screen, loan detail, and consistent modal behavior.
@@ -63,3 +65,4 @@ Make the existing seven permission flags affect supported admin features, make a
 - Body part: Skin, Brain, Spine, and Immune System.
 - (2026-11-06) Validation: `node --test` passed all 178 tests. `node server.js` completed startup data validation and reported Navi Server running on port 3000; the process was then stopped cleanly.
 - (2026-11-06) Added an access-approval test confirming request notification recipients are restricted to same-store Franchise Admins and the decision flow uses the existing OTP service.
+- (2026-11-06) UI follow-up validation: all 178 tests pass, including admin DOM/data-attribute integrity checks; `node server.js` passes startup data validation and reports the server running on port 3000.
