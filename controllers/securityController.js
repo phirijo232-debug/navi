@@ -73,6 +73,18 @@ function readUsers() {
   return dataStore.readJson(dataStore.paths.users, [], value => Array.isArray(value));
 }
 
+function getEffectivePermissions(user) {
+  if (user?.role === 'admin' || user?.role === 'franchise_admin') {
+    return Object.fromEntries(PERMISSION_KEYS.map(key => [key, true]));
+  }
+  const base = user?.role === 'store_admin' ? STORE_ADMIN_DEFAULTS : CUSTOMER_DEFAULTS;
+  const groups = readGroups();
+  const group = groups.find(item => item.id === user?.permissionGroupId && item.storeId === getRecordStoreId(user));
+  const storedOverrides = user?.permissionOverrides && typeof user.permissionOverrides === 'object' ? user.permissionOverrides : {};
+  const effectivePermissions = { ...base, ...(group?.permissions || {}), ...storedOverrides };
+  return Object.fromEntries(PERMISSION_KEYS.map(key => [key, effectivePermissions[key] === true]));
+}
+
 function safeEmployee(user, groups) {
   const base = user.role === 'store_admin' ? STORE_ADMIN_DEFAULTS : CUSTOMER_DEFAULTS;
   const group = groups.find(item => item.id === user.permissionGroupId && item.storeId === getRecordStoreId(user));
@@ -83,6 +95,39 @@ function safeEmployee(user, groups) {
     permissionGroupName: group?.name || null,
     permissions: Object.fromEntries(PERMISSION_KEYS.map(key => [key, effectivePermissions[key] === true]))
   };
+}
+
+function getMySecurity(req, res) {
+  try {
+    if (!req.authUser) return res.status(401).json({ error: 'Sign in to view your security settings.' });
+    const user = readUsers().find(item => String(item.email || '').toLowerCase() === String(req.authUser.email || '').toLowerCase());
+    const permissions = getEffectivePermissions(user || req.authUser);
+    return res.json({ role: req.authUser.role, storeId: getRecordStoreId(user || req.authUser), permissions });
+  } catch (err) {
+    logError(`SECURITY GET MY PERMISSIONS FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Unable to load your security settings.' });
+  }
+}
+
+function setCustomerPremium(req, res) {
+  try {
+    if (!isFranchiseAdmin(req.authUser?.role)) return res.status(403).json({ error: 'Only admin or franchise_admin can manage premium customer status.' });
+    if (typeof req.body?.premiumProtected !== 'boolean') return res.status(400).json({ error: 'premiumProtected must be true or false.' });
+    const users = readUsers();
+    const index = users.findIndex(user => String(user.id) === String(req.params.id) || String(user.email || '').toLowerCase() === String(req.params.id).toLowerCase());
+    if (index < 0) return res.status(404).json({ error: 'Customer not found.' });
+    const target = users[index];
+    if (target.role !== 'user') return res.status(400).json({ error: 'Premium protection can only be set on customer accounts.' });
+    if (!canAccessStore(req, getRecordStoreId(target))) return res.status(403).json({ error: 'Access to this customer is not allowed.' });
+    target.premiumProtected = req.body.premiumProtected;
+    users[index] = target;
+    dataStore.writeJson(dataStore.paths.users, users);
+    auditGuardian.writeAudit({ action: 'PREMIUM_CUSTOMER_UPDATED', actor: req.authUser.email || req.authUser.username, targetId: target.id || target.email, ip: req.ip, detail: { storeId: getRecordStoreId(target), premiumProtected: target.premiumProtected } });
+    return res.json({ customer: { id: target.id, username: target.username, email: target.email, storeId: getRecordStoreId(target), premiumProtected: target.premiumProtected } });
+  } catch (err) {
+    logError(`SECURITY UPDATE PREMIUM CUSTOMER FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Unable to update premium customer status.' });
+  }
 }
 
 function listPermissionGroups(req, res) {
@@ -255,7 +300,7 @@ function updateEmployeeSecurity(req, res) {
 }
 
 module.exports = {
-  PERMISSION_KEYS, BUILTIN_GROUP,
+  PERMISSION_KEYS, BUILTIN_GROUP, getEffectivePermissions, getMySecurity, setCustomerPremium,
   listPermissionGroups, createPermissionGroup, updatePermissionGroup, deletePermissionGroup,
   listEmployeeSecurity, getEmployeeSecurity, updateEmployeeSecurity
 };

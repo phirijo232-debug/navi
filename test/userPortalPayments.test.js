@@ -41,12 +41,11 @@ test('customer payments are chart-free and the admin collections chart is role-g
 test('loan details modal has reliable accessible close controls', () => {
   assert.match(userPage, /id="loanModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true"/);
   assert.match(userPage, /type="button" class="modal-close" data-modal-close="loanModal" aria-label="Close loan details"/);
-  assert.match(userPage, /loanModalCloseButton\?\.addEventListener\('click', closeLoanModal\)/);
-  assert.match(userPage, /if \(event\.target === loanModal\) closeLoanModal\(\)/);
-  assert.match(userPage, /event\.key === 'Escape' && loanModal\?\.classList\.contains\('active'\)/);
+  assert.match(userPage, /document\.addEventListener\('click', event =>[\s\S]*data-modal-close="loanModal"[\s\S]*event\.target === modal[\s\S]*closeLoanModal\(\)/);
+  assert.match(userPage, /document\.addEventListener\('keydown', event =>[\s\S]*event\.key === 'Escape' && modal\?\.classList\.contains\('active'\)[\s\S]*closeLoanModal\(\)/);
   assert.match(userPage, /m\.setAttribute\('aria-hidden', 'true'\)/);
   assert.match(userPage, /modal\.setAttribute\('aria-hidden', 'false'\)/);
-  assert.match(userPage, /\.customer-portal \.modal-content \{[^}]*max-height:90vh[^}]*background:var\(--portal-card\)/s);
+  assert.match(userPage, /\.customer-portal \.modal-content \{[^}]*max-height:calc\(100vh - 24px\)[^}]*background:#161b22[^}]*opacity:1/s);
 });
 
 test('payment selection shows the selected loan balance read-only and submits only the proof', () => {

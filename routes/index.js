@@ -37,14 +37,27 @@ const {
   getTypedReport, getTypedReportExcel, getTypedReportPdf, isPromptReportType
 } = require('../controllers/reportController');
 
-const { healthRateLimiter, getServerMode, setServerMode, isFranchiseManager } = require('../middleware/security');
+const { healthRateLimiter, authRateLimiter, getServerMode, setServerMode, isFranchiseManager } = require('../middleware/security');
 const { signUpload } = require('../controllers/fileController');
 const {
   listPermissionGroups, createPermissionGroup, updatePermissionGroup, deletePermissionGroup,
-  listEmployeeSecurity, getEmployeeSecurity, updateEmployeeSecurity
+  listEmployeeSecurity, getEmployeeSecurity, updateEmployeeSecurity, getMySecurity, setCustomerPremium
 } = require('../controllers/securityController');
 const { getAuditEntries } = require('../controllers/auditController');
 const { requestApproval, listApprovals, decideApproval, checkApproval } = require('../controllers/accessApprovalController');
+const { requireFeatures, requirePremiumReportVisibility } = require('../middleware/featurePermissions');
+
+const viewRevenueGate = requireFeatures('view_revenue');
+const reportBuildGate = requireFeatures(['view_revenue', 'generate_reports']);
+const reportPremiumGate = [reportBuildGate, requirePremiumReportVisibility];
+const inviteGate = requireFeatures('generate_invite');
+const createUsersGate = requireFeatures('create_users');
+const bulkNotifyGate = requireFeatures('bulk_notify');
+const forceLoanCloseGate = (req, res, next) => {
+  const action = String(req.body?.action || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!['liquidate', 'force_close', 'write_off'].includes(action)) return next();
+  return requireFeatures('force_loan_close')(req, res, next);
+};
 
 function dispatchReportExport(req, res, next) {
   const normalizedType = String(req.params.type).toLowerCase().replace(/_/g, '-');
@@ -69,36 +82,38 @@ router.get('/logs/access', getAccessLogs);
 router.get('/logs/errors', getErrorLogs);
 router.get('/sessions', getActiveSessions);
 router.get('/admin/audit-log', getAuditEntries);
+router.get('/admin/security/me', getMySecurity);
+router.patch('/admin/security/customers/:id/premium', setCustomerPremium);
 router.post('/admin/access-approvals', requestApproval);
 router.get('/admin/access-approvals/check', checkApproval);
 router.get('/admin/access-approvals', listApprovals);
-router.post('/admin/access-approvals/:id/decision', decideApproval);
+router.post('/admin/access-approvals/:id/decision', authRateLimiter, decideApproval);
 
 router.get('/reports/user', getSingleUserReport);
-router.get('/reports/all', getAllUsersReport);
-router.get('/reports/analytics', getAnalyticsReport);
-router.get('/reports/search', searchReports);
-router.get('/reports/user/:email', getUserReport);
-router.get('/reports/analytics/tracking', getTrackingAnalytics);
-router.get('/reports/analytics/tracking/export', exportTrackingSheet);
+router.get('/reports/all', viewRevenueGate, getAllUsersReport);
+router.get('/reports/analytics', viewRevenueGate, getAnalyticsReport);
+router.get('/reports/search', viewRevenueGate, searchReports);
+router.get('/reports/user/:email', viewRevenueGate, getUserReport);
+router.get('/reports/analytics/tracking', viewRevenueGate, getTrackingAnalytics);
+router.get('/reports/analytics/tracking/export', ...reportPremiumGate, exportTrackingSheet);
 // /api alias matches the admin-panel report prompt and keeps the legacy /reports
 // routes working for existing clients.
-router.get('/api/reports/:type', getTypedReport);
-router.get('/api/reports/:type/export', dispatchReportExport);
-router.get('/api/reports/:type/pdf', getTypedReportPdf);
+router.get('/api/reports/:type', viewRevenueGate, getTypedReport);
+router.get('/api/reports/:type/export', ...reportPremiumGate, dispatchReportExport);
+router.get('/api/reports/:type/pdf', ...reportPremiumGate, getTypedReportPdf);
 // Flat typed-report routes (static, must come before :scope dynamic routes)
-router.get('/reports/:type', getTypedReport);
-router.get('/reports/:type/export', dispatchReportExport);
-router.get('/reports/:type/pdf', getTypedReportPdf);
+router.get('/reports/:type', viewRevenueGate, getTypedReport);
+router.get('/reports/:type/export', ...reportPremiumGate, dispatchReportExport);
+router.get('/reports/:type/pdf', ...reportPremiumGate, getTypedReportPdf);
 
-router.get('/reports/:scope/summary', getReportSummary);
-router.get('/reports/:scope/export', exportReport);
-router.get('/reports/:scope/profits', getProfitAnalytics);
-router.get('/reports/:scope/defaulters', getDefaulterAnalytics);
-router.get('/reports/:scope/overdue', getOverdueAnalytics);
-router.get('/reports/:scope/paid', getPaidAnalytics);
-router.get('/reports/:scope/tracking', getTrackingSheet);
-router.get('/reports/:scope/users/:id', getUserTracking);
+router.get('/reports/:scope/summary', viewRevenueGate, getReportSummary);
+router.get('/reports/:scope/export', ...reportPremiumGate, exportReport);
+router.get('/reports/:scope/profits', viewRevenueGate, getProfitAnalytics);
+router.get('/reports/:scope/defaulters', viewRevenueGate, getDefaulterAnalytics);
+router.get('/reports/:scope/overdue', viewRevenueGate, getOverdueAnalytics);
+router.get('/reports/:scope/paid', viewRevenueGate, getPaidAnalytics);
+router.get('/reports/:scope/tracking', viewRevenueGate, getTrackingSheet);
+router.get('/reports/:scope/users/:id', viewRevenueGate, getUserTracking);
 
 router.get('/users', getAllUsers);
 
@@ -108,9 +123,9 @@ router.patch('/notifications/:id/read', markNotificationRead);
 router.get('/loans', getLoans);
 router.get('/loans/all', getAllLoans);
 router.get('/loans/search', searchByReceiptId);
-router.get('/payments', getPaymentsLedger);
-router.get('/payments/export', getPaymentsReportExport);
-router.post('/loans/notify-overdue', notifyAllOverdue);
+router.get('/payments', viewRevenueGate, getPaymentsLedger);
+router.get('/payments/export', ...reportPremiumGate, getPaymentsReportExport);
+router.post('/loans/notify-overdue', bulkNotifyGate, notifyAllOverdue);
 router.post('/loans/notify-user', notifyUser);
 router.post('/loans/:id/payment-submissions', upload.fields([
   { name: 'paymentProof', maxCount: 1 }
@@ -123,7 +138,7 @@ router.post('/loans/request', upload.fields([
   { name: 'nrcFront', maxCount: 1 },
   { name: 'nrcBack', maxCount: 1 }
 ]), requestLoan);
-router.post('/loans/:id/action', updateLoanStatus);
+router.post('/loans/:id/action', forceLoanCloseGate, updateLoanStatus);
 router.post('/loans/:id/notify-overdue', sendLoanNotification);
 router.post('/loans/payment', upload.fields([
   { name: 'screenshot', maxCount: 1 }
@@ -142,14 +157,14 @@ router.post('/login', requestLogin);
 router.post('/login/confirm', confirmLogin);
 router.post('/password-reset', requestPasswordReset);
 router.post('/password-reset/confirm', confirmPasswordReset);
-router.post('/invites/create', createInvite);
-router.get('/invites', listInvites);
-router.post('/admin/users', createAdminUser);
+router.post('/invites/create', inviteGate, createInvite);
+router.get('/invites', inviteGate, listInvites);
+router.post('/admin/users', createUsersGate, createAdminUser);
 router.post('/admin/loans', upload.fields([
   { name: 'collateralFront', maxCount: 1 },
   { name: 'collateralBack', maxCount: 1 }
 ]), createAdminLoan);
-router.post('/admin/announcements', sendAdminAnnouncement);
+router.post('/admin/announcements', bulkNotifyGate, sendAdminAnnouncement);
 router.post('/admin/backup', createBackup);
 router.get('/admin/backups', listBackups);
 router.post('/admin/restore', restoreBackup);

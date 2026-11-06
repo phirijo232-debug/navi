@@ -4,7 +4,9 @@ const path = require('path');
 const crypto = require('crypto');
 const dataStore = require('../middleware/dataStore');
 const emailService = require('../middleware/email');
+const otpService = require('../middleware/otp');
 const { logError } = require('../middleware/logger');
+const config = require('../config');
 const { getRecordStoreId, canAccessStore, isFranchiseAdmin } = require('../middleware/storeScope');
 const auditGuardian = require('../middleware/auditLog');
 
@@ -45,18 +47,23 @@ function safe(item) {
   };
 }
 
-function recipients() {
-  return [...new Set(String(process.env.GUARDIAN_EMAILS || process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || '')
-    .split(',').map(value => value.trim().toLowerCase()).filter(Boolean))];
+function recipients(storeId) {
+  const users = dataStore.readJson(dataStore.paths.users, [], Array.isArray);
+  return [...new Set(users
+    .filter(user => user.role === 'franchise_admin' && storeOf(user) === storeId)
+    .map(user => String(user.email || '').trim().toLowerCase())
+    .filter(Boolean))];
 }
 
 async function send(to, subject, text) {
-  if (!to || (Array.isArray(to) && !to.length)) return;
+  if (!to || (Array.isArray(to) && !to.length)) return { ok: false, reason: 'No authorized recipient is configured.' };
   try {
     const result = await emailService.sendCustomerEmail({ to, subject, text });
     if (!result?.ok && !result?.skipped) logError(`ACCESS APPROVAL EMAIL FAILED: ${result?.reason || 'unknown mail error'}`);
+    return result || { ok: false, reason: 'Email service returned no result.' };
   } catch (err) {
     logError(`ACCESS APPROVAL EMAIL FAILED: ${err.message}`);
+    return { ok: false, reason: err.message };
   }
 }
 
@@ -71,6 +78,9 @@ async function requestApproval(req, res) {
     const items = read();
     if (expire(items, now)) write(items);
     const storeId = storeOf(req.authUser);
+    if (!config.STORES.some(store => store.id === storeId)) return res.status(403).json({ error: 'Your account is not assigned to a configured store.' });
+    const admins = recipients(storeId);
+    if (!admins.length) return res.status(503).json({ error: 'No Franchise Admin is configured for this store. The request was not submitted.' });
     const existing = items.find(item => item.requesterId === requesterId && item.storeId === storeId &&
       item.feature === feature && ['pending', 'approved'].includes(item.status));
     if (existing) return res.status(409).json({ error: 'An active request or approval already exists for this permission.', approval: safe(existing) });
@@ -84,10 +94,9 @@ async function requestApproval(req, res) {
     items.push(item);
     write(items);
     auditGuardian.writeAudit({ action: 'ACCESS_APPROVAL_REQUESTED', actor: requesterId, targetId: item.id, ip: req.ip, detail: { feature, storeId, status: item.status } });
-    const admins = recipients();
-    if (admins.length) await send(admins, `Temporary access request: ${feature}`,
-      `Requester: ${item.requesterName} (${requesterId})\nStore: ${storeId}\nPermission: ${feature}\nReason: ${item.reason || 'Not provided'}\nRequest ID: ${item.id}\n\nAn admin or franchise_admin must review this request in NaviServer.`);
-    return res.status(201).json({ approval: safe(item), notification: admins.length ? 'attempted' : 'no_recipients_configured' });
+    const delivery = await send(admins, `Temporary access request: ${feature}`,
+      `Requester: ${item.requesterName} (${requesterId})\nStore: ${storeId}\nPermission: ${feature}\nReason: ${item.reason || 'Not provided'}\nRequest ID: ${item.id}\n\nA Franchise Admin must review this request in NaviServer.`);
+    return res.status(201).json({ approval: safe(item), notification: { success: delivery?.ok === true, reason: delivery?.ok ? '' : (delivery?.reason || (delivery?.skipped ? 'Email delivery is not configured.' : 'Email delivery failed.')) } });
   } catch (err) {
     logError(`ACCESS APPROVAL REQUEST FAILED: ${err.message}`);
     return res.status(503).json({ error: 'Unable to submit access request.' });
@@ -135,6 +144,20 @@ async function decideApproval(req, res) {
     if (item.status !== 'pending' || Date.parse(item.requestExpiresAt) <= now) return res.status(409).json({ error: 'This access request is no longer pending.' });
     const decision = String(req.body?.decision || '').toLowerCase();
     if (!['approve', 'deny'].includes(decision)) return res.status(400).json({ error: 'Decision must be approve or deny.' });
+    const approverEmail = String(req.authUser.email || '').trim().toLowerCase();
+    if (!approverEmail) return res.status(400).json({ error: 'Your Franchise Admin account needs a registered email to approve requests.' });
+    const otpPurpose = `Access Approval ${item.id}`;
+    if (!req.body?.otp) {
+      try {
+        await otpService.sendOTP(otpPurpose, approverEmail, false);
+        return res.json({ otpRequired: true, otpSentTo: approverEmail, message: 'Verification code sent to your registered Franchise Admin email.' });
+      } catch (err) {
+        logError(`ACCESS APPROVAL OTP SEND FAILED: ${err.message}`);
+        return res.status(503).json({ error: 'Unable to send the approval verification code.' });
+      }
+    }
+    const otpResult = otpService.verifyOTP(String(req.body.otp), approverEmail, otpPurpose);
+    if (!otpResult.valid) return res.status(400).json({ error: otpResult.message || 'Approval verification failed.' });
     item.status = decision === 'approve' ? 'approved' : 'denied';
     item.decidedAt = new Date(now).toISOString();
     item.decidedBy = identity(req.authUser);

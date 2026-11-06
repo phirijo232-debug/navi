@@ -20,6 +20,7 @@ const { isPrivateControlClient } = require('./middleware/localControl');
 const { shareKeyGate } = require('./middleware/shareLinks');
 const { validateStartup } = require('./middleware/startupHealth');
 const auditGuardian = require('./middleware/auditLog');
+const { premiumPrivacy } = require('./middleware/premiumPrivacy');
 
 const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || null;
 const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
@@ -194,6 +195,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(deviceAuth);
+app.use(premiumPrivacy);
 app.use(logAccess);
 app.use(trackSession);
 // Application reads and reviews are admin-only and need req.authUser from

@@ -2051,6 +2051,7 @@ function getLoanStatus(loan) {
 
 function renderLoanDetails(loan) {
   const status = getLoanStatus(loan);
+  const money = value => loan.masked ? 'K ••••••' : formatCurrency(value);
   const canManageStore = ['admin', 'franchise_admin', 'store_admin'].includes(localStorage.getItem('userRole'));
   const history = Array.isArray(loan.statusHistory) && loan.statusHistory.length
     ? loan.statusHistory.map(entry => `
@@ -2065,7 +2066,7 @@ function renderLoanDetails(loan) {
   // Placeholder anchors: the click-to-sign listener above fetches a short-lived
   // signed URL from /uploads/sign at open time (?token= no longer exists).
   const fileLink = (name) => `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(name)}">`;
-  const paymentHistory = payments.length ? payments.map(payment => `
+  const paymentHistory = loan.masked ? '<li>🔒 Premium customer repayment details are restricted.</li>' : payments.length ? payments.map(payment => `
     <li>
       ${formatCurrency(payment.amount)} · ${escapeHtml(payment.mode || 'payment')} · ${escapeHtml(formatDate(payment.date))}
       ${payment.note ? `<div>${escapeHtml(payment.note)}</div>` : ''}
@@ -2076,7 +2077,7 @@ function renderLoanDetails(loan) {
     ['collateral front', loan.collateralFront], ['collateral back', loan.collateralBack],
     ['NRC front', loan.nrcFront], ['NRC back', loan.nrcBack]
   ].filter(([, filename]) => filename).map(([label, filename]) => `${fileLink(filename)}View ${label}</a>`).join('');
-  const paymentReviews = (loan.paymentSubmissions || []).map(item => `
+  const paymentReviews = loan.masked ? '' : (loan.paymentSubmissions || []).map(item => `
     <li class="payment-review-item"><strong>${formatCurrency(item.amount)}</strong> · ${escapeHtml(item.mode)} · Ref: ${escapeHtml(item.transactionReference)} · <strong>${escapeHtml(item.status)}</strong>
       <div>${escapeHtml(formatDate(item.submittedAt))} · Submitted by ${escapeHtml(item.submittedBy || 'borrower')}</div>
       ${item.screenshot ? `${fileLink(item.screenshot)}View transfer proof</a>` : ''}
@@ -2087,13 +2088,13 @@ function renderLoanDetails(loan) {
   // Payments: admin or store_admin (both may record money). Decisions: the
   // assigned store_admin only — mirrors the backend's franchise-scoping gate.
   const canDecide = localStorage.getItem('userRole') === 'store_admin';
-  const canRecordPayment = canManageStore && outstanding > 0 &&
+  const canRecordPayment = !loan.masked && canManageStore && outstanding > 0 &&
     ['active', 'grace', 'defaulted'].includes(status);
-  const canReview = canDecide &&
+  const canReview = !loan.masked && canDecide &&
     ['pending', 'active'].includes(status);
   // Grace lifecycle controls: manual grace entry needs an agreed end date;
   // verify-overdue and liquidate are one-way admin decisions.
-  const canManageLifecycle = canDecide && outstanding > 0 &&
+  const canManageLifecycle = !loan.masked && canDecide && outstanding > 0 &&
     ['active', 'grace', 'defaulted'].includes(status);
   const creator = loan.reviewedBy ||
     (Array.isArray(loan.statusHistory) && loan.statusHistory[0]?.actor) || null;
@@ -2104,10 +2105,10 @@ function renderLoanDetails(loan) {
         <strong>${escapeHtml(loan.product || 'Loan')} #${escapeHtml(loan.id)}</strong>
         <span class="status-tag status-${escapeHtml(status)}">${escapeHtml(status.replace(/_/g, ' ').toUpperCase())}</span>
       </div>
-      <p><strong>Amount:</strong> ${formatCurrency(loan.amount)}</p>
-      <p><strong>Interest:</strong> ${formatCurrency(loan.interestAmount || 0)}</p>
-      <p><strong>Total:</strong> ${formatCurrency(loan.totalRepayment || loan.amount || 0)}</p>
-      <p><strong>Outstanding:</strong> ${formatCurrency(loan.outstanding || 0)}</p>
+      <p><strong>Amount:</strong> ${money(loan.amount)}</p>
+      <p><strong>Interest:</strong> ${money(loan.interestAmount || 0)}</p>
+      <p><strong>Total:</strong> ${money(loan.totalRepayment || loan.amount || 0)}</p>
+      <p><strong>Outstanding:</strong> ${money(loan.outstanding || 0)}</p>
       <div class="loan-fields">
         <p><strong>Due date:</strong> ${escapeHtml(formatDate(loan.dueDate))}</p>
         <p><strong>Urgency:</strong> ${escapeHtml(loan.urgency || 'standard')}</p>
@@ -2252,6 +2253,8 @@ function renderSelectedUser() {
   );
 
   const canNotifyUser = ['admin', 'franchise_admin', 'store_admin'].includes(localStorage.getItem('userRole') || '');
+  const canManagePremium = ['admin', 'franchise_admin'].includes(localStorage.getItem('userRole') || '') && selectedUser.role === 'user';
+  const hasMaskedLoans = selectedLoans.some(loan => loan.masked === true);
   const totalRequested = selectedLoans.reduce((sum, loan) => sum + (Number(loan.amount) || 0), 0);
   const totalOutstanding = selectedLoans.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
   const totalPaid = selectedLoans.reduce((sum, loan) => sum + (loan.paidTotal != null ? (Number(loan.paidTotal) || 0) : Math.max(0, (Number(loan.totalRepayment || loan.amount) || 0) - (Number(loan.outstanding) || 0))), 0);
@@ -2261,7 +2264,7 @@ function renderSelectedUser() {
     <article class="customer-application-summary">
       <h3>Quick Screen application ${escapeHtml(application.applicationId || application.id || '')}</h3>
       <p><strong>Status:</strong> ${escapeHtml(formatStatus(application.status || 'pending'))} · <strong>Submitted:</strong> ${escapeHtml(formatDate(application.createdAt))}</p>
-      <p><strong>Product:</strong> ${escapeHtml(application.product || '—')} · <strong>Requested:</strong> ${formatCurrency(application.amount)}</p>
+      <p><strong>Product:</strong> ${escapeHtml(application.product || '—')} · <strong>Requested:</strong> ${selectedUser.premiumProtected || application.masked ? 'K ••••••' : formatCurrency(application.amount)}</p>
       <p><strong>Tenure:</strong> ${escapeHtml(application.tenureWeeks || '—')} week(s) · <strong>Urgency:</strong> ${escapeHtml(formatStatus(application.urgency || 'standard'))}</p>
       <div class="customer-application-files">
         ${application.nrcFront ? `<a class="proof-link" href="#" data-upload-filename="${escapeHtml(application.nrcFront)}">View NRC front</a>` : ''}
@@ -2285,12 +2288,13 @@ function renderSelectedUser() {
     <section class="customer-profile-section"><h3>Loan portfolio</h3>
       <div class="customer-profile-kpis">
         <div class="customer-profile-kpi"><small>Total loans</small><strong>${selectedLoans.length}</strong></div>
-        <div class="customer-profile-kpi"><small>Total requested</small><strong>${formatCurrency(totalRequested)}</strong></div>
-        <div class="customer-profile-kpi"><small>Outstanding</small><strong>${formatCurrency(totalOutstanding)}</strong></div>
-        <div class="customer-profile-kpi"><small>Paid</small><strong>${formatCurrency(totalPaid)}</strong></div>
+        <div class="customer-profile-kpi"><small>Total requested</small><strong>${hasMaskedLoans ? 'K ••••••' : formatCurrency(totalRequested)}</strong></div>
+        <div class="customer-profile-kpi"><small>Outstanding</small><strong>${hasMaskedLoans ? 'K ••••••' : formatCurrency(totalOutstanding)}</strong></div>
+        <div class="customer-profile-kpi"><small>Paid</small><strong>${hasMaskedLoans ? 'K ••••••' : formatCurrency(totalPaid)}</strong></div>
         <div class="customer-profile-kpi"><small>Settled loans</small><strong>${settledCount}</strong></div>
       </div>
     </section>
+    ${canManagePremium ? `<section class="customer-profile-section"><h3>Premium protection</h3><p>Premium customer amounts and repayment history are hidden from restricted staff.</p><button type="button" class="toggle-mode" data-premium-toggle>${selectedUser.premiumProtected ? 'Turn off premium protection' : 'Turn on premium protection'}</button></section>` : ''}
     ${applicationHistory ? `<section class="customer-profile-section customer-application-history"><h3>Quick Screen history</h3>${applicationHistory}</section>` : ''}
     ${canNotifyUser ? `
     <div class="button-row" style="margin: 10px 0;">
@@ -2320,6 +2324,23 @@ function renderSelectedUser() {
       ${visibleLoans.length ? visibleLoans.map(renderLoanDetails).join('') : '<p>No loans match the selected filters.</p>'}
     </div>
   `;
+}
+
+async function togglePremiumProtection() {
+  if (!selectedUser || !['admin', 'franchise_admin'].includes(localStorage.getItem('userRole') || '') || selectedUser.role !== 'user') return;
+  const premiumProtected = selectedUser.premiumProtected !== true;
+  try {
+    const response = await fetch(`/admin/security/customers/${encodeURIComponent(selectedUser.id)}/premium`, {
+      method: 'PATCH', headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ premiumProtected })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to update premium protection.');
+    selectedUser.premiumProtected = data.customer?.premiumProtected === true;
+    allUsers = allUsers.map(user => String(user.id) === String(selectedUser.id) ? { ...user, premiumProtected: selectedUser.premiumProtected } : user);
+    renderSelectedUser();
+    showBmfToast(`Premium protection ${selectedUser.premiumProtected ? 'enabled' : 'disabled'}.`);
+  } catch (error) { showBmfToast(error.message || 'Unable to update premium protection.', 'error'); }
 }
 
 async function viewUserDetails(userId) {
@@ -2886,6 +2907,38 @@ const SECURITY_PERMISSION_LABELS = {
   generate_reports: 'Reports', create_users: 'Create users',
   view_premium_customers: 'Premium customer details', force_loan_close: 'Force loan closure'
 };
+const accessRequestInProgress = new Set();
+const originalWindowFetch = window.fetch.bind(window);
+let lastAdminClickAt = 0;
+document.addEventListener('click', () => { lastAdminClickAt = Date.now(); }, true);
+
+async function sendFeatureAccessRequest(feature) {
+  if (!feature || accessRequestInProgress.has(feature)) return;
+  accessRequestInProgress.add(feature);
+  try {
+    const label = SECURITY_PERMISSION_LABELS[feature] || feature;
+    if (!window.confirm(`Your account is not allowed to use ${label}. Send an access request to your store's Franchise Admin?`)) return;
+    const reason = window.prompt('Add a short reason for this request (optional):') || '';
+    const response = await originalWindowFetch('/admin/access-approvals', {
+      method: 'POST', headers: getStoreHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ feature, reason })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to send the access request.');
+    showBmfToast(data.notification?.success === false
+      ? `Request saved, but the Franchise Admin email could not be sent: ${data.notification.reason || 'delivery failed'}`
+      : `Access request sent to your store's Franchise Admin.`, data.notification?.success === false ? 'error' : 'success');
+  } catch (error) { showBmfToast(error.message || 'Unable to send the access request.', 'error'); }
+  finally { accessRequestInProgress.delete(feature); }
+}
+
+window.fetch = async function featureAwareFetch(input, init) {
+  const response = await originalWindowFetch(input, init);
+  if (response.status === 403 && Date.now() - lastAdminClickAt < 5000) {
+    const data = await response.clone().json().catch(() => ({}));
+    if (data.accessRequestRequired && data.feature) sendFeatureAccessRequest(data.feature);
+  }
+  return response;
+};
 let securityGroups = [];
 let securityEmployees = [];
 
@@ -3018,12 +3071,19 @@ async function fetchAccessApprovals() {
 async function decideAccessApproval(id, decision) {
   const reason = decision === 'deny' ? (window.prompt('Optional reason for denying this request:') || '') : '';
   try {
-    const response = await fetch(`/admin/access-approvals/${encodeURIComponent(id)}/decision`, {
-      method: 'POST', headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ decision, reason })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Unable to update this request.');
+    const url = `/admin/access-approvals/${encodeURIComponent(id)}/decision`;
+    const postDecision = async body => {
+      const response = await fetch(url, { method: 'POST', headers: getStoreHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Unable to update this request.');
+      return data;
+    };
+    let data = await postDecision({ decision, reason });
+    if (data.otpRequired) {
+      const otp = window.prompt(`Enter the verification code sent to ${data.otpSentTo || 'your registered email'} to ${decision} this request:`);
+      if (!otp) return;
+      data = await postDecision({ decision, reason, otp: otp.trim() });
+    }
     document.getElementById('accessApprovalsStatus').textContent = `Request ${decision === 'approve' ? 'approved' : 'denied'}.`;
     await fetchAccessApprovals();
   } catch (error) { document.getElementById('accessApprovalsStatus').textContent = error.message; }
@@ -3423,6 +3483,10 @@ document.getElementById('hrEmployeeList')?.addEventListener('click', event => {
 });
 
 document.getElementById('modalBody').addEventListener('click', event => {
+  if (event.target.closest('[data-premium-toggle]')) {
+    togglePremiumProtection();
+    return;
+  }
   const paymentReview = event.target.closest('[data-payment-review]');
   if (paymentReview) {
     reviewPaymentSubmission(paymentReview.dataset.loanId, paymentReview.dataset.submissionId, paymentReview.dataset.paymentReview);

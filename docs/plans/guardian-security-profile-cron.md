@@ -26,7 +26,7 @@ Implement the user's three build prompts, fix customer/admin loan detail and mod
 ## Outcomes and Retrospective
 Customer profiles now show bordered customer, loan, and payment details; customer loan cards open the full detail modal on click and close through the button, backdrop, or Escape. Quick Screen facts are arranged in bordered fields, and the request-lock dialog closes immediately.
 
-Audit entries are redacted append-only JSONL records with a SHA-256 chain, tamper detection, threat email deduplication, login/loan/payment hooks, an admin audit view, and borrower advisories for detected balance inconsistencies. Security group routes/UI support store-scoped custom group creation, assignment, and deletion while keeping the built-in Franchise Admin locked. Temporary access requests are persisted and store scoped; admin/franchise_admin decisions expire after 15 minutes, with requester/admin email notifications and an HR review queue. The approval controller exposes an active-approval check, but does not by itself grant feature access; the repository's existing role/store gates remain authoritative. Group settings are stored and displayed but are not yet consumed as a new authorization layer, and premium-customer masking is not wired into every customer/loan/report response.
+Audit entries are redacted append-only JSONL records with a SHA-256 chain, tamper detection, threat email deduplication, login/loan/payment hooks, an admin audit view, and borrower advisories for detected balance inconsistencies. Security group routes/UI support store-scoped custom group creation, assignment, and deletion while keeping the built-in Franchise Admin locked. Temporary access requests are persisted and store scoped; eligible admin/franchise_admin decisions expire after 15 minutes, require an OTP through the existing OTP service, and send request notices only to configured same-store Franchise Admins. Stored flags and active approvals now gate reports, invite generation, user creation, bulk notifications, and force-close actions without replacing the original role/store checks. Server-side premium masking covers customer, loan, payment, and report JSON responses, with sensitive exports blocked when they could expose premium records. The HR approval queue and customer premium toggle use the new endpoints.
 
 All scheduler callbacks run via `setImmediate` with cron error handling. The HTTPS keep-alive is registered after scheduler startup.
 
@@ -35,6 +35,25 @@ All scheduler callbacks run via `setImmediate` with cron error handling. The HTT
 2. Improve `public/admin.js`, `public/admin.html`, and necessary styles for the customer profile, Quick Screen, loan detail, and consistent modal behavior.
 3. Add security permissions and custom permission-group behavior using current role/store gates and `routes/index.js`.
 4. Update `scheduler.js` cron callbacks and `server.js` keep-alive startup.
+5. Wire stored permissions and OTP-backed approvals into route gates; mask premium borrower details before staff JSON responses.
+
+## Security Wiring Addendum
+
+### Goal
+Make the existing seven permission flags affect supported admin features, make a denied feature produce a store-scoped approval request, require the existing OTP service for approval decisions, and mask premium borrower detail on staff responses.
+
+### Invariants
+- Existing role/store/loan gates remain the outer authority; a feature permission or active approval can only narrow access or unlock a feature for a role that already had base access.
+- Approval notices go only to real, same-store `franchise_admin` accounts loaded from the system users store. No prompt sample addresses are used.
+- Franchise Admin permissions remain fixed. OTP uses the current middleware service and its current authentication identities; do not change `middleware/otp.js`.
+- Premium masking must happen server-side for customer-level loan/payment records; main `admin` and same-store `franchise_admin` remain unrestricted.
+
+### Steps
+1. Derive effective permissions from stored custom groups/defaults and active approval records.
+2. Add shared route/controller gates for locked features without bypassing current role and store checks.
+3. Bind the approval decision endpoint to `otpService.sendOTP` / `verifyOTP` and notify only scoped Franchise Admins.
+4. Add server-side premium masking to customer/loan/payment/report record responses, plus a safe premium toggle for authorized Franchise Admins.
+5. Update simple UI lock/request states and HR approval queue, then test role/store gates, OTP transitions, expiry, and masking.
 
 ## Validation
 - Preserve existing routes and status/action gates; add tests for the new security and audit behavior where appropriate.
@@ -42,3 +61,5 @@ All scheduler callbacks run via `setImmediate` with cron error handling. The HTT
 - Routes added/changed: `/admin/security/groups`, `/admin/security/employees`, `/admin/audit-log`, and `/admin/access-approvals` in `routes/index.js`.
 - Middleware changed: audit module/security integration only; logger, OTP, and dataStore remain unchanged.
 - Body part: Skin, Brain, Spine, and Immune System.
+- (2026-11-06) Validation: `node --test` passed all 178 tests. `node server.js` completed startup data validation and reported Navi Server running on port 3000; the process was then stopped cleanly.
+- (2026-11-06) Added an access-approval test confirming request notification recipients are restricted to same-store Franchise Admins and the decision flow uses the existing OTP service.

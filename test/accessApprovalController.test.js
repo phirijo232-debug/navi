@@ -4,7 +4,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const controller = require('../controllers/accessApprovalController');
 const emailService = require('../middleware/email');
-emailService.sendCustomerEmail = async () => ({ ok: true });
+const otpService = require('../middleware/otp');
+const dataStore = require('../middleware/dataStore');
+const sentMessages = [];
+emailService.sendCustomerEmail = async message => { sentMessages.push(message); return { ok: true }; };
+otpService.sendOTP = async () => '123456';
+otpService.verifyOTP = input => ({ valid: input === '123456', message: 'Incorrect OTP.' });
+
+const sandboxUsers = dataStore.readJson(dataStore.paths.users, [], Array.isArray);
+if (!sandboxUsers.some(user => user.role === 'franchise_admin' && (user.storeId || 'buraza') === 'buraza')) {
+  sandboxUsers.push({ id: 'approval-test-franchise-admin', role: 'franchise_admin', email: 'approver@example.test', storeId: 'buraza', trustedDevices: [] });
+  dataStore.writeJson(dataStore.paths.users, sandboxUsers);
+}
 
 function response() {
   return {
@@ -28,6 +39,9 @@ test('requests are feature-whitelisted and visible only to the requester and sco
   const created = response();
   await controller.requestApproval(request(requester, { feature: 'generate_reports', reason: 'Monthly work' }), created);
   assert.equal(created.statusCode, 201);
+  const firstNotice = sentMessages[0];
+  const franchiseAdminEmails = sandboxUsers.filter(user => user.role === 'franchise_admin' && (user.storeId || 'buraza') === 'buraza').map(user => user.email.toLowerCase()).sort();
+  assert.deepEqual([].concat(firstNotice.to).map(email => email.toLowerCase()).sort(), franchiseAdminEmails);
   const id = created.payload.approval.id;
 
   const scopedAdmin = response();
@@ -59,8 +73,11 @@ test('only scoped admin/franchise_admin can approve and approval is requester-bo
   assert.equal(wrongStore.statusCode, 403);
 
   const approver = { role: 'franchise_admin', email: 'fa@example.com', storeId: 'buraza' };
+  const otpChallenge = response();
+  await controller.decideApproval(request(approver, { decision: 'approve' }, { id }), otpChallenge);
+  assert.equal(otpChallenge.payload.otpRequired, true);
   const approved = response();
-  await controller.decideApproval(request(approver, { decision: 'approve' }, { id }), approved);
+  await controller.decideApproval(request(approver, { decision: 'approve', otp: '123456' }, { id }), approved);
   assert.equal(approved.statusCode, 200);
   assert.equal(approved.payload.approval.status, 'approved');
   assert.ok(Date.parse(approved.payload.approval.expiresAt) - Date.parse(approved.payload.approval.decidedAt) <= 15 * 60 * 1000);
