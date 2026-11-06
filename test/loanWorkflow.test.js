@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   calculateInterest,
+  calculateDueDateFromApproval,
   getApprovalDeadline,
   filterLoansByTimeframe,
   generateLoanReceiptId,
@@ -20,6 +21,14 @@ test('calculateInterest applies the expected weekly rate', () => {
   assert.equal(result.rate, 16);
   assert.equal(result.interest, 160);
   assert.equal(result.total, 1160);
+});
+
+test('loan due date counts full tenure from approval in Lusaka calendar days', () => {
+  assert.equal(calculateDueDateFromApproval('2026-11-06T00:30:00+02:00', 1), '2026-11-13');
+  assert.equal(calculateDueDateFromApproval('2026-11-06T23:30:00+02:00', 1), '2026-11-13');
+  assert.equal(calculateDueDateFromApproval('2026-11-06T09:00:00+02:00', 2), '2026-11-20');
+  assert.equal(calculateDueDateFromApproval('2026-12-28T12:00:00+02:00', 1), '2027-01-04');
+  assert.throws(() => calculateDueDateFromApproval('2026-11-06T09:00:00+02:00', 5), /Tenure must be between 1 and 4 weeks/);
 });
 
 test('getApprovalDeadline uses the urgency level', () => {

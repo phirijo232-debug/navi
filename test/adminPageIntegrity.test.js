@@ -162,7 +162,14 @@ test('admin dashboard controls are wired and persist an admin-only theme prefere
   }
   assert.match(js, /data-loan-page/);
   assert.match(js, /activeCollectionRange = button\.dataset\.collectionRange/);
-  assert.match(html, /data-collection-range="CUSTOM"[^>]*>Custom<\/button>/);
+  assert.match(html, /data-collection-range="CUSTOM"[^>]*>Choose dates<\/button>/);
+  assert.match(html, />Last 7 days<\/button>/);
+  assert.match(html, />Last 30 days<\/button>/);
+  assert.match(html, />Last 90 days<\/button>/);
+  assert.match(html, />Last 12 months<\/button>/);
+  assert.match(js, /const verticalGrid = tickIndexes\.map/);
+  assert.match(js, /class="chart-point chart-point-payments"/);
+  assert.match(js, /rangeDays <= 90 \? 1 : rangeDays <= 366 \? 7/);
   assert.match(js, /getElementById\('applyCollectionRange'\)\?\.addEventListener\('click'/);
   assert.match(js, /The start date must be on or before the end date/);
   assert.match(js, /The end date cannot be in the future/);

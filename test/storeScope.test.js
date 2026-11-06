@@ -7,7 +7,7 @@ const {
   getReportData, getReportSummary, getSingleUserReport,
   getAllUsersReport, getAnalyticsReport, getUserReport
 } = require('../controllers/reportController');
-const { getLoans } = require('../controllers/loanController');
+const { getLoans, calculateDueDateFromApproval, daysBetween } = require('../controllers/loanController');
 const { getFeedback } = require('../controllers/feedbackController');
 const { updateLoanStatus } = require('../controllers/loanController');
 const { createAdminUser } = require('../controllers/authController');
@@ -171,7 +171,7 @@ test('main admin can decide BMF loans while other-store franchise admins remain 
     {
       id: 88, email: 'borrower@example.test', storeId: 'buraza', status: 'pending',
       amount: 100, interestAmount: 10, totalRepayment: 110, outstanding: 110,
-      dueDate: '2099-01-01', tenureWeeks: 1, createdAt: new Date().toISOString(), payments: []
+      dueDate: '2099-01-01', tenureWeeks: 1, createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), payments: []
     }
   ]));
 
@@ -184,7 +184,10 @@ test('main admin can decide BMF loans while other-store franchise admins remain 
       headers: { 'x-business-unit': 'buraza' }
     }, adminResponse);
     assert.equal(adminResponse.statusCode, 200);
-    assert.equal(JSON.parse(fs.readFileSync(LOANS_FILE, 'utf8'))[0].status, 'active');
+    const approvedLoan = JSON.parse(fs.readFileSync(LOANS_FILE, 'utf8'))[0];
+    assert.equal(approvedLoan.status, 'active');
+    assert.equal(approvedLoan.dueDate, calculateDueDateFromApproval(approvedLoan.approvedAt, approvedLoan.tenureWeeks));
+    assert.equal(daysBetween(approvedLoan.borrowedDate, approvedLoan.dueDate), 7, 'review wait must not extend the approved loan term');
     assert.ok(sendEmail.mock.calls.length > 0);
 
     fs.writeFileSync(LOANS_FILE, JSON.stringify([

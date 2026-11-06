@@ -3,7 +3,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const dataStore = require('./dataStore');
 const emailService = require('./email');
 const { logError, logBreakage } = require('./logger');
-const { getLoansData, deriveLoanStatus } = require('../controllers/loanController');
+const { getLoansData, deriveLoanStatus, getZambiaDateKey } = require('../controllers/loanController');
 
 // ─── Automated borrower notifications (Task 7 — email channel) ───────────────
 // Daily check at 23:58 (driven by scheduler.js), for each active loan:
@@ -62,7 +62,7 @@ async function sendTemplatedMessage({ loan, messageKey, days, day, context = 'sc
     return { ok: false, skipped: true, reason: `Unknown message template: ${messageKey}` };
   }
 
-  const dedupeDay = day || new Date().toISOString().slice(0, 10);
+  const dedupeDay = day || getZambiaDateKey();
   const dedupeKey = buildDedupeKey({ loanId: loan.id, day: dedupeDay });
   const log = getNotificationLog();
   if (log.some(entry => entry.dedupeKey === dedupeKey && entry.status !== 'failed')) {
@@ -121,7 +121,7 @@ async function sendTemplatedMessage({ loan, messageKey, days, day, context = 'sc
 }
 
 /** Task 7 pass: countdown 3 → 2 → 1 → 0 → overdue for every active loan. */
-async function runDueDatePass(today = new Date().toISOString().slice(0, 10)) {
+async function runDueDatePass(today = getZambiaDateKey()) {
   const summary = { date: today, sent: 0, reminders: 0, overdue: 0, skipped: 0, failed: 0 };
 
   for (const loan of getLoansData()) {

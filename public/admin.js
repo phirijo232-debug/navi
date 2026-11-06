@@ -1321,7 +1321,7 @@ function renderPortfolioOverview() {
     ? customEnd
     : new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const rangeEnd = new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate() + 1).getTime();
-  const bucketDays = Math.max(1, Math.ceil(rangeDays / 365));
+  const bucketDays = rangeDays <= 90 ? 1 : rangeDays <= 366 ? 7 : Math.ceil(rangeDays / 12);
   const bucketCount = Math.ceil(rangeDays / bucketDays);
   const dates = Array.from({ length: bucketCount }, (_, index) =>
     new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate() + index * bucketDays)
@@ -1336,7 +1336,7 @@ function renderPortfolioOverview() {
   if (monthLabel) {
     monthLabel.textContent = customRangeValid
       ? `${formatDate(firstDay)} – ${formatDate(lastDay)}`
-      : isCustomRange ? 'Choose a custom date range' : `Last ${rangeDays} days`;
+      : isCustomRange ? 'Choose a custom date range' : ({ '7D': 'Last 7 days', '1M': 'Last 30 days', '3M': 'Last 90 days', '1Y': 'Last 12 months' }[activeCollectionRange] || `Last ${rangeDays} days`);
   }
   const chartPayments = new Map();
   payments.forEach(item => {
@@ -1373,28 +1373,31 @@ function renderPortfolioOverview() {
   const makeArea = points => `${makeLine(points)} L ${points[points.length - 1]?.x || left},${top + plotHeight} L ${points[0]?.x || left},${top + plotHeight} Z`;
   const paymentPoints = pointsFor('payments');
   const loanPoints = pointsFor('loans');
-  const grid = Array.from({ length: 5 }, (_, index) => {
+  const tickIndexes = [...new Set([0, Math.floor((series.length - 1) / 4), Math.floor((series.length - 1) / 2), Math.floor((series.length - 1) * 3 / 4), series.length - 1])];
+  const horizontalGrid = Array.from({ length: 5 }, (_, index) => {
     const value = max * (1 - index / 4);
     const yPosition = top + plotHeight * index / 4;
-    return `<g><line x1="${left}" y1="${yPosition}" x2="${chartWidth - right}" y2="${yPosition}"/><text x="${left - 10}" y="${yPosition + 4}" text-anchor="end">${escapeHtml(formatCurrency(value))}</text></g>`;
+    return `<g><line class="chart-grid-line" x1="${left}" y1="${yPosition}" x2="${chartWidth - right}" y2="${yPosition}"/><text x="${left - 10}" y="${yPosition + 4}" text-anchor="end">${escapeHtml(formatCurrency(value))}</text></g>`;
   }).join('');
-  const tickIndexes = [...new Set([0, Math.floor((series.length - 1) / 4), Math.floor((series.length - 1) / 2), Math.floor((series.length - 1) * 3 / 4), series.length - 1])];
+  const verticalGrid = tickIndexes.map(index => `<line class="chart-grid-line chart-grid-vertical" x1="${x(index)}" y1="${top}" x2="${x(index)}" y2="${top + plotHeight}"/>`).join('');
+  const grid = horizontalGrid + verticalGrid;
   const xLabels = tickIndexes.map(index =>
     `<text x="${x(index)}" y="${chartHeight - 8}" text-anchor="middle">${escapeHtml(dates[index].toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }))}</text>`
   ).join('');
-  const tooltips = tickIndexes.map(index => {
-    const point = series[index];
+  const tooltips = series.map((point, index) => {
     const bucketEnd = new Date(point.date.getFullYear(), point.date.getMonth(), point.date.getDate() + bucketDays - 1);
     if (bucketEnd > lastDay) bucketEnd.setTime(lastDay.getTime());
-    const periodLabel = bucketDays === 1 ? formatDate(point.date) : `${formatDate(point.date)} – ${formatDate(bucketEnd)}`;
-    return `<g><circle cx="${x(index)}" cy="${y(point.payments)}" r="4" fill="#2f81f7"><title>${escapeHtml(periodLabel)} · Payments: ${escapeHtml(formatCurrency(point.payments))} · New loans: ${escapeHtml(formatCurrency(point.loans))}</title></circle><circle cx="${x(index)}" cy="${y(point.loans)}" r="4" fill="#3fb950"><title>${escapeHtml(periodLabel)} · Payments: ${escapeHtml(formatCurrency(point.payments))} · New loans: ${escapeHtml(formatCurrency(point.loans))}</title></circle></g>`;
+    const periodLabel = bucketDays === 1 ? formatDate(point.date) : `${formatDate(point.date)} - ${formatDate(bucketEnd)}`;
+    const title = `${escapeHtml(periodLabel)} | Payments: ${escapeHtml(formatCurrency(point.payments))} | New loans: ${escapeHtml(formatCurrency(point.loans))}`;
+    return `<g>${point.payments > 0 ? `<circle class="chart-point chart-point-payments" cx="${x(index)}" cy="${y(point.payments)}" r="4.5" tabindex="0"><title>${title}</title></circle>` : ''}${point.loans > 0 ? `<circle class="chart-point chart-point-loans" cx="${x(index)}" cy="${y(point.loans)}" r="4.5" tabindex="0"><title>${title}</title></circle>` : ''}</g>`;
   }).join('');
-  const chartSvg = `<svg class="collections-svg admin-month-chart" viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="${bucketDays === 1 ? 'Daily' : `${bucketDays}-day interval`} payments received and newly approved loan amounts from ${formatDate(firstDay)} to ${formatDate(lastDay)}">
+  const intervalLabel = bucketDays === 1 ? 'Daily' : bucketDays <= 7 ? 'Weekly' : 'Monthly';
+  const chartSvg = `<svg class="collections-svg admin-month-chart" viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="${intervalLabel} payments received and newly approved loan amounts from ${formatDate(firstDay)} to ${formatDate(lastDay)}">
     ${grid}${xLabels}
     <path d="${makeArea(paymentPoints)}" fill="#2f81f7" opacity=".1"></path>
     <path d="${makeArea(loanPoints)}" fill="#3fb950" opacity=".1"></path>
-    <path d="${makeLine(paymentPoints)}" fill="none" stroke="#2f81f7" stroke-width="3"></path>
-    <path d="${makeLine(loanPoints)}" fill="none" stroke="#3fb950" stroke-width="3"></path>
+    <path d="${makeLine(paymentPoints)}" fill="none" stroke="#2f81f7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="${makeLine(loanPoints)}" fill="none" stroke="#3fb950" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></path>
     ${tooltips}
   </svg>`;
   chart.innerHTML = customRangeValid || !isCustomRange
@@ -3319,6 +3322,20 @@ function weeklyRate(weeks) {
   return ladder[weeks] ?? 0.10;
 }
 
+function getCurrentLusakaDateKey() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Lusaka', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function addDaysToDateKey(dateKey, days) {
+  const date = new Date(`${dateKey}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 function updateAddLoanPreview() {
   const amount = Number(document.getElementById('addLoanAmount').value) || 0;
   const weeks = parseInt(document.getElementById('addLoanTenure').value, 10) || 1;
@@ -3327,9 +3344,7 @@ function updateAddLoanPreview() {
   document.getElementById('addLoanInterest').value = formatCurrency(interest);
   document.getElementById('addLoanTotal').value = formatCurrency(total);
   const dueField = document.getElementById('addLoanDueDate');
-  if (!dueField.value) {
-    dueField.value = new Date(Date.now() + weeks * 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  }
+  dueField.value = addDaysToDateKey(getCurrentLusakaDateKey(), weeks * 7);
 }
 
 async function handleAddLoanSubmit(event) {
@@ -3347,7 +3362,6 @@ async function handleAddLoanSubmit(event) {
   formData.append('tenureWeeks', document.getElementById('addLoanTenure').value);
   formData.append('urgency', document.getElementById('addLoanUrgency').value);
   formData.append('paymentMode', document.getElementById('addLoanDisbursement').value);
-  formData.append('dueDate', document.getElementById('addLoanDueDate').value);
   formData.append('collateralGrade', document.getElementById('addLoanCollateralGrade').value);
   formData.append('collateralDescription', product);
   formData.append('adminReason', document.getElementById('addLoanNotes').value.trim());

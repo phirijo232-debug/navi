@@ -57,6 +57,23 @@ Make the existing seven permission flags affect supported admin features, make a
 4. Add server-side premium masking to customer/loan/payment/report record responses, plus a safe premium toggle for authorized Franchise Admins.
 5. Update simple UI lock/request states and HR approval queue, then test role/store gates, OTP transitions, expiry, and masking.
 
+## Chart and Tenure Accuracy Addendum
+
+### Goal
+Make dashboard chart series and time ranges easier to read, and calculate every new loan's due date as its fixed tenure from the actual approval date in the Africa/Lusaka calendar.
+
+### Invariants
+- Preserve the fixed BMF tenure/rate ladder of 1 to 4 weeks.
+- Approval date is day zero of the loan term; a one-week loan is due seven calendar days later, regardless of how long approval took after request.
+- Persist dates as ISO calendar dates and display them using the existing BMF date format.
+- Do not silently rewrite existing due dates because this can change grace/default status, penalties, reminders, and repayment obligations.
+
+### Validation
+- Added calendar arithmetic tests for Lusaka midnight boundaries, week offsets, and year rollover.
+- Added an approval-flow test where the request predates approval by two days and verifies exactly seven days from approval.
+- Added readable chart range, guide-line, and point-marker assertions.
+- (2026-11-06) Read-only live-data audit found 4 open loans whose stored due dates differ from a fresh approval-date calculation; 6 existing records match the prior approval-wait formula. Existing loan records were left untouched pending explicit direction because recalculation may change customer obligations.
+
 ## Validation
 - Preserve existing routes and status/action gates; add tests for the new security and audit behavior where appropriate.
 - Run focused tests and syntax checks, then verify `node server.js` starts.

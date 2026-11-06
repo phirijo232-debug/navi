@@ -281,11 +281,42 @@ function daysBetween(fromDate, toDate) {
   return Math.round((to - from) / 86400000);
 }
 
+function getZambiaDateKey(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) throw new TypeError('A valid approval date is required.');
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: config.REPORTS.TIME_ZONE || 'Africa/Lusaka', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function addCalendarDays(dateKey, days) {
+  const match = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const offset = Number(days);
+  if (!match || !Number.isInteger(offset)) throw new TypeError('A valid date and whole-day offset are required.');
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    throw new TypeError('The date is invalid.');
+  }
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+}
+
+function calculateDueDateFromApproval(approvedAt, tenureWeeks) {
+  const weeks = Number.parseInt(tenureWeeks, 10) || 1;
+  if (![1, 2, 3, 4].includes(weeks)) throw new RangeError('Tenure must be between 1 and 4 weeks.');
+  return addCalendarDays(getZambiaDateKey(approvedAt), weeks * 7);
+}
+
 /**
  * Derive the live business status from the due date, balance and any manual
  * override (liquidated is always set by an admin decision, never by the clock).
  */
-function deriveLoanStatus(loan, today = new Date().toISOString().slice(0, 10)) {
+function deriveLoanStatus(loan, today = getZambiaDateKey()) {
   const stored = normalizeStatus(loan.status);
   if (stored === 'liquidated') return 'liquidated';
   if (stored === 'declined' || stored === 'pending') return stored;
@@ -338,7 +369,7 @@ function parseDateInput(value) {
  * Pure mutator: the scheduler persists daily; read-only callers re-derive the
  * same value on every load, so un-persisted reads stay idempotent.
  */
-function applyGraceAccrual(loan, today = new Date().toISOString().slice(0, 10)) {
+function applyGraceAccrual(loan, today = getZambiaDateKey()) {
   try {
     if (!loan || Number(loan.outstanding || 0) <= 0) return loan;
     if (normalizeStatus(loan.status) === 'liquidated') return loan;
@@ -385,7 +416,7 @@ function applyGraceAccrual(loan, today = new Date().toISOString().slice(0, 10)) 
 }
 
 /** Persist grace accrual across every grace/defaulted loan (idempotent). */
-function accrueAllGrace(today = new Date().toISOString().slice(0, 10)) {
+function accrueAllGrace(today = getZambiaDateKey()) {
   const loans = getLoansData();
   let changedCount = 0;
   loans.forEach(loan => {
@@ -486,7 +517,7 @@ function getLoansData() {
 }
 
 /** Loans enriched for reading: receipts backfilled, ledgers rebuilt, status derived. */
-function getEnrichedLoans(today = new Date().toISOString().slice(0, 10)) {
+function getEnrichedLoans(today = getZambiaDateKey()) {
   const loans = getLoansData();
   const existingPaymentIds = new Set(loans.flatMap(loan =>
     (Array.isArray(loan.payments) ? loan.payments : [])
@@ -570,7 +601,7 @@ function calculateSummary(loans) {
 // ─── Portfolio analytics (all-users view) ────────────────────────────────────
 // total loans, total capital deployed, total interest booked, total defaults,
 // plus the overdue / paid / liquidated splits the BMF analytics sheet needs.
-function summarizeStore(loans, today = new Date().toISOString().slice(0, 10)) {
+function summarizeStore(loans, today = getZambiaDateKey()) {
   const enriched = loans.map(loan => ({
     ...loan,
     businessStatus: deriveLoanStatus(loan, today)
@@ -1011,7 +1042,7 @@ function getLoanById(req, res) {
     // Rebuild the ledger here too (not just in getLoans) so the single-loan
     // detail view can never show stale paidTotal/outstanding — recorded
     // payments must appear identically on the list and the detail panel.
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getZambiaDateKey();
     const detail = { ...loan, payments: (loan.payments || []).map(p => ({ ...p })) };
     applyGraceAccrual(detail, today); // read-only; same value re-derives on every load
     rebuildPaymentLedger(detail);
@@ -1053,13 +1084,10 @@ async function updateLoanStatus(req, res) {
       loan.status = 'active';
       loan.adminReason = reason || loan.adminReason || 'Approved by admin.';
       const approvedAt = new Date();
-      const approvalDelayDays = Math.max(0, Math.ceil((approvedAt - new Date(loan.createdAt || Date.now())) / (1000 * 60 * 60 * 24)));
-      const adjustedWeeks = Math.max(Number(loan.tenureWeeks) || 1, 1);
-      const approvalWindow = approvedAt.getTime() + (adjustedWeeks * 7 + Math.max(0, approvalDelayDays)) * 24 * 60 * 60 * 1000;
       loan.approvedAt = approvedAt.toISOString();
       // Borrowed date IS the approval date (BMF loan contract rule).
-      loan.borrowedDate = approvedAt.toISOString().slice(0, 10);
-      loan.dueDate = new Date(approvalWindow).toISOString().slice(0, 10);
+      loan.borrowedDate = getZambiaDateKey(approvedAt);
+      loan.dueDate = calculateDueDateFromApproval(approvedAt, loan.tenureWeeks);
       rebuildPaymentLedger(loan);
     } else if (['in_progress', 'in-progress', 'start', 'started'].includes(normalizedAction) && isAdmin) {
       loan.status = 'active'; // canonical — 'in_progress' is legacy-mapped only
@@ -1072,7 +1100,7 @@ async function updateLoanStatus(req, res) {
       if (!agreed) {
         return res.status(400).json({ error: 'Entering grace requires an agreed grace-until date (YYYY-MM-DD or DD/MM/YYYY).' });
       }
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getZambiaDateKey();
       if (agreed <= today) {
         return res.status(400).json({ error: 'The agreed grace date must be in the future.' });
       }
@@ -1155,7 +1183,7 @@ async function updateLoanStatus(req, res) {
 
       await emailService.sendCustomerEmail({
         to: adminRecipients,
-        subject: `Loan audit report — ${new Date().toISOString().slice(0, 10)}`,
+        subject: `Loan audit report — ${getZambiaDateKey()}`,
         text: `Loan audit report for Pryme Vertex\n\n${reportLines || 'No loan activity recorded.'}`
       });
     }
@@ -1326,7 +1354,7 @@ async function notifyUser(req, res) {
     const totalInterestAdded = loans.reduce((sum, loan) => sum + Number(loan.graceInterestAdded || 0), 0);
 
     // Apply grace accrual to each loan before building notification details
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getZambiaDateKey();
     loans.forEach(loan => {
       const interestBefore = Number(loan.graceAccrued || 0);
       applyGraceAccrual(loan, today);
@@ -1385,7 +1413,7 @@ async function notifyAllOverdue(req, res) {
 
     const storeId = getRequestedStoreId(req);
     if (!canAccessStore(req, storeId)) return res.status(403).json({ error: 'Access to this store is not allowed.' });
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getZambiaDateKey();
     const overdueLoans = getLoansData().filter(loan => (storeId === 'all' || getRecordStoreId(loan) === storeId)).filter(loan => {
       const status = normalizeLoanStatus(loan.status);
       const outstanding = Number(loan.outstanding || 0);
@@ -1443,7 +1471,7 @@ async function createAdminLoan(req, res) {
     if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'Admin access required to create loans.' });
 
     const {
-      email, product, amount, dueDate, tenureWeeks,
+      email, product, amount, tenureWeeks,
       urgency, paymentMode, collateralDescription, collateralGrade, adminReason
     } = req.body;
 
@@ -1476,10 +1504,8 @@ async function createAdminLoan(req, res) {
     const { rate, interest, total } = calculateInterest(requestedAmount, weeks);
     const now = new Date();
     const approvedAt = now.toISOString();
-    const borrowedDate = approvedAt.slice(0, 10);
-    const computedDueDate = dueDate
-      ? String(dueDate).slice(0, 10)
-      : new Date(now.getTime() + weeks * 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const borrowedDate = getZambiaDateKey(now);
+    const computedDueDate = calculateDueDateFromApproval(now, weeks);
 
     const files = req.files || {};
     const collateralFront = files.collateralFront?.[0]?.filename || null;
@@ -1660,5 +1686,8 @@ module.exports = {
   searchByReceiptId,
   normalizePaymentMode,
   PAYMENT_MODES,
-  daysBetween
+  daysBetween,
+  getZambiaDateKey,
+  addCalendarDays,
+  calculateDueDateFromApproval
 };

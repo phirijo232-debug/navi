@@ -5,6 +5,7 @@ const dataStore = require('../middleware/dataStore');
 const emailService = require('../middleware/email');
 const {
   createAdminLoan,
+  calculateDueDateFromApproval,
   getNotifications,
   markNotificationRead
 } = require('../controllers/loanController');
@@ -50,6 +51,8 @@ test('admin-created loans notify both borrower and scoped admin', async t => {
 
   assert.equal(res.statusCode, 201);
   const loanId = res.body.loan.id;
+  const createdLoan = dataStore.readJson(dataStore.paths.loans, [], Array.isArray).find(loan => loan.id === loanId);
+  assert.equal(createdLoan.dueDate, calculateDueDateFromApproval(createdLoan.approvedAt, createdLoan.tenureWeeks));
   const notifications = dataStore.readJson(dataStore.paths.notifications, [], Array.isArray);
   assert.ok(notifications.some(item => item.recipientEmail === 'borrower@example.test' && item.loanId === loanId));
   assert.ok(notifications.some(item => !item.recipientEmail && item.loanId === loanId && item.type === 'admin-loan-created'));

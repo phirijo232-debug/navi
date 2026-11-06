@@ -2107,8 +2107,8 @@ body:has(#adminDashboard:not(.hidden)) .dashboard-screen { grid-template-columns
 .chart-heading { display:flex; flex-direction:column; gap:4px; margin-right:auto; }
 .chart-heading strong { color:#e6edf3; font-size:15px; }
 .chart-heading span { color:#8b949e; font-size:12px; }
-.chart-range-pills { display:flex; gap:4px; }
-.chart-range-pills button { width:auto; min-width:34px; min-height:30px; padding:5px 8px; border:1px solid #484f58; border-radius:5px; background:#21262d; color:#8b949e; font-size:11px; cursor:pointer; }
+.chart-range-pills { display:flex; gap:6px; flex-wrap:wrap; }
+.chart-range-pills button { width:auto; min-width:92px; min-height:34px; padding:6px 10px; border:1px solid #484f58; border-radius:7px; background:#21262d; color:#cdd9e5; font-size:11px; cursor:pointer; }
 .chart-range-pills button:hover { border-color:#768390; color:#fff; }
 .chart-range-pills button.active { border-color:#2f81f7; background:#2f81f7; color:#fff; }
 .collection-custom-range { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:4px 0 10px; color:#8b949e; font-size:12px; }
@@ -2122,8 +2122,14 @@ body:has(#adminDashboard:not(.hidden)) .dashboard-screen { grid-template-columns
 .legend-payments { background:#2f81f7; }
 .legend-loans { background:#3fb950; }
 .collections-svg.admin-month-chart { min-height:205px; }
-.collections-svg.admin-month-chart line { stroke:#30363d; }
+.collections-svg.admin-month-chart line { stroke:#39414b; }
+.collections-svg.admin-month-chart .chart-grid-vertical { stroke:#30363d; stroke-dasharray:3 5; opacity:.72; }
+.collections-svg.admin-month-chart .chart-point { cursor:crosshair; stroke:#0d1117; stroke-width:2px; }
+.collections-svg.admin-month-chart .chart-point-payments { fill:#2f81f7; }
+.collections-svg.admin-month-chart .chart-point-loans { fill:#3fb950; }
+.collections-svg.admin-month-chart .chart-point:focus { outline:none; stroke:#fff; stroke-width:3px; }
 .collections-svg.admin-month-chart text { fill:#8b949e; font-size:11px; }
+.chart-analysis-hint { margin:4px 0 0; color:#8b949e; font-size:12px; line-height:1.5; }
 .admin-activity-panel h2,.admin-data-section h2,#feedbackOverview h2,.admin-quick-actions h2 { color:#e6edf3; font-size:15px; font-weight:600; }
 .activity-list { display:flex; flex-direction:column; gap:0; padding:0; margin:10px 0 6px; list-style:none; }
 .activity-list li { display:grid; grid-template-columns:9px minmax(0,1fr) auto; align-items:start; gap:10px; padding:11px 0; border-bottom:1px solid #21262d; }

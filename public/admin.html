@@ -696,11 +696,11 @@
             <header>
               <div class="chart-heading"><strong>Collections Overview</strong><span id="collectionMonthLabel">Last 30 days</span></div>
               <div class="chart-range-pills" role="group" aria-label="Collections chart time range">
-                <button type="button" data-collection-range="7D" aria-pressed="false">7D</button>
-                <button type="button" class="active" data-collection-range="1M" aria-pressed="true">1M</button>
-                <button type="button" data-collection-range="3M" aria-pressed="false">3M</button>
-                <button type="button" data-collection-range="1Y" aria-pressed="false">1Y</button>
-                <button type="button" data-collection-range="CUSTOM" aria-pressed="false">Custom</button>
+                <button type="button" data-collection-range="7D" aria-pressed="false">Last 7 days</button>
+                <button type="button" class="active" data-collection-range="1M" aria-pressed="true">Last 30 days</button>
+                <button type="button" data-collection-range="3M" aria-pressed="false">Last 90 days</button>
+                <button type="button" data-collection-range="1Y" aria-pressed="false">Last 12 months</button>
+                <button type="button" data-collection-range="CUSTOM" aria-pressed="false">Choose dates</button>
               </div>
               <button type="button" class="toggle-mode" id="refreshPortfolioBtn">Refresh</button>
             </header>
@@ -711,6 +711,7 @@
               <span id="collectionRangeError" class="collection-range-error" role="status" aria-live="polite"></span>
             </div>
             <div id="collectionsChart" aria-live="polite"></div>
+            <p class="chart-analysis-hint">Amounts are in Kwacha. Blue shows payments received; green shows newly approved loans. Point markers show exact totals for each date or period.</p>
             <div class="chart-legend"><span><i class="legend-payments"></i>Payments Received</span><span><i class="legend-loans"></i>New Loans</span></div>
           </section>
           <section class="panel admin-activity-panel"><h2>Recent Activity</h2><ul id="recentActivity" class="activity-list"></ul><button type="button" class="link-button" data-admin-jump="requestQueue">View all activity →</button></section>
@@ -1062,8 +1063,8 @@
         </div>
         <div class="loan-fields">
           <div>
-            <label for="addLoanDueDate">Due date (auto, editable)</label>
-            <input type="date" id="addLoanDueDate" class="modal-input">
+            <label for="addLoanDueDate">Due date (7-day weeks from approval date)</label>
+            <input type="date" id="addLoanDueDate" class="modal-input" readonly aria-readonly="true" title="Calculated from the approval date and selected tenure">
           </div>
           <div>
             <label for="addLoanUrgency">Urgency</label>

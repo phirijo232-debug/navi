@@ -101,7 +101,7 @@ function buildPaymentsReportBody(data) {
 /** Everything the daily report email shows — single source for body/PDF/XLSX. */
 function buildDailyReportData(reportDate = lusakaDate()) {
   const loans = getEnrichedLoans();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = lusakaDate();
   const usePeriod = Boolean(PORTFOLIO_FROM || PORTFOLIO_TO);
 
   // Counts a date value against the active frame: the configured period when
