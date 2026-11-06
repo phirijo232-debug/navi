@@ -30,7 +30,7 @@
     .customer-portal .summary-inline-card { background:#1c2128; border:1px solid #30363d; border-radius:9px; padding:15px; }
     .customer-portal .history-filters { display:none; }
     .customer-portal .loan-list { padding:0; list-style:none; }
-    .customer-portal .loan-card { background:#161b22; border:1px solid #30363d; border-radius:10px; margin:10px 0; padding:16px; cursor:pointer; }
+    .customer-portal .loan-card { background:#161b22; border:1px solid #30363d; border-radius:10px; margin:10px 0; padding:16px; cursor:pointer; min-width:0; overflow-wrap:anywhere; }
     .customer-portal .loan-meta { color:#8b949e; margin-top:9px; }
     .customer-portal .request-field-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
     .customer-portal .request-field-grid:first-child { grid-template-columns:1fr; }
@@ -216,8 +216,12 @@
     .customer-portal .customer-payment-table { color:var(--portal-text); }
     .customer-portal .customer-payment-table th { background:var(--portal-surface); color:var(--portal-muted); text-transform:uppercase; letter-spacing:.04em; }
     .customer-portal .customer-payment-table td { border-color:var(--portal-border); }
-    .customer-portal .modal { z-index:1100; background:rgba(5,9,14,.82); backdrop-filter:blur(3px); }
-    .customer-portal .modal-content { width:min(620px, calc(100vw - 24px)); max-height:90vh; overflow-y:auto; background:var(--portal-card); border:1px solid var(--portal-border); color:var(--portal-text); }
+    .customer-portal .modal { z-index:1100; background:rgba(5,9,14,.92); backdrop-filter:blur(3px); padding:12px; }
+    .customer-portal .modal-content { width:min(760px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow-y:auto; background:#161b22; border:1px solid #30363d; color:#e6edf3; opacity:1; isolation:isolate; }
+    .customer-portal .modal-grid p { min-width:0; overflow-wrap:anywhere; padding:10px; border:1px solid #30363d; border-radius:8px; background:#0d1117; }
+    .customer-portal .loan-receipt { overflow-wrap:anywhere; }
+    .customer-portal .loan-facts { overflow-wrap:anywhere; line-height:1.7; }
+    @media(max-width:600px) { .customer-portal .modal-grid { grid-template-columns:1fr; } }
     .customer-portal .modal-close { display:grid; place-items:center; width:40px; height:40px; border:1px solid var(--portal-border); border-radius:8px; background:var(--portal-surface); color:var(--portal-text); font:inherit; font-size:24px; line-height:1; }
     .customer-portal .modal-close:hover,.customer-portal .modal-close:focus-visible { border-color:#2f81f7; outline:2px solid rgba(47,129,247,.35); outline-offset:2px; }
     body.customer-portal.light .standing-badge { color:#15803d; border-color:#86c99b; }
@@ -368,7 +372,7 @@
           <div class="support-panel-heading"><h3>Record a Payment</h3><p>Submit your transfer receipt. Your balance updates after BMF verifies and approves the payment.</p></div>
           <form id="customerRecordPaymentForm" class="auth-form support-form">
             <div class="request-field-grid two-up">
-              <label class="field-label">Loan<select id="recordPaymentLoanId" class="auth-input" required><option value="">Choose a loan...</option></select></label>
+              <label class="field-label">BMF loan receipt<select id="recordPaymentLoanId" class="auth-input" required><option value="">Choose a loan...</option></select><small>Find the receipt under My Loans. The payment is linked only to the loan selected here.</small></label>
               <div class="field-label">Current outstanding balance<output id="recordPaymentExpectedBalance" class="auth-input payment-balance-output" aria-live="polite">Choose a loan</output></div>
             </div>
             <div class="request-field-grid two-up">
@@ -716,6 +720,17 @@
       e.preventDefault();
       const messageEl = document.getElementById('loanRequestMessage');
       messageEl.textContent = '';
+      if (!customerLoansLoaded) {
+        pendingRequestOpen = true;
+        showRequestLockBox('Checking your account', 'Please wait while we check your current loan balance.');
+        await loadLoans(currentHistoryFilter);
+        return;
+      }
+      if (getUnsettledCustomerLoans().length) {
+        showRequestLockBox();
+        messageEl.textContent = 'Please settle your current outstanding BMF loan before submitting a new request.';
+        return;
+      }
       const product = document.getElementById('loanProduct').value.trim();
       const amount = document.getElementById('loanAmount').value;
       const dueDate = document.getElementById('loanDueDate').value;
@@ -784,6 +799,7 @@
         const data = await res.json();
         if (data.error) {
           messageEl.textContent = data.error;
+          if (res.status === 409) showRequestLockBox();
         } else {
           messageEl.textContent = data.message || 'Request submitted.';
           showBmfToast(data.message || 'BMF success: loan request submitted.');
@@ -802,6 +818,8 @@
     });
 
     let allLoans = [];
+    let customerLoansLoaded = false;
+    let pendingRequestOpen = false;
     let currentLoanFilter = 'all';
     let currentHistoryFilter = 'all';
     let activeSupportPanel = 'payment-history';
@@ -849,10 +867,12 @@
     function setActiveLoanTab(tab) {
       // Lock gate: block New Request if user has any unsettled loans
       if (tab === 'request') {
-        const unsettled = allLoans.filter(loan =>
-          ['active', 'grace', 'defaulted', 'liquidated'].includes(loanStatusOf(loan)) && Number(loan.outstanding || 0) > 0
-        );
-        if (unsettled.length > 0) {
+        if (!customerLoansLoaded) {
+          pendingRequestOpen = true;
+          showRequestLockBox('Checking your account', 'Please wait while we check your current loan balance.');
+          return;
+        }
+        if (getUnsettledCustomerLoans().length > 0) {
           showRequestLockBox();
           return;
         }
@@ -875,7 +895,7 @@
       }
     }
 
-    function showRequestLockBox() {
+    function showRequestLockBox(heading = 'Settle your current loan first', message = 'Our records show an active, grace, or defaulted BMF loan with an outstanding balance. Please settle that balance before continuing or submitting a new loan request.') {
       let box = document.getElementById('requestLockBox');
       if (!box) {
         box = document.createElement('div');
@@ -884,13 +904,20 @@
         box.innerHTML = `
           <div class="lock-box-content">
             <div class="lock-icon">🔒</div>
-            <h2 class="lock-heading">Cannot request a new loan</h2>
-            <p class="lock-message">You must settle your current loan before a new request is allowed.</p>
-            <button class="enter-btn lock-close-btn" onclick="hideRequestLockBox()">Understood</button>
+            <h2 class="lock-heading" id="requestLockHeading"></h2>
+            <p class="lock-message" id="requestLockMessage"></p>
+            <button type="button" class="enter-btn lock-close-btn" id="requestLockAction">Understood</button>
           </div>
         `;
         document.body.appendChild(box);
+        box.querySelector('#requestLockAction').addEventListener('click', () => {
+          pendingRequestOpen = false;
+          hideRequestLockBox();
+        });
       }
+      box.querySelector('#requestLockHeading').textContent = heading;
+      box.querySelector('#requestLockMessage').textContent = message;
+      box.querySelector('#requestLockAction').textContent = 'Understood';
       box.classList.remove('hidden');
     }
 
@@ -1108,6 +1135,12 @@
       return LEGACY_STATUS_MAP[raw] || (CANONICAL_STATUSES.includes(raw) ? raw : 'pending');
     }
 
+    function getUnsettledCustomerLoans() {
+      return allLoans.filter(loan =>
+        ['active', 'grace', 'defaulted'].includes(loanStatusOf(loan)) && Number(loan.outstanding || 0) > 0
+      );
+    }
+
     function countLoanStatus(loans) {
       return {
         pending: loans.filter(loan => loanStatusOf(loan) === 'pending').length,
@@ -1141,7 +1174,7 @@
           const progress = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
           const status = loanStatusOf(loan);
           return `
-            <li class="loan-card" data-loan-status="${escapeHtml(status)}" data-loan-id="${Number(loan.id)}" title="Product: ${escapeHtml(loan.product || 'Loan')}\nRequested: ${formatKwacha(loan.amount)}\nInterest: ${formatKwacha(loan.interestAmount || 0)}\nTotal: ${formatKwacha(loan.totalRepayment || loan.amount || 0)}\nTenure: ${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'}\nUrgency: ${formatStatusLabel(loan.urgency || 'standard')}\nDue: ${formatDateDisplay(loan.dueDate)}\nDecision: ${escapeHtml(loan.adminReason || 'No decision reason yet.') }">
+            <li class="loan-card" data-loan-status="${escapeHtml(status)}" data-loan-id="${Number(loan.id)}">
               <div class="loan-card-heading">
                 <div class="loan-card-identity"><span class="loan-receipt">${escapeHtml(loan.receiptNumber || `BMF-${loan.id}`)}</span><strong>${escapeHtml(loan.product || 'Loan')}</strong></div>
                 <span class="loan-badge ${status}">${formatStatusLabel(status).toUpperCase()}</span>
@@ -1257,16 +1290,20 @@
       const loanList = document.getElementById('loan-list');
       const deviceToken = localStorage.getItem('deviceToken');
       if (!userEmail) {
+        customerLoansLoaded = false;
         loanList.innerHTML = '<li>Please login again to see your loan information.</li>';
         document.getElementById('loanTotal').textContent = '0 loans';
         document.getElementById('loanOutstanding').textContent = 'K0';
         updateStandingBadge([]);
         renderLoanSummaryCounts([]);
+        if (pendingRequestOpen) showRequestLockBox('Unable to check your account', 'Please sign in again so we can verify your current loan balance.');
         return false;
       }
 
       if (!deviceToken) {
+        customerLoansLoaded = false;
         loanList.innerHTML = '<li>Device token missing. Please login again.</li>';
+        if (pendingRequestOpen) showRequestLockBox('Unable to check your account', 'Please sign in again so we can verify your current loan balance.');
         return false;
       }
 
@@ -1282,11 +1319,14 @@
         const data = await res.json();
 
         if (data.error) {
+          customerLoansLoaded = false;
           loanList.innerHTML = `<li>${escapeHtml(data.error)}</li>`;
+          if (pendingRequestOpen) showRequestLockBox('Unable to check your account', data.error);
           return false;
         }
 
         allLoans = data.loans || [];
+        customerLoansLoaded = true;
         populateSupportLoanOptions();
         const totalLoans = data.summary?.total || 0;
         const outstanding = data.summary?.outstanding || 0;
@@ -1301,9 +1341,24 @@
         renderLoanList();
         renderPaymentOverview();
         loadCustomerNotifications();
+        if (pendingRequestOpen) {
+          pendingRequestOpen = false;
+          if (getUnsettledCustomerLoans().length) {
+            showRequestLockBox();
+          } else {
+            hideRequestLockBox();
+            setActiveLoanTab('request');
+          }
+        }
+        if (!document.getElementById('requestSection')?.classList.contains('hidden') && getUnsettledCustomerLoans().length) {
+          setActiveLoanTab('summary');
+          showRequestLockBox();
+        }
         return true;
       } catch (err) {
+        customerLoansLoaded = false;
         loanList.innerHTML = '<li>Unable to load loan information. Please try again later.</li>';
+        if (pendingRequestOpen) showRequestLockBox('Unable to check your account', 'We could not verify your loan balance. Please try again before requesting a new loan.');
         return false;
       }
     }
@@ -1590,14 +1645,16 @@
       m.setAttribute('aria-hidden', 'true');
     }
 
-    const loanModal = document.getElementById('loanModal');
-    const loanModalCloseButton = loanModal?.querySelector('[data-modal-close="loanModal"]');
-    loanModalCloseButton?.addEventListener('click', closeLoanModal);
-    loanModal?.addEventListener('click', event => {
-      if (event.target === loanModal) closeLoanModal();
+    // This script is loaded before the loan modal markup, so use delegation to
+    // bind close/backdrop clicks after the modal has been parsed.
+    document.addEventListener('click', event => {
+      const modal = document.getElementById('loanModal');
+      if (!modal) return;
+      if (event.target.closest?.('[data-modal-close="loanModal"]') || event.target === modal) closeLoanModal();
     });
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && loanModal?.classList.contains('active')) closeLoanModal();
+      const modal = document.getElementById('loanModal');
+      if (event.key === 'Escape' && modal?.classList.contains('active')) closeLoanModal();
     });
 
     async function submitLoanDecision(action, loanId) {
@@ -1651,24 +1708,34 @@
         document.getElementById('modalLoanProduct').dataset.loanId = String(loan.id || '');
         document.getElementById('modalLoanProduct').textContent = loan.product || 'Loan';
         document.getElementById('modalLoanBorrower').textContent = loan.email || 'Unknown';
+        document.getElementById('modalLoanReceipt').textContent = loan.receiptNumber || `BMF-${loan.id}`;
         document.getElementById('modalLoanAmount').textContent = formatKwacha(loan.amount);
         document.getElementById('modalLoanInterestRate').textContent = `${loan.interestRate || 0}%`;
         document.getElementById('modalLoanInterest').textContent = formatKwacha(loan.interestAmount || 0);
         document.getElementById('modalLoanTotal').textContent = formatKwacha(loan.totalRepayment || loan.amount || 0);
         document.getElementById('modalLoanOutstanding').textContent = formatKwacha(loan.outstanding || 0);
+        document.getElementById('modalLoanPaid').textContent = formatKwacha(loan.paidTotal || Math.max(0, Number(loan.totalRepayment || loan.amount || 0) - Number(loan.outstanding || 0)));
         document.getElementById('modalLoanDue').textContent = formatDateDisplay(loan.dueDate);
         document.getElementById('modalLoanStatus').textContent = formatStatusLabel(loan.status);
         document.getElementById('modalLoanRequested').textContent = formatDateDisplay(loan.createdAt);
+        document.getElementById('modalLoanBorrowed').textContent = loan.approvedAt || loan.borrowedDate ? formatDateDisplay(loan.approvedAt || loan.borrowedDate) : 'Not yet approved';
+        document.getElementById('modalLoanTenure').textContent = loan.tenureWeeks ? `${loan.tenureWeeks} week${Number(loan.tenureWeeks) === 1 ? '' : 's'}` : 'Not provided';
+        document.getElementById('modalLoanPaymentMode').textContent = loan.paymentMode || 'Not provided';
         document.getElementById('modalLoanUrgency').textContent = formatStatusLabel(loan.urgency || 'standard');
         document.getElementById('modalLoanCollateral').textContent = collateralText;
         document.getElementById('modalLoanDecision').textContent = loan.adminReason || 'No decision reason provided yet.';
+        const modalPayments = document.getElementById('modalLoanPayments');
+        const paymentRecords = Array.isArray(loan.payments) ? loan.payments : [];
+        modalPayments.innerHTML = paymentRecords.length
+          ? `<ul>${paymentRecords.map(payment => `<li>${formatKwacha(payment.amount)} · ${escapeHtml(payment.mode || 'Payment')} · ${escapeHtml(formatDateDisplay(payment.paymentDate || payment.date))}${payment.paymentReceiptId ? ` · ${escapeHtml(payment.paymentReceiptId)}` : ''}${payment.note ? `<br>${escapeHtml(payment.note)}` : ''}</li>`).join('')}</ul>`
+          : '<p>No payments recorded yet.</p>';
         document.getElementById('adminDecisionReason').value = loan.adminReason || '';
 
         adminBox.hidden = !hasAdminAccess;
         const modal = document.getElementById('loanModal');
         modal.classList.add('active');
         modal.setAttribute('aria-hidden', 'false');
-        loanModalCloseButton?.focus();
+        document.querySelector('[data-modal-close="loanModal"]')?.focus();
       } catch (err) {
         console.warn('Could not load loan details', err);
       }
@@ -1689,19 +1756,28 @@
       <button type="button" class="modal-close" data-modal-close="loanModal" aria-label="Close loan details">×</button>
       <h3 id="modalLoanProduct">Loan</h3>
       <div class="modal-grid">
+        <p><strong>Loan receipt:</strong> <span id="modalLoanReceipt">-</span></p>
         <p><strong>Requested by:</strong> <span id="modalLoanBorrower">-</span></p>
         <p><strong>Amount requested:</strong> <span id="modalLoanAmount">-</span></p>
         <p><strong>Interest rate:</strong> <span id="modalLoanInterestRate">-</span></p>
         <p><strong>Interest amount:</strong> <span id="modalLoanInterest">-</span></p>
         <p><strong>Total after interest:</strong> <span id="modalLoanTotal">-</span></p>
         <p><strong>Outstanding:</strong> <span id="modalLoanOutstanding">-</span></p>
+        <p><strong>Amount paid:</strong> <span id="modalLoanPaid">-</span></p>
         <p><strong>Due date:</strong> <span id="modalLoanDue">-</span></p>
         <p><strong>Urgency:</strong> <span id="modalLoanUrgency">-</span></p>
         <p><strong>Collateral:</strong> <span id="modalLoanCollateral">-</span></p>
         <p><strong>Status:</strong> <span id="modalLoanStatus">-</span></p>
         <p><strong>Requested:</strong> <span id="modalLoanRequested">-</span></p>
+        <p><strong>Borrowed (approved):</strong> <span id="modalLoanBorrowed">-</span></p>
+        <p><strong>Tenure:</strong> <span id="modalLoanTenure">-</span></p>
+        <p><strong>Payment mode:</strong> <span id="modalLoanPaymentMode">-</span></p>
         <p><strong>Decision reason:</strong> <span id="modalLoanDecision">-</span></p>
       </div>
+      <section class="customer-profile-section" aria-labelledby="modalLoanPaymentsTitle">
+        <h4 id="modalLoanPaymentsTitle">Payment history</h4>
+        <div id="modalLoanPayments"><p>No payments recorded yet.</p></div>
+      </section>
 
       <div id="adminDecisionBox" class="admin-decision-box" hidden>
         <label for="adminDecisionReason">Provide decision reason</label>

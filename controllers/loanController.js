@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
 const { logError, logBreakage } = require('../middleware/logger');
+const auditGuardian = require('../middleware/auditLog');
 const emailService = require('../middleware/email');
 const config = require('../config');
 const dataStore = require('../middleware/dataStore');
@@ -752,6 +753,19 @@ async function requestLoan(req, res) {
       return res.status(403).json({ error: 'Request denied. Device token does not match this account.' });
     }
 
+    const unsettledLoan = getEnrichedLoans().find(loan =>
+      String(loan.email || '').trim().toLowerCase() === String(authEmail).trim().toLowerCase() &&
+      ['active', 'grace', 'defaulted'].includes(loan.businessStatus) &&
+      Number(loan.outstanding || 0) > 0
+    );
+    if (unsettledLoan) {
+      return res.status(409).json({
+        error: 'You have an active, grace, or outstanding BMF loan. Please settle your current loan balance before submitting a new request.',
+        receiptNumber: unsettledLoan.receiptNumber || `BMF-${unsettledLoan.id}`,
+        outstanding: Number(unsettledLoan.outstanding)
+      });
+    }
+
     if (agreedToTerms !== 'true' && agreedToTerms !== true) {
       return res.status(400).json({ error: 'You must agree to the terms and conditions.' });
     }
@@ -825,6 +839,8 @@ async function requestLoan(req, res) {
 
     loans.push(newLoan);
     saveLoansData(loans);
+    auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.LOAN_CREATED, actor: req.authUser?.email || email, targetId: newLoan.receiptNumber, ip: req.ip, detail: { storeId: newLoan.storeId, amount: newLoan.amount, status: newLoan.status } });
+    await auditGuardian.checkLoanIntegrity(newLoan, req.authUser?.email || email, req.ip);
     addInAppNotification(email, 'loan-request', 'Your loan request was received and is awaiting review.', newLoan.id);
     addAdminInAppNotification('loan-request', `New loan request from ${String(email).trim()}: ${product} for ${formatCurrency(newLoan.amount)}.`, newLoan.id);
 
@@ -1029,6 +1045,7 @@ async function updateLoanStatus(req, res) {
     if (!isAdmin && authEmail !== loan.email) {
       return res.status(403).json({ error: 'Access denied.' });
     }
+    const previousStatus = loan.status;
 
     if (['approve', 'approved'].includes(normalizedAction) && isAdmin) {
       // Canonical status is 'active' — 'approved' is a legacy value that only
@@ -1112,6 +1129,13 @@ async function updateLoanStatus(req, res) {
     loan.reviewedAt = new Date().toISOString();
     loans[idx] = loan;
     saveLoansData(loans);
+    const auditAction = normalizedAction.startsWith('approve') || normalizedAction === 'approved'
+      ? auditGuardian.ACTIONS.LOAN_APPROVED
+      : ['decline', 'declined', 'reject', 'rejected'].includes(normalizedAction)
+        ? auditGuardian.ACTIONS.LOAN_DECLINED
+        : auditGuardian.ACTIONS.LOAN_STATUS_CHANGED;
+    auditGuardian.writeAudit({ action: auditAction, actor: req.authUser?.email || 'unknown', targetId: loan.receiptNumber || loan.id, ip: req.ip, detail: { storeId: getRecordStoreId(loan), previousStatus, status: loan.status, action: normalizedAction } });
+    await auditGuardian.checkLoanIntegrity(loan, req.authUser?.email || 'unknown', req.ip);
     addInAppNotification(loan.email, 'loan-update', `Your loan ${loan.receiptNumber || `#${loan.id}`} was updated: ${decisionText}`, loan.id);
 
     try {
@@ -1172,7 +1196,7 @@ function getAllLoans(req, res) {
   }
 }
 
-function recordPayment(req, res) {
+async function recordPayment(req, res) {
   try {
     const { id, amount, mode, note } = req.body;
     if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'BMF store admin access required.' });
@@ -1222,6 +1246,9 @@ function recordPayment(req, res) {
     loans[index].updatedAt = recordedAt;
 
     saveLoansData(loans);
+    auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.PAYMENT_RECORDED, actor: req.authUser?.email || 'unknown', targetId: payment.paymentReceiptId, ip: req.ip, detail: { storeId: getRecordStoreId(loans[index]), loanId: loans[index].receiptNumber || loans[index].id, amount: payment.amount, balanceBefore, balanceAfter: payment.balanceAfter, mode: payment.mode } });
+    await auditGuardian.checkPaymentIntegrity(payment, loans[index], balanceBefore, payment.balanceAfter, req.authUser?.email || 'unknown', req.ip);
+    if (auditGuardian.isAfterHours(new Date(recordedAt))) auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_AFTER_HOURS_MONEY, actor: req.authUser?.email || 'unknown', targetId: payment.paymentReceiptId, ip: req.ip, detail: { storeId: getRecordStoreId(loans[index]), loanId: loans[index].receiptNumber || loans[index].id, amount: payment.amount } });
     res.json({ message: 'Payment recorded.', outstanding: loans[index].outstanding, payment });
   } catch (err) {
     logBreakage('loanController.js', 'recordPayment', err, 'PAYMENT RECORD ERROR');
@@ -1517,6 +1544,8 @@ async function createAdminLoan(req, res) {
     rebuildPaymentLedger(newLoan);
     loans.push(newLoan);
     saveLoansData(loans);
+    auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.LOAN_CREATED, actor: req.authUser?.email || 'admin', targetId: newLoan.receiptNumber, ip: req.ip, detail: { storeId: newLoan.storeId, amount: newLoan.amount, status: newLoan.status, source: 'admin' } });
+    await auditGuardian.checkLoanIntegrity(newLoan, req.authUser?.email || 'admin', req.ip);
 
     try {
       addInAppNotification(

@@ -39,6 +39,12 @@ const {
 
 const { healthRateLimiter, getServerMode, setServerMode, isFranchiseManager } = require('../middleware/security');
 const { signUpload } = require('../controllers/fileController');
+const {
+  listPermissionGroups, createPermissionGroup, updatePermissionGroup, deletePermissionGroup,
+  listEmployeeSecurity, getEmployeeSecurity, updateEmployeeSecurity
+} = require('../controllers/securityController');
+const { getAuditEntries } = require('../controllers/auditController');
+const { requestApproval, listApprovals, decideApproval, checkApproval } = require('../controllers/accessApprovalController');
 
 function dispatchReportExport(req, res, next) {
   const normalizedType = String(req.params.type).toLowerCase().replace(/_/g, '-');
@@ -62,6 +68,11 @@ router.get('/health', healthRateLimiter, getHealth);
 router.get('/logs/access', getAccessLogs);
 router.get('/logs/errors', getErrorLogs);
 router.get('/sessions', getActiveSessions);
+router.get('/admin/audit-log', getAuditEntries);
+router.post('/admin/access-approvals', requestApproval);
+router.get('/admin/access-approvals/check', checkApproval);
+router.get('/admin/access-approvals', listApprovals);
+router.post('/admin/access-approvals/:id/decision', decideApproval);
 
 router.get('/reports/user', getSingleUserReport);
 router.get('/reports/all', getAllUsersReport);
@@ -178,6 +189,14 @@ router.post('/admin/server-mode', (req, res) => {
 });
 router.get('/hr/employees', listEmployees);
 router.patch('/hr/employees/:id', editEmployee);
+// Security groups are feature metadata and remain subordinate to hard role/store gates.
+router.get('/admin/security/groups', listPermissionGroups);
+router.post('/admin/security/groups', createPermissionGroup);
+router.patch('/admin/security/groups/:id', updatePermissionGroup);
+router.delete('/admin/security/groups/:id', deletePermissionGroup);
+router.get('/admin/security/employees', listEmployeeSecurity);
+router.get('/admin/security/employees/:id', getEmployeeSecurity);
+router.patch('/admin/security/employees/:id', updateEmployeeSecurity);
 router.post('/hr/employees/:id/restrictions', setEmployeeRestriction);
 router.post('/hr/store-switch/request', requestStoreSwitch);
 router.post('/hr/store-switch/verify', verifyStoreSwitch);

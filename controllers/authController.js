@@ -9,6 +9,7 @@ const emailService = require('../middleware/email');
 const config = require('../config');
 const { normalizeZambianPhone, isValidZambianMobile } = require('../middleware/phoneNumber');
 const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole, isFranchiseAdmin } = require('../middleware/storeScope');
+const auditGuardian = require('../middleware/auditLog');
 
 const NRC_PATTERN = /^\d{6}\/\d{2}\/\d$/;
 
@@ -487,13 +488,18 @@ async function requestLogin(req, res) {
     const user = users.find(u => u.email === email);
 
     if (!user) {
+      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN_FAILED, actor: normalizeEmail(email), ip: req.ip, detail: { reason: 'Invalid credentials' } });
+      if (auditGuardian.trackFailedLogin(req.ip) >= auditGuardian.BRUTE_THRESHOLD) auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_BRUTE_FORCE, actor: normalizeEmail(email), ip: req.ip, detail: { path: '/login', attempts: auditGuardian.BRUTE_THRESHOLD } });
       return res.status(400).json({ error: 'Invalid email or password.' });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
+      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN_FAILED, actor: normalizeEmail(email), targetId: user.id, ip: req.ip, detail: { reason: 'Invalid credentials' } });
+      if (auditGuardian.trackFailedLogin(req.ip) >= auditGuardian.BRUTE_THRESHOLD) auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_BRUTE_FORCE, actor: normalizeEmail(email), targetId: user.id, ip: req.ip, detail: { path: '/login', attempts: auditGuardian.BRUTE_THRESHOLD } });
       return res.status(400).json({ error: 'Invalid email or password.' });
     }
+    auditGuardian.clearFailedLogin(req.ip);
 
     const otpEmail = String(user.email || '').trim();
     if (!otpEmail) {
@@ -540,6 +546,9 @@ async function confirmLogin(req, res) {
 
     const result = otpService.verifyOTP(otp, email, 'Login Verification');
     if (!result.valid) {
+      const attempts = auditGuardian.trackFailedLogin(req.ip);
+      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN_FAILED, actor: normalizeEmail(email), ip: req.ip, detail: { reason: 'Invalid login verification code', attemptCount: attempts } });
+      if (attempts >= auditGuardian.BRUTE_THRESHOLD) auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_BRUTE_FORCE, actor: normalizeEmail(email), ip: req.ip, detail: { path: '/login/confirm', attempts } });
       return res.status(400).json({ error: result.message });
     }
 
@@ -574,6 +583,8 @@ async function confirmLogin(req, res) {
 
     saveUsers(users);
     delete pendingLogins[email];
+    auditGuardian.clearFailedLogin(req.ip);
+    auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN, actor: email, targetId: users[userIndex].id, ip: req.ip, detail: { role: pending.role, storeId: pending.storeId } });
 
     res.json({
       message: 'Login successful.',
@@ -692,10 +703,14 @@ async function createInvite(req, res) {
 async function createAdminUser(req, res) {
   try {
     if (!isAdminRole(req.authUser?.role)) {
+      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_UNAUTHORISED_ADMIN, actor: req.authUser?.email || 'unauthenticated', ip: req.ip, detail: { path: '/admin/users', role: req.authUser?.role || null } });
       return res.status(403).json({ error: 'Admin access required.' });
     }
 
     const { username, email, password, confirmPassword, phone, role, nrc } = req.body || {};
+    if (role === 'admin' || (role === 'franchise_admin' && req.authUser.role !== 'admin')) {
+      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_FORBIDDEN_PROMOTION, actor: req.authUser.email || 'unknown', targetId: normalizeEmail(email) || null, ip: req.ip, detail: { attemptedRole: role, actorRole: req.authUser.role } });
+    }
 
     if (!username || !email || !password || !confirmPassword) {
       return res.status(400).json({ error: 'Username, email, password, and confirmation are required.' });
@@ -749,6 +764,7 @@ async function createAdminUser(req, res) {
 
     users.push(newUser);
     saveUsers(users);
+    auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_CREATED, actor: req.authUser?.email || 'admin', targetId: newUser.id, ip: req.ip, detail: { role: newUser.role, storeId: newUser.storeId } });
 
     return res.status(201).json({
       message: 'User created successfully.',

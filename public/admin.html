@@ -320,7 +320,20 @@
     .status-defaulted { background: rgba(220,53,69,0.18); color: #ff9ca9; }
     .status-liquidated { background: rgba(111,76,255,0.20); color: #c9beff; }
     /* Selected customer modal spans the full screen width. */
-    #userModal .modal-content { width: calc(100vw - 36px); max-width: none; margin: 12px auto; }
+    #userModal { display: none; align-items: flex-start; justify-content: center; }
+    #userModal[aria-hidden="false"] { display: flex; }
+    #userModal .modal-content { width: calc(100vw - 36px); max-width: 1440px; max-height: calc(100vh - 24px); overflow-y: auto; margin: 12px auto; background: var(--bmf-surface, #151b22); opacity: 1; }
+    #userModal .close { z-index: 2; width: 38px; height: 38px; border: 1px solid var(--bmf-border, #30363d); border-radius: 8px; background: var(--bmf-surface, #151b22); color: inherit; }
+    .customer-profile-heading, .customer-profile-section { border: 1px solid var(--bmf-border, rgba(255,255,255,.12)); border-radius: 10px; padding: 16px; margin: 12px 0; background: var(--bmf-surface, rgba(255,255,255,.025)); }
+    .customer-profile-heading { border-left: 4px solid var(--bmf-blue, #2f81f7); }
+    .customer-profile-heading h2 { margin: 0 48px 6px 0; }
+    .customer-profile-fields, .customer-profile-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 10px; margin-top: 12px; }
+    .customer-profile-field, .customer-profile-kpi { min-width: 0; padding: 11px 12px; border: 1px solid var(--bmf-border, rgba(255,255,255,.12)); border-radius: 8px; overflow-wrap: anywhere; }
+    .customer-profile-field small, .customer-profile-kpi small { display: block; opacity: .72; margin-bottom: 5px; }
+    .customer-profile-field strong, .customer-profile-kpi strong { display: block; overflow-wrap: anywhere; }
+    .customer-profile-kpi strong { font-size: 1.15rem; }
+    .customer-application-summary { border: 1px solid var(--bmf-border, rgba(255,255,255,.12)); border-radius: 8px; padding: 12px; margin-top: 10px; overflow-wrap: anywhere; }
+    .customer-application-summary p { margin: 7px 0; }
     .timeframe-filters { margin-top: 6px; }
     .timeframe-custom { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
     .timeframe-custom label { font-weight: 600; font-size: 0.9rem; }
@@ -335,10 +348,18 @@
     .loan-filter.active { border-color: #9BA8AB; background: rgba(155,168,171,0.18); }
     .loan-fields {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
       gap: 6px 14px;
       margin: 12px 0;
     }
+    .loan-fields > p, .loan-fields > section { min-width: 0; overflow-wrap: anywhere; }
+    .loan-item, .loan-header { min-width: 0; }
+    .loan-item .loan-header strong { overflow-wrap: anywhere; }
+    #applicationsList .loan-item p { overflow-wrap: anywhere; }
+    #applicationsList .application-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 8px; margin: 10px 0; }
+    #applicationsList .application-facts > div { min-width: 0; border: 1px solid var(--bmf-border, rgba(255,255,255,.12)); border-radius: 8px; padding: 9px 10px; overflow-wrap: anywhere; }
+    #applicationsList .application-facts small { display: block; opacity: .72; margin-bottom: 4px; }
+    @media (max-width: 600px) { #userModal { padding: 8px; } #userModal .modal-content { width: 100%; max-height: calc(100vh - 16px); margin: 0 auto; padding: 18px 14px; } }
     .proof-link { display: inline-block; margin: 4px 8px 4px 0; }
     .announcement-form { max-width: 720px; }
     .announcement-form textarea { min-height: 180px; resize: vertical; }
@@ -764,6 +785,55 @@
       <nav id="hrPagination" class="directory-pagination" aria-label="Employee pages"></nav>
       <p id="hrMessage" class="message-text"></p>
 
+      <section class="panel store-section" aria-labelledby="securityGroupsTitle">
+        <div class="admin-topbar">
+          <div>
+            <h2 id="securityGroupsTitle">Permission Groups</h2>
+            <p>Set and assign permission group settings for staff. Role and store safeguards remain in force. The built-in Franchise Admin group is fixed and cannot be edited.</p>
+          </div>
+          <button type="button" class="toggle-mode" id="securityGroupsRefreshBtn" style="max-width:180px;">Refresh groups</button>
+        </div>
+        <form id="securityGroupForm" class="auth-form" style="margin-top:12px;">
+          <input type="text" id="securityGroupName" class="modal-input" placeholder="New group name" maxlength="60" required>
+          <input type="text" id="securityGroupDescription" class="modal-input" placeholder="Description (optional)" maxlength="240">
+          <div class="loan-fields" id="securityGroupPermissions">
+            <label><input type="checkbox" value="bulk_notify"> Send bulk notifications</label>
+            <label><input type="checkbox" value="generate_invite"> Generate invite links</label>
+            <label><input type="checkbox" value="view_revenue"> View revenue</label>
+            <label><input type="checkbox" value="generate_reports"> Generate reports</label>
+            <label><input type="checkbox" value="create_users"> Create users</label>
+            <label><input type="checkbox" value="view_premium_customers"> View premium customers</label>
+            <label><input type="checkbox" value="force_loan_close"> Force loan closure</label>
+          </div>
+          <button type="submit" class="enter-btn" style="max-width:220px;">Create group</button>
+          <p id="securityGroupMessage" class="message-text" role="status" aria-live="polite"></p>
+        </form>
+        <div id="securityGroupList" class="directory-empty" role="status">Permission groups will appear here after loading.</div>
+        <div class="toolbar" aria-label="Employee permission group assignments">
+          <select id="securityEmployeeSelect" class="search-box" aria-label="Select employee"></select>
+          <select id="securityEmployeeGroup" class="search-box" aria-label="Select permission group"></select>
+          <button type="button" class="toggle-mode" id="securityAssignGroupBtn" style="max-width:220px;">Assign group</button>
+        </div>
+      </section>
+
+      <section class="panel store-section" aria-labelledby="auditLogTitle">
+        <div class="admin-topbar">
+          <div><h2 id="auditLogTitle">Security Audit Log</h2><p>Recent sign-ins, loan and payment changes, and security alerts.</p></div>
+          <button type="button" class="toggle-mode" id="auditLogRefreshBtn" style="max-width:180px;">Refresh audit log</button>
+        </div>
+        <p id="auditLogStatus" class="directory-status" role="status" aria-live="polite"></p>
+        <div id="auditLogList" class="directory-empty">Audit records will appear here after loading.</div>
+      </section>
+
+      <section class="panel store-section" aria-labelledby="accessApprovalsTitle">
+        <div class="admin-topbar">
+          <div><h2 id="accessApprovalsTitle">Temporary Access Requests</h2><p>Review staff requests. Approved access expires after 15 minutes and does not bypass existing role or store safeguards.</p></div>
+          <button type="button" class="toggle-mode" id="accessApprovalsRefreshBtn" style="max-width:180px;">Refresh requests</button>
+        </div>
+        <p id="accessApprovalsStatus" class="directory-status" role="status" aria-live="polite"></p>
+        <div id="accessApprovalsList" class="directory-empty">Access requests will appear here after loading.</div>
+      </section>
+
       <section class="panel store-section" aria-labelledby="hrSwitchTitle">
         <div class="admin-topbar">
           <div>
@@ -819,7 +889,7 @@
     </section>
   </div>
 
-  <div id="userModal" class="modal">
+  <div id="userModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="customerProfileTitle">
     <div class="modal-content">
       <button class="close" type="button" data-close-modal="userModal" aria-label="Close">&times;</button>
       <div id="modalBody"></div>

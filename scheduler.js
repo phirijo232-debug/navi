@@ -358,7 +358,13 @@ function startScheduler() {
   // KIDNEYS — hourly hygiene sweep (expired OTPs, dead pending-auth entries,
   // stale device tokens, idle sessions). Counts-only logging, never an alert.
   cron.schedule('20 * * * *', () => {
-    runKidneySweep();
+    setImmediate(async () => {
+      try {
+        runKidneySweep();
+      } catch (err) {
+        console.error('[CRON]', err.message);
+      }
+    });
   }, { timezone: TIMEZONE });
   // One sweep shortly after boot clears anything that accrued while the
   // server was down (delayed so startup data repair finishes first).
@@ -368,45 +374,69 @@ function startScheduler() {
   // Idempotent (loanController accrues by graceLastAccrual), so a restart or a
   // missed day never double-charges; it simply catches up on the next run.
   cron.schedule('5 0 * * *', () => {
-    try {
-      const result = accrueAllGrace(lusakaDate());
-      if (result.changed) {
-        console.log(`[scheduler] grace accrual applied to ${result.changed} loan(s)`);
+    setImmediate(async () => {
+      try {
+        try {
+          const result = accrueAllGrace(lusakaDate());
+          if (result.changed) {
+            console.log(`[scheduler] grace accrual applied to ${result.changed} loan(s)`);
+          }
+        } catch (err) {
+          logBreakage('scheduler.js', 'grace-accrual', err, 'GRACE ACCRUAL ERROR');
+        }
+      } catch (err) {
+        console.error('[CRON]', err.message);
       }
-    } catch (err) {
-      logBreakage('scheduler.js', 'grace-accrual', err, 'GRACE ACCRUAL ERROR');
-    }
+    });
   }, { timezone: TIMEZONE });
 
   // Task 7 — notifications first, one minute before the report.
   cron.schedule('58 23 * * *', () => {
-    runDueDatePass()
-      .then(summary => console.log(`[scheduler] notifications: ${JSON.stringify(summary)}`))
-      .catch(err => logBreakage('scheduler.js', 'cron:notifications', err, 'SCHEDULER NOTIFICATIONS FAILED'));
+    setImmediate(async () => {
+      try {
+        await runDueDatePass()
+          .then(summary => console.log(`[scheduler] notifications: ${JSON.stringify(summary)}`))
+          .catch(err => logBreakage('scheduler.js', 'cron:notifications', err, 'SCHEDULER NOTIFICATIONS FAILED'));
+      } catch (err) {
+        console.error('[CRON]', err.message);
+      }
+    });
   }, { timezone: TIMEZONE });
 
   // Task 5 — daily report at DAILY_SEND_TIME (default 08:00 Lusaka). Guarded so
   // a morning catch-up + scheduled cron never double-sends the same day's report.
   cron.schedule(`${DAILY_REPORT_MINUTE} ${DAILY_REPORT_HOUR} * * *`, () => {
-    const today = lusakaDate();
-    if (readState().lastSentDate >= today) {
-      console.log(`[scheduler] daily report for ${today} already sent — skipping duplicate run`);
-      return;
-    }
-    sendDailyLoanReport().catch(err => logBreakage('scheduler.js', 'cron:dailyReport', err, 'SCHEDULER REPORT FAILED'));
+    setImmediate(async () => {
+      try {
+        const today = lusakaDate();
+        if (readState().lastSentDate >= today) {
+          console.log(`[scheduler] daily report for ${today} already sent — skipping duplicate run`);
+          return;
+        }
+        await sendDailyLoanReport().catch(err => logBreakage('scheduler.js', 'cron:dailyReport', err, 'SCHEDULER REPORT FAILED'));
+      } catch (err) {
+        console.error('[CRON]', err.message);
+      }
+    });
   }, { timezone: TIMEZONE });
 
   // Flexible payment tracking sheet - same 23:59 slot, time frame set via env.
   // Same once-per-day guard as the daily report above.
   cron.schedule('59 23 * * *', () => {
-    const today = lusakaDate();
-    const frame = `${TRACKING_FROM || 'all'}:${TRACKING_TO || 'all'}`;
-    const state = readTrackingState();
-    if (state.lastSentDate >= today && state.frame === frame) {
-      console.log(`[scheduler] payments tracking sheet for ${today} already sent — skipping duplicate run`);
-      return;
-    }
-    sendPaymentsTrackingEmail().catch(err => logBreakage('scheduler.js', 'cron:paymentsTracking', err, 'SCHEDULER TRACKING FAILED'));
+    setImmediate(async () => {
+      try {
+        const today = lusakaDate();
+        const frame = `${TRACKING_FROM || 'all'}:${TRACKING_TO || 'all'}`;
+        const state = readTrackingState();
+        if (state.lastSentDate >= today && state.frame === frame) {
+          console.log(`[scheduler] payments tracking sheet for ${today} already sent — skipping duplicate run`);
+          return;
+        }
+        await sendPaymentsTrackingEmail().catch(err => logBreakage('scheduler.js', 'cron:paymentsTracking', err, 'SCHEDULER TRACKING FAILED'));
+      } catch (err) {
+        console.error('[CRON]', err.message);
+      }
+    });
   }, { timezone: TIMEZONE });
 
   catchUpMissedReports().catch(err => logBreakage('scheduler.js', 'catchUpMissedReports', err, 'SCHEDULER CATCH-UP FAILED'));

@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const https = require('https');
+const cron = require('node-cron');
 const config = require('./config');
 const { logError, logAccess, replayPendingAlerts } = require('./middleware/logger');
 const { helmet, deviceAuth, rateLimiter, authRateLimiter, getServerMode } = require('./middleware/security');
@@ -17,6 +19,7 @@ const { errorAudit, captureOrigin, appendAudit } = require('./middleware/errorAu
 const { isPrivateControlClient } = require('./middleware/localControl');
 const { shareKeyGate } = require('./middleware/shareLinks');
 const { validateStartup } = require('./middleware/startupHealth');
+const auditGuardian = require('./middleware/auditLog');
 
 const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || null;
 const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
@@ -182,6 +185,14 @@ app.use('/api/apply', (req, res, next) => {
   return applyRouter(req, res, next);
 });
 
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    if (/^\/(?:admin|hr)(?:\/|$)/.test(req.path) && [401, 403].includes(res.statusCode)) {
+      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_UNAUTHORISED_ADMIN, actor: req.authUser?.email || 'unauthenticated', ip: req.ip, detail: { path: req.path, method: req.method, status: res.statusCode, role: req.authUser?.role || null, storeId: req.authUser?.storeId || null } });
+    }
+  });
+  next();
+});
 app.use(deviceAuth);
 app.use(logAccess);
 app.use(trackSession);
@@ -203,6 +214,9 @@ app.use((req, res) => {
   }
   const msg = `UNKNOWN ROUTE: ${req.method} ${req.url} from ${req.ip}`;
   logError(msg);
+  if (req.path.startsWith('/api/') || req.path.startsWith('/admin/')) {
+    auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_UNKNOWN_ROUTE, actor: req.authUser?.email || 'unauthenticated', ip: req.ip, detail: { path: req.path, method: req.method, storeId: req.authUser?.storeId || null } });
+  }
   res.status(404).send('Route not found');
 });
 
@@ -227,9 +241,22 @@ if (startupProblems.length) {
 
 app.listen(config.PORT, config.HOST, () => {
   console.log(`Navi Server running on port ${config.PORT}`);
+  auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.SERVER_STARTED, actor: 'system', detail: { port: config.PORT } });
   const mode = typeof getServerMode === 'function' ? getServerMode() : 'private';
   console.log(`[server-mode] started in ${mode.toUpperCase()} mode`);
   startScheduler();
+  // Hosting keep-alive: register after the scheduled application jobs.
+  // Errors are intentionally silent so an unavailable self-ping never affects service.
+  cron.schedule('*/10 * * * *', () => {
+    setImmediate(async () => {
+      try {
+        if (!process.env.APP_BASE_URL) return;
+        https.get(process.env.APP_BASE_URL, response => response.resume()).on('error', () => {});
+      } catch (err) {
+        console.error('[CRON]', err.message);
+      }
+    });
+  });
   // IMMUNE: start heartbeat + outage detection (also fires the boot-time
   // "server was offline" catch-up alert if the previous run died).
   try {

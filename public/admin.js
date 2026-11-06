@@ -339,7 +339,7 @@ function showAdminPage(pageId, { recordHistory = true } = {}) {
 
   if (pageId === 'paymentsView') fetchPayments();
   else if (pageId === 'customersView') fetchUsers();
-  else if (pageId === 'hrView') fetchHrEmployees();
+  else if (pageId === 'hrView') { fetchHrEmployees(); fetchSecurityGroups(); fetchAuditLog(); fetchAccessApprovals(); }
   else if (pageId === 'applicationsView') fetchApplications();
   else if (pageId === 'requestQueue') fetchNewRequests();
   else if (pageId === 'portfolioReports') renderReportLibrary();
@@ -1864,10 +1864,15 @@ function renderApplications() {
           <strong style="margin-left:8px;">${escapeHtml(product)} — ${escapeHtml(applicationId)}</strong>
           ${statusBadge(app.status)}
         </div>
-        <p><strong>Applicant:</strong> ${escapeHtml(app.fullName)}</p>
-        <p><strong>Email:</strong> ${escapeHtml(app.email)} · <strong>Phone:</strong> ${escapeHtml(app.phone)} · <strong>NRC:</strong> ${escapeHtml(nrcNumber)}</p>
-        <p><strong>Amount:</strong> ${formatCurrency(amount)} · <strong>Interest:</strong> ${formatCurrency(interest)} · <strong>Total:</strong> ${formatCurrency(total)}</p>
-        <p><strong>Tenure:</strong> ${tenureWeeks} week${tenureWeeks === 1 ? '' : 's'} · <strong>Urgency:</strong> ${escapeHtml(app.urgency || 'standard')} · <strong>Requested:</strong> ${escapeHtml(formatDate(app.createdAt))}</p>
+        <div class="application-facts">
+          <div><small>Applicant</small><strong>${escapeHtml(app.fullName || 'Unknown applicant')}</strong></div>
+          <div><small>Contact</small><strong>${escapeHtml(app.email || '—')}<br>${escapeHtml(app.phone || 'Phone not provided')}</strong></div>
+          <div><small>NRC</small><strong>${escapeHtml(nrcNumber)}</strong></div>
+          <div><small>Requested amount</small><strong>${formatCurrency(amount)}</strong></div>
+          <div><small>Interest · total</small><strong>${formatCurrency(interest)} · ${formatCurrency(total)}</strong></div>
+          <div><small>Terms</small><strong>${tenureWeeks} week${tenureWeeks === 1 ? '' : 's'} · ${escapeHtml(formatStatus(app.urgency || 'standard'))}</strong></div>
+          <div><small>Submitted</small><strong>${escapeHtml(formatDate(app.createdAt))}</strong></div>
+        </div>
         ${app.nrcFront ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(app.nrcFront)}">View NRC front</a></p>` : ''}
         ${app.nrcBack ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(app.nrcBack)}">View NRC back</a></p>` : ''}
         ${collateralFront ? `<p><a class="proof-link" href="#" data-upload-filename="${escapeHtml(collateralFront)}">View collateral front</a></p>` : ''}
@@ -2247,6 +2252,11 @@ function renderSelectedUser() {
   );
 
   const canNotifyUser = ['admin', 'franchise_admin', 'store_admin'].includes(localStorage.getItem('userRole') || '');
+  const totalRequested = selectedLoans.reduce((sum, loan) => sum + (Number(loan.amount) || 0), 0);
+  const totalOutstanding = selectedLoans.reduce((sum, loan) => sum + (Number(loan.outstanding) || 0), 0);
+  const totalPaid = selectedLoans.reduce((sum, loan) => sum + (loan.paidTotal != null ? (Number(loan.paidTotal) || 0) : Math.max(0, (Number(loan.totalRepayment || loan.amount) || 0) - (Number(loan.outstanding) || 0))), 0);
+  const settledCount = selectedLoans.filter(loan => getLoanStatus(loan) === 'paid').length;
+  const field = (label, value) => `<div class="customer-profile-field"><small>${label}</small><strong>${escapeHtml(String(value || 'Not provided'))}</strong></div>`;
   const applicationHistory = (selectedUser.quickScreenApplications || []).map(application => `
     <article class="customer-application-summary">
       <h3>Quick Screen application ${escapeHtml(application.applicationId || application.id || '')}</h3>
@@ -2263,11 +2273,25 @@ function renderSelectedUser() {
   `).join('');
 
   modalBody.innerHTML = `
-    <h2>Customer: ${escapeHtml(selectedUser.username || 'Unknown user')}</h2>
-    <p><strong>Email:</strong> ${escapeHtml(selectedUser.email)}</p>
-    <p><strong>Phone:</strong> ${escapeHtml(selectedUser.phone || 'N/A')}</p>
-    <p><strong>Record:</strong> ${selectedUser.quickScreenApplicant ? 'Quick Screen applicant (not a registered login)' : escapeHtml(selectedUser.role || 'user')}</p>
-    ${applicationHistory ? `<section class="customer-application-history"><h3>Quick Screen history</h3>${applicationHistory}</section>` : ''}
+    <header class="customer-profile-heading">
+      <h2 id="customerProfileTitle">${escapeHtml(selectedUser.username || selectedUser.fullName || 'Customer profile')}</h2>
+      <p class="user-meta">${selectedUser.quickScreenApplicant ? 'Quick Screen applicant · not a registered login' : `Customer account · ${escapeHtml(selectedUser.role || 'user')}`}</p>
+      <div class="customer-profile-fields">
+        ${field('Email', selectedUser.email)}${field('Phone', selectedUser.phone)}
+        ${field('NRC', selectedUser.nrcNumber || selectedUser.nrc)}${field('Account status', selectedUser.status || 'Active')}
+        ${field('Store', getStoreName(selectedUser.storeId))}${field('Customer record', selectedUser.quickScreenApplicant ? 'Quick Screen applicant' : 'Registered customer')}
+      </div>
+    </header>
+    <section class="customer-profile-section"><h3>Loan portfolio</h3>
+      <div class="customer-profile-kpis">
+        <div class="customer-profile-kpi"><small>Total loans</small><strong>${selectedLoans.length}</strong></div>
+        <div class="customer-profile-kpi"><small>Total requested</small><strong>${formatCurrency(totalRequested)}</strong></div>
+        <div class="customer-profile-kpi"><small>Outstanding</small><strong>${formatCurrency(totalOutstanding)}</strong></div>
+        <div class="customer-profile-kpi"><small>Paid</small><strong>${formatCurrency(totalPaid)}</strong></div>
+        <div class="customer-profile-kpi"><small>Settled loans</small><strong>${settledCount}</strong></div>
+      </div>
+    </section>
+    ${applicationHistory ? `<section class="customer-profile-section customer-application-history"><h3>Quick Screen history</h3>${applicationHistory}</section>` : ''}
     ${canNotifyUser ? `
     <div class="button-row" style="margin: 10px 0;">
       <button class="toggle-mode" type="button" data-notify-user>Notify this customer</button>
@@ -2308,7 +2332,9 @@ async function viewUserDetails(userId) {
   activeTimeframeFilter = 'all';
   customTimeframeFrom = '';
   customTimeframeTo = '';
-  document.getElementById('userModal').style.display = 'block';
+  const customerModal = document.getElementById('userModal');
+  customerModal.setAttribute('aria-hidden', 'false');
+  customerModal.style.display = 'flex';
   document.getElementById('modalBody').innerHTML = '<p>Loading customer loan history...</p>';
   document.getElementById('detailFeedback').textContent = '';
 
@@ -2411,7 +2437,10 @@ async function sendOverdueNotice(loanId) {
 }
 
 function closeModal() {
-  document.getElementById('userModal').style.display = 'none';
+  const modal = document.getElementById('userModal');
+  if (!modal) return;
+  modal.setAttribute('aria-hidden', 'true');
+  modal.style.display = 'none';
 }
 
 function closeCreateUserModal() {
@@ -2852,6 +2881,154 @@ async function fetchHrEmployees() {
   }
 }
 
+const SECURITY_PERMISSION_LABELS = {
+  bulk_notify: 'Bulk notifications', generate_invite: 'Invite links', view_revenue: 'Revenue',
+  generate_reports: 'Reports', create_users: 'Create users',
+  view_premium_customers: 'Premium customer details', force_loan_close: 'Force loan closure'
+};
+let securityGroups = [];
+let securityEmployees = [];
+
+function selectedSecurityStore() {
+  const selected = localStorage.getItem('adminStore');
+  return selected && selected !== 'all' ? selected : (localStorage.getItem('userStoreId') || 'buraza');
+}
+
+async function fetchSecurityGroups() {
+  const list = document.getElementById('securityGroupList');
+  if (!list || !ensureAdminAccess()) return;
+  list.innerHTML = '<div class="directory-empty">Loading permission groups…</div>';
+  const params = new URLSearchParams({ storeId: selectedSecurityStore() });
+  try {
+    const response = await fetch(`/admin/security/groups?${params}`, { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to load permission groups.');
+    securityGroups = Array.isArray(data.groups) ? data.groups : [];
+    list.innerHTML = securityGroups.map(group => `<article class="panel" style="margin:8px 0;padding:14px;border:1px solid var(--bmf-border,#30363d);border-radius:10px;">
+      <div class="admin-topbar"><div><strong>${escapeHtml(group.name)}</strong>${group.builtIn ? ' <span class="status-badge">Built-in · Locked</span>' : ''}<div class="table-subtext">${escapeHtml(group.description || (group.builtIn ? 'System group. Cannot be changed.' : 'Custom staff group.'))}</div></div>${group.builtIn ? '' : `<button type="button" class="toggle-mode" data-security-delete="${escapeHtml(group.id)}">Delete</button>`}</div>
+      <div class="loan-fields">${Object.entries(SECURITY_PERMISSION_LABELS).map(([key, label]) => `<span>${group.permissions?.[key] ? '✓' : '—'} ${escapeHtml(label)}</span>`).join('')}</div>
+    </article>`).join('') || '<div class="directory-empty">No permission groups are available.</div>';
+    const groupSelect = document.getElementById('securityEmployeeGroup');
+    if (groupSelect) groupSelect.innerHTML = '<option value="">No custom group</option>' + securityGroups.filter(group => !group.builtIn).map(group => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)}</option>`).join('');
+    await fetchSecurityEmployees();
+  } catch (error) {
+    list.innerHTML = `<div class="directory-empty" role="status">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+async function fetchSecurityEmployees() {
+  const params = new URLSearchParams({ storeId: selectedSecurityStore() });
+  const response = await fetch(`/admin/security/employees?${params}`, { headers: getStoreHeaders() });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Unable to load employee permission assignments.');
+  securityEmployees = (Array.isArray(data.employees) ? data.employees : []).filter(employee => employee.role === 'store_admin');
+  const select = document.getElementById('securityEmployeeSelect');
+  if (select) select.innerHTML = securityEmployees.map(employee => `<option value="${escapeHtml(employee.id || employee.email)}">${escapeHtml(employee.username || employee.email)} · ${escapeHtml(employee.role)}</option>`).join('') || '<option value="">No staff available</option>';
+  syncEmployeeSecuritySelection();
+}
+
+function syncEmployeeSecuritySelection() {
+  const employee = securityEmployees.find(item => String(item.id || item.email) === document.getElementById('securityEmployeeSelect')?.value);
+  const select = document.getElementById('securityEmployeeGroup');
+  if (select && employee) select.value = employee.permissionGroupId || '';
+}
+
+async function submitSecurityGroup(event) {
+  event.preventDefault();
+  const message = document.getElementById('securityGroupMessage');
+  const permissions = Object.fromEntries([...document.querySelectorAll('#securityGroupPermissions input[type="checkbox"]')].map(box => [box.value, box.checked]));
+  try {
+    const response = await fetch('/admin/security/groups', {
+      method: 'POST', headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ name: document.getElementById('securityGroupName').value.trim(), description: document.getElementById('securityGroupDescription').value.trim(), permissions, storeId: selectedSecurityStore() })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to create permission group.');
+    document.getElementById('securityGroupForm').reset();
+    message.textContent = 'Permission group created.';
+    await fetchSecurityGroups();
+  } catch (error) { message.textContent = error.message; }
+}
+
+async function assignSecurityGroup() {
+  const employeeId = document.getElementById('securityEmployeeSelect')?.value;
+  const permissionGroupId = document.getElementById('securityEmployeeGroup')?.value || null;
+  const message = document.getElementById('securityGroupMessage');
+  if (!employeeId) { message.textContent = 'Select a staff member first.'; return; }
+  try {
+    const response = await fetch(`/admin/security/employees/${encodeURIComponent(employeeId)}`, {
+      method: 'PATCH', headers: getStoreHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ permissionGroupId })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to assign permission group.');
+    message.textContent = 'Permission group assigned.';
+    await fetchSecurityGroups();
+  } catch (error) { message.textContent = error.message; }
+}
+
+async function deleteSecurityGroup(groupId) {
+  if (!window.confirm('Delete this permission group?')) return;
+  const response = await fetch(`/admin/security/groups/${encodeURIComponent(groupId)}`, { method: 'DELETE', headers: getStoreHeaders() });
+  const data = await response.json().catch(() => ({}));
+  document.getElementById('securityGroupMessage').textContent = response.ok ? 'Permission group deleted.' : (data.error || 'Unable to delete permission group.');
+  if (response.ok) await fetchSecurityGroups();
+}
+
+async function fetchAuditLog() {
+  const list = document.getElementById('auditLogList');
+  if (!list || !ensureAdminAccess()) return;
+  list.innerHTML = '<div class="directory-empty">Loading audit entries…</div>';
+  try {
+    const params = new URLSearchParams({ limit: '100', storeId: selectedSecurityStore() });
+    const response = await fetch(`/admin/audit-log?${params}`, { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to load the security audit log.');
+    const status = document.getElementById('auditLogStatus');
+    if (status) status.textContent = data.integrity?.valid === false ? 'Audit log integrity check found an issue. Review this with the system administrator.' : `${data.total || 0} audit records · ${data.integrity?.valid === false ? 'Integrity issue detected' : 'Integrity verified'}`;
+    list.innerHTML = (data.entries || []).map(entry => `<article class="panel" style="margin:8px 0;padding:12px;border:1px solid var(--bmf-border,#30363d);border-radius:10px;">
+      <div class="admin-topbar"><strong>${escapeHtml(String(entry.action || '').replaceAll('_', ' '))}</strong><span>${escapeHtml(new Date(entry.timestamp).toLocaleString('en-GB', { timeZone: 'Africa/Lusaka' }))}</span></div>
+      <div class="table-subtext">By ${escapeHtml(entry.actor || 'system')}${entry.targetId ? ` · Ref ${escapeHtml(entry.targetId)}` : ''}${entry.ip ? ` · ${escapeHtml(entry.ip)}` : ''}</div>
+      ${entry.detail && Object.keys(entry.detail).length ? `<div class="table-subtext">${escapeHtml(JSON.stringify(entry.detail))}</div>` : ''}
+    </article>`).join('') || '<div class="directory-empty">No audit entries are available.</div>';
+  } catch (error) {
+    list.innerHTML = `<div class="directory-empty" role="status">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+async function fetchAccessApprovals() {
+  const list = document.getElementById('accessApprovalsList');
+  if (!list || !ensureAdminAccess()) return;
+  list.innerHTML = '<div class="directory-empty">Loading access requests…</div>';
+  try {
+    const params = new URLSearchParams({ storeId: selectedSecurityStore() });
+    const response = await fetch(`/admin/access-approvals?${params}`, { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to load access requests.');
+    const approvals = Array.isArray(data.approvals) ? data.approvals : [];
+    const pending = approvals.filter(item => item.status === 'pending');
+    const status = document.getElementById('accessApprovalsStatus');
+    if (status) status.textContent = `${pending.length} request${pending.length === 1 ? '' : 's'} awaiting review.`;
+    list.innerHTML = approvals.map(item => `<article class="panel" style="margin:8px 0;padding:12px;border:1px solid var(--bmf-border,#30363d);border-radius:10px;">
+      <div class="admin-topbar"><div><strong>${escapeHtml(item.requesterName || item.requesterId)}</strong><div class="table-subtext">${escapeHtml(SECURITY_PERMISSION_LABELS[item.feature] || item.feature)} · ${escapeHtml(item.storeId)} · ${escapeHtml(new Date(item.requestedAt).toLocaleString('en-GB', { timeZone: 'Africa/Lusaka' }))}</div>${item.reason ? `<div>${escapeHtml(item.reason)}</div>` : ''}</div><span class="status-badge">${escapeHtml(item.status)}</span></div>
+      ${item.status === 'pending' ? `<div class="button-row"><button type="button" class="toggle-mode" data-approval-decision="approve" data-approval-id="${escapeHtml(item.id)}">Allow for 15 minutes</button><button type="button" class="toggle-mode" data-approval-decision="deny" data-approval-id="${escapeHtml(item.id)}">Deny</button></div>` : ''}
+    </article>`).join('') || '<div class="directory-empty">No access requests are available.</div>';
+  } catch (error) { list.innerHTML = `<div class="directory-empty" role="status">${escapeHtml(error.message)}</div>`; }
+}
+
+async function decideAccessApproval(id, decision) {
+  const reason = decision === 'deny' ? (window.prompt('Optional reason for denying this request:') || '') : '';
+  try {
+    const response = await fetch(`/admin/access-approvals/${encodeURIComponent(id)}/decision`, {
+      method: 'POST', headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ decision, reason })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to update this request.');
+    document.getElementById('accessApprovalsStatus').textContent = `Request ${decision === 'approve' ? 'approved' : 'denied'}.`;
+    await fetchAccessApprovals();
+  } catch (error) { document.getElementById('accessApprovalsStatus').textContent = error.message; }
+}
+
 const HR_ROLE_LABELS = { admin: 'Main admin', franchise_admin: 'Franchise Employee Admin', store_admin: 'Store admin (restricted)' };
 
 function renderHrEmployees() {
@@ -3209,6 +3386,20 @@ document.getElementById('userList').addEventListener('click', event => {
 
 // ─── HR / menu event wiring ─────────────────────────────────────────────────
 document.getElementById('hrRefreshBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchHrEmployees));
+document.getElementById('securityGroupsRefreshBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchSecurityGroups));
+document.getElementById('auditLogRefreshBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchAuditLog));
+document.getElementById('accessApprovalsRefreshBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchAccessApprovals));
+document.getElementById('securityGroupForm')?.addEventListener('submit', submitSecurityGroup);
+document.getElementById('securityAssignGroupBtn')?.addEventListener('click', assignSecurityGroup);
+document.getElementById('securityEmployeeSelect')?.addEventListener('change', syncEmployeeSecuritySelection);
+document.getElementById('securityGroupList')?.addEventListener('click', event => {
+  const button = event.target.closest('[data-security-delete]');
+  if (button) deleteSecurityGroup(button.dataset.securityDelete);
+});
+document.getElementById('accessApprovalsList')?.addEventListener('click', event => {
+  const button = event.target.closest('[data-approval-decision]');
+  if (button) decideAccessApproval(button.dataset.approvalId, button.dataset.approvalDecision);
+});
 ['hrSearch', 'hrRoleFilter', 'hrDateFrom', 'hrDateTo'].forEach(id => {
   const control = document.getElementById(id);
   control?.addEventListener(id === 'hrSearch' ? 'input' : 'change', () => {
