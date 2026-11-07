@@ -2203,6 +2203,122 @@ body:has(#adminDashboard:not(.hidden)) .notification-menu .table-empty { padding
 body:has(#adminDashboard:not(.hidden)) .admin-data-section .admin-table { min-width:760px; }
 body:has(#adminDashboard:not(.hidden)) .admin-appbar,
 body:has(#adminDashboard:not(.hidden)) .admin-sidebar { font-family:Inter,Arial,sans-serif; }
+
+/* Admin light mode: keep dashboard components on one light palette. These
+   rules intentionally follow the admin skin above, which uses fixed dark
+   values for its default theme. */
+body.light:has(#adminDashboard:not(.hidden)) {
+  --app-bg:#f3f6f9;
+  --panel-bg:#ffffff;
+  --border:#d5dde5;
+  --text:#182230;
+  --muted:#5b6878;
+  --admin-surface:#f7f9fb;
+  background:var(--app-bg) !important;
+  color:var(--text) !important;
+}
+body.light:has(#adminDashboard:not(.hidden)) .admin-appbar,
+body.light:has(#adminDashboard:not(.hidden)) .admin-sidebar,
+body.light:has(#adminDashboard:not(.hidden)) .panel,
+body.light:has(#adminDashboard:not(.hidden)) .admin-data-section,
+body.light:has(#adminDashboard:not(.hidden)) .admin-kpi-card,
+body.light:has(#adminDashboard:not(.hidden)) .admin-utility-section,
+body.light:has(#adminDashboard:not(.hidden)) .server-mode-confirm,
+body.light:has(#adminDashboard:not(.hidden)) .admin-main-content > .admin-page:not(.dashboard-screen).panel {
+  background:#fff !important;
+  border-color:var(--border) !important;
+  color:var(--text) !important;
+  box-shadow:0 2px 8px rgba(24,34,48,.045);
+}
+body.light:has(#adminDashboard:not(.hidden)) .admin-sidebar { border-right:1px solid var(--border) !important; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-sidebar-section { color:#778394; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-nav-item { color:#465467; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-nav-item:hover { background:#edf3fa; color:#182230; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-nav-item.active { background:#e8f1ff; color:#0969da; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-main-content,
+body.light:has(#adminDashboard:not(.hidden)) .dashboard-screen { color:var(--text); }
+body.light:has(#adminDashboard:not(.hidden)) .admin-page-header h1,
+body.light:has(#adminDashboard:not(.hidden)) .admin-page .admin-topbar h1,
+body.light:has(#adminDashboard:not(.hidden)) .chart-heading strong,
+body.light:has(#adminDashboard:not(.hidden)) .admin-kpi-card > strong,
+body.light:has(#adminDashboard:not(.hidden)) .admin-activity-panel h2,
+body.light:has(#adminDashboard:not(.hidden)) .admin-data-section h2,
+body.light:has(#adminDashboard:not(.hidden)) #feedbackOverview h2,
+body.light:has(#adminDashboard:not(.hidden)) .admin-quick-actions h2,
+body.light:has(#adminDashboard:not(.hidden)) .activity-list li strong,
+body.light:has(#adminDashboard:not(.hidden)) .activity-list li > b { color:var(--text) !important; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-page-header p,
+body.light:has(#adminDashboard:not(.hidden)) .directory-date-filter,
+body.light:has(#adminDashboard:not(.hidden)) .admin-page .directory-pagination > span,
+body.light:has(#adminDashboard:not(.hidden)) .chart-heading span,
+body.light:has(#adminDashboard:not(.hidden)) .chart-legend,
+body.light:has(#adminDashboard:not(.hidden)) .chart-analysis-hint,
+body.light:has(#adminDashboard:not(.hidden)) .activity-list li p,
+body.light:has(#adminDashboard:not(.hidden)) .activity-list li small,
+body.light:has(#adminDashboard:not(.hidden)) .admin-data-section > header p,
+body.light:has(#adminDashboard:not(.hidden)) #paymentsStatus,
+body.light:has(#adminDashboard:not(.hidden)) #customerDirectoryStatus,
+body.light:has(#adminDashboard:not(.hidden)) #allLoansStatusMessage,
+body.light:has(#adminDashboard:not(.hidden)) #overdueStatusMessage,
+body.light:has(#adminDashboard:not(.hidden)) #defaultersStatusMessage { color:var(--muted) !important; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-table,
+body.light:has(#adminDashboard:not(.hidden)) .admin-table tbody tr,
+body.light:has(#adminDashboard:not(.hidden)) .notification-menu,
+body.light:has(#adminDashboard:not(.hidden)) .notification-item,
+body.light:has(#adminDashboard:not(.hidden)) .customer-application-history,
+body.light:has(#adminDashboard:not(.hidden)) .customer-application-summary,
+body.light:has(#adminDashboard:not(.hidden)) .admin-table-wrap { background:#fff !important; color:var(--text) !important; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-table tbody tr:nth-child(even),
+body.light:has(#adminDashboard:not(.hidden)) .admin-table th,
+body.light:has(#adminDashboard:not(.hidden)) .notification-menu > header { background:var(--admin-surface) !important; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-table th,
+body.light:has(#adminDashboard:not(.hidden)) .admin-table td,
+body.light:has(#adminDashboard:not(.hidden)) .admin-table-wrap,
+body.light:has(#adminDashboard:not(.hidden)) .activity-list li,
+body.light:has(#adminDashboard:not(.hidden)) .notification-item,
+body.light:has(#adminDashboard:not(.hidden)) .customer-application-history,
+body.light:has(#adminDashboard:not(.hidden)) .customer-application-summary { border-color:var(--border) !important; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-table td,
+body.light:has(#adminDashboard:not(.hidden)) .admin-table th { color:var(--text); }
+body.light:has(#adminDashboard:not(.hidden)) .admin-table .table-subtext,
+body.light:has(#adminDashboard:not(.hidden)) .notification-item small,
+body.light:has(#adminDashboard:not(.hidden)) .notification-item p { color:var(--muted); }
+body.light:has(#adminDashboard:not(.hidden)) .admin-search-wrap,
+body.light:has(#adminDashboard:not(.hidden)) .admin-search-wrap input,
+body.light:has(#adminDashboard:not(.hidden)) .search-box,
+body.light:has(#adminDashboard:not(.hidden)) .auth-input,
+body.light:has(#adminDashboard:not(.hidden)) .modal-input,
+body.light:has(#adminDashboard:not(.hidden)) .collection-custom-range input,
+body.light:has(#adminDashboard:not(.hidden)) .collection-custom-range select,
+body.light:has(#adminDashboard:not(.hidden)) .admin-page select { background:#fff !important; color:var(--text) !important; border-color:var(--border) !important; }
+body.light:has(#adminDashboard:not(.hidden)) input::placeholder,
+body.light:has(#adminDashboard:not(.hidden)) textarea::placeholder { color:#778394 !important; }
+body.light:has(#adminDashboard:not(.hidden)) .toggle-mode,
+body.light:has(#adminDashboard:not(.hidden)) .chart-range-pills button,
+body.light:has(#adminDashboard:not(.hidden)) .admin-page-back,
+body.light:has(#adminDashboard:not(.hidden)) .admin-row-actions button,
+body.light:has(#adminDashboard:not(.hidden)) .loan-table-pagination button,
+body.light:has(#adminDashboard:not(.hidden)) .admin-quick-grid button:not(.quick-primary):not(.quick-warning):not(.quick-red),
+body.light:has(#adminDashboard:not(.hidden)) .notification-actions .notification-view {
+  background:#f7f9fb !important;
+  color:#344256 !important;
+  border-color:var(--border) !important;
+}
+body.light:has(#adminDashboard:not(.hidden)) .toggle-mode:hover,
+body.light:has(#adminDashboard:not(.hidden)) .chart-range-pills button:hover,
+body.light:has(#adminDashboard:not(.hidden)) .admin-row-actions button:hover,
+body.light:has(#adminDashboard:not(.hidden)) .loan-table-pagination button:hover,
+body.light:has(#adminDashboard:not(.hidden)) .admin-quick-grid button:not(.quick-primary):not(.quick-warning):not(.quick-red):hover { background:#edf3fa !important; color:#182230 !important; }
+body.light:has(#adminDashboard:not(.hidden)) .chart-range-pills button.active,
+body.light:has(#adminDashboard:not(.hidden)) .loan-table-pagination button[aria-current="page"] { background:#2f81f7 !important; border-color:#2f81f7 !important; color:#fff !important; }
+body.light:has(#adminDashboard:not(.hidden)) .collections-svg.admin-month-chart line { stroke:#d5dde5; }
+body.light:has(#adminDashboard:not(.hidden)) .collections-svg.admin-month-chart .chart-point { stroke:#fff; }
+body.light:has(#adminDashboard:not(.hidden)) .collections-svg.admin-month-chart text { fill:#5b6878; }
+body.light:has(#adminDashboard:not(.hidden)) .collection-range-error { color:#b42318; }
+body.light:has(#adminDashboard:not(.hidden)) .admin-page-back:hover { color:#0969da !important; }
+body.light:has(#adminDashboard:not(.hidden)) .notification-item.unread { background:#edf5ff !important; }
+body.light:has(#adminDashboard:not(.hidden)) .notification-actions button[data-notification-application-action="approve"] { background:#eaf7ee; color:#1a7f37; border-color:#a8d5b5; }
+body.light:has(#adminDashboard:not(.hidden)) .notification-actions .notification-decline { background:#fff0ef; color:#cf222e; border-color:#f0b8b5; }
 @media (max-width:1023px) {
   .admin-sidebar { width:64px; padding:14px 6px 20px; }
   .admin-main-content { margin-left:64px; padding-right:16px; padding-left:16px; }
