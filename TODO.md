@@ -2,6 +2,10 @@
 
 ## Confirmed this week: necessary for the project
 
+- [x] Customer custom-date loan terms: exact calendar days, server-priced simple interest, starts on approval date, and extension interest ends at due date.
+- [x] Store-scoped BMF rates editable by `admin` and `franchise_admin`; updates are audited and apply to new quotes/requests. Grace/default penalties remain a separate existing policy.
+- [x] Custom-term pricing regression coverage and admin/customer UI wiring. Full suite passes (187 tests); server starts successfully.
+
 - [x] Review the current user flow and server-side loan logic to confirm the real gaps.
 - [ ] Finalize the desktop-only UX and keep the dark theme untouched while adding light-mode clarity where required.
 - [ ] Extend the user loan request form with timeframe/urgency fields and the matching interest calculation.

@@ -61,6 +61,7 @@ let showAllAdminNotifications = false;
 let activeAdminPage = 'portfolioOverview';
 let createUserReturnPage = 'portfolioOverview';
 let adminPageHistory = [];
+let loanInterestPolicy = null;
 
 function openCreateUserModal(mode = 'customer') {
   createUserReturnPage = activeAdminPage || 'portfolioOverview';
@@ -319,6 +320,10 @@ function ensureAdminPageBackButton(page) {
 
 function showAdminPage(pageId, { recordHistory = true } = {}) {
   if (!ensureAdminAccess()) return false;
+  if (pageId === 'loanInterestRatesView' && !['admin', 'franchise_admin'].includes(localStorage.getItem('userRole'))) {
+    showBmfToast('Only admin and franchise admin can manage loan rates.', 'error');
+    return false;
+  }
   const page = document.getElementById(pageId);
   if (!page || !page.classList.contains('admin-page')) {
     throw new Error(`Unknown admin page: ${pageId}`);
@@ -345,6 +350,7 @@ function showAdminPage(pageId, { recordHistory = true } = {}) {
   else if (pageId === 'portfolioReports') renderReportLibrary();
   else if (pageId === 'feedbackDetails') fetchStoreFeedback();
   else if (pageId === 'serverSettingsView') initServerMode();
+  else if (pageId === 'loanInterestRatesView') loadLoanInterestPolicy(true);
   else if (['allLoansView', 'overdueView', 'defaultersView'].includes(pageId)) {
     renderLoanDirectory(pageId);
     if (!portfolioLoaded) fetchNewRequests();
@@ -427,11 +433,94 @@ function initServerMode() {
   if (isFranchiseManager) refreshServerMode();
 }
 
+function getDisplayedExtensionRate() {
+  const oneWeekRate = Number(document.getElementById('loanRateWeek1')?.value);
+  const baseDailyRate = Number(document.getElementById('loanExtensionDailyRate')?.value);
+  if (!Number.isFinite(oneWeekRate) || !Number.isFinite(baseDailyRate)) return null;
+  return baseDailyRate * (oneWeekRate / 10);
+}
+
+function updateExtensionRatePreview() {
+  const output = document.getElementById('loanExtensionEffectiveRate');
+  const dailyRate = getDisplayedExtensionRate();
+  if (output) output.textContent = dailyRate == null
+    ? 'Enter valid rate values to preview the effective daily extension rate.'
+    : `Effective extension: ${dailyRate.toFixed(4)}% per day after day 28 (based on the current 1-week rate).`;
+}
+
+async function loadLoanInterestPolicy(showStatus = false) {
+  const status = document.getElementById('loanInterestRatesStatus');
+  const form = document.getElementById('loanInterestRatesForm');
+  if (!form) return;
+  if (!['admin', 'franchise_admin'].includes(localStorage.getItem('userRole'))) {
+    if (status) status.textContent = 'Only admin and franchise admin can manage loan rates.';
+    return;
+  }
+  if (status) status.textContent = showStatus ? 'Loading current store rates…' : '';
+  try {
+    const response = await fetch('/loans/interest-policy', { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not load loan rates.');
+    loanInterestPolicy = data;
+    [1, 2, 3, 4].forEach(week => {
+      const field = document.getElementById(`loanRateWeek${week}`);
+      if (field) field.value = data.weeklyRates?.[week] ?? '';
+    });
+    const extension = document.getElementById('loanExtensionDailyRate');
+    if (extension) extension.value = data.extensionDailyRatePercent ?? '';
+    const updated = document.getElementById('loanInterestRatesUpdated');
+    if (updated) updated.textContent = data.lastUpdatedAt
+      ? `Last updated ${new Date(data.lastUpdatedAt).toLocaleString('en-GB')}${data.updatedBy ? ` by ${data.updatedBy}` : ''}.`
+      : 'Default rates are in use. No manual rate changes have been saved for this store.';
+    if (status) status.textContent = showStatus ? `Showing rates for ${data.storeId}.` : '';
+    updateExtensionRatePreview();
+    updateAddLoanPreview();
+    if (typeof renderApplications === 'function' && allApplications.length) renderApplications();
+  } catch (err) {
+    if (status) status.textContent = err.message || 'Could not load loan rates.';
+  }
+}
+
+async function saveLoanInterestPolicy(event) {
+  event.preventDefault();
+  const status = document.getElementById('loanInterestRatesStatus');
+  const button = document.getElementById('saveLoanInterestRates');
+  const payload = {
+    weeklyRates: Object.fromEntries([1, 2, 3, 4].map(week => [week, Number(document.getElementById(`loanRateWeek${week}`).value)])),
+    extensionDailyRatePercent: Number(document.getElementById('loanExtensionDailyRate').value)
+  };
+  if (status) status.textContent = 'Saving loan rates…';
+  if (button) button.disabled = true;
+  try {
+    const response = await fetch('/admin/loan-interest-policy', {
+      method: 'PATCH',
+      headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not save loan rates.');
+    loanInterestPolicy = data;
+    if (status) status.textContent = `Loan rates saved for ${data.storeId}. New requests will use these rates.`;
+    const updated = document.getElementById('loanInterestRatesUpdated');
+    if (updated) updated.textContent = `Last updated ${new Date(data.updatedAt).toLocaleString('en-GB')} by ${data.updatedBy}.`;
+    updateExtensionRatePreview();
+    updateAddLoanPreview();
+    if (typeof renderApplications === 'function' && allApplications.length) renderApplications();
+    showBmfToast('Loan rates updated successfully.');
+  } catch (err) {
+    if (status) status.textContent = err.message || 'Could not save loan rates.';
+    showBmfToast(err.message || 'Could not save loan rates.', 'error');
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 function showDashboard() {
   if (!showAdminPage('portfolioOverview')) return;
   renderLoggedInAdmin();
   renderReportLibrary();
   initServerMode();
+  if (['admin', 'franchise_admin'].includes(localStorage.getItem('userRole'))) loadLoanInterestPolicy(false);
   renderPortfolioOverview();
   if (portfolioRefreshTimer) clearInterval(portfolioRefreshTimer);
   portfolioRefreshTimer = setInterval(() => {
@@ -692,6 +781,8 @@ function applyRolePermissions() {
   if (sidebarHr) sidebarHr.hidden = !isFranchiseLevel;
   const sidebarServerMode = document.getElementById('adminSidebarServerMode');
   if (sidebarServerMode) sidebarServerMode.hidden = !isFranchiseLevel;
+  const sidebarLoanRates = document.getElementById('adminSidebarLoanRates');
+  if (sidebarLoanRates) sidebarLoanRates.hidden = !isFranchiseLevel;
   const sidebarSwitchStore = document.getElementById('adminSidebarSwitchStore');
   if (sidebarSwitchStore) sidebarSwitchStore.hidden = BMF_STORES.length < 2;
   const sidebarAnnouncement = document.querySelector('[data-admin-page="announcementView"]');
@@ -970,7 +1061,7 @@ function renderNewRequests() {
         <p><strong>Email:</strong> ${escapeHtml(customer.email || loan.email || 'N/A')}</p>
         <p><strong>Phone:</strong> ${escapeHtml(customer.phone || 'N/A')}</p>
         <p><strong>Amount:</strong> ${formatCurrency(loan.amount)} · <strong>Interest:</strong> ${formatCurrency(loan.interestAmount || 0)} · <strong>Total:</strong> ${formatCurrency(loan.totalRepayment || loan.amount || 0)}</p>
-        <p><strong>Tenure:</strong> ${escapeHtml(loan.tenureWeeks || 'N/A')} weeks · <strong>Urgency:</strong> ${escapeHtml(loan.urgency || 'standard')} · <strong>Requested:</strong> ${escapeHtml(formatDate(loan.createdAt))}</p>
+        <p><strong>Tenure:</strong> ${escapeHtml(formatAdminLoanTerm(loan))} · <strong>Urgency:</strong> ${escapeHtml(loan.urgency || 'standard')} · <strong>Requested:</strong> ${escapeHtml(formatDate(loan.createdAt))}</p>
       </div>
       <div class="button-row">
         <button class="toggle-mode" type="button" data-request-user="${escapeHtml(customer.id ?? '')}" ${customer.id == null ? 'disabled' : ''}>Open customer</button>
@@ -1836,10 +1927,10 @@ function renderApplications() {
     return;
   }
   list.innerHTML = page.items.map(app => {
-    const weeklyRates = { 1: 0.10, 2: 0.16, 3: 0.24, 4: 0.32 };
     const amount = Number(app.amount) || 0;
     const tenureWeeks = Number(app.tenureWeeks) || 1;
-    const rate = weeklyRates[tenureWeeks] ?? 0.10;
+    const ratePercent = Number(loanInterestPolicy?.weeklyRates?.[tenureWeeks] ?? ({ 1: 10, 2: 16, 3: 24, 4: 32 })[tenureWeeks] ?? 10);
+    const rate = ratePercent / 100;
     const interest = amount * rate;
     const total = amount + interest;
     const product = app.product || app.loanPurpose || 'Loan application';
@@ -2117,7 +2208,7 @@ function renderLoanDetails(loan) {
       <div class="loan-fields">
         <p><strong>Due date:</strong> ${escapeHtml(formatDate(loan.dueDate))}</p>
         <p><strong>Urgency:</strong> ${escapeHtml(loan.urgency || 'standard')}</p>
-        <p><strong>Tenure:</strong> ${escapeHtml(loan.tenureWeeks || 'N/A')} weeks</p>
+        <p><strong>Tenure:</strong> ${escapeHtml(formatAdminLoanTerm(loan))}</p>
         <p><strong>Payment mode:</strong> ${escapeHtml(loan.paymentMode || 'Not provided')}</p>
         <p><strong>Collateral:</strong> ${escapeHtml(loan.collateralDescription || 'Not provided')}</p>
         <p><strong>Collateral grade:</strong> ${escapeHtml(loan.collateralGrade || 'Not graded')}</p>
@@ -2780,7 +2871,7 @@ function buildExportTable(kind) {
   if (kind === 'requests') {
     const rows = pendingRequests.map(loan => {
       const customer = findCustomerForLoan(loan) || {};
-      return [loan.receiptNumber, customer.username, loan.email, loan.product, loan.amount, loan.tenureWeeks, loan.urgency, formatDate(loan.createdAt)];
+      return [loan.receiptNumber, customer.username, loan.email, loan.product, loan.amount, formatAdminLoanTerm(loan), loan.urgency, formatDate(loan.createdAt)];
     });
     return { name: `bmf-new-requests-${stamp}`, title: 'BMF New Loan Requests', headers: ['Receipt ID', 'Customer', 'Email', 'Product', 'Amount', 'Tenure (weeks)', 'Urgency', 'Requested'], rows };
   }
@@ -3317,9 +3408,15 @@ function closeAddLoanModal() {
 }
 
 function weeklyRate(weeks) {
-  // Must match backend calculateInterest (AGENTS.md fixed BMF ladder).
-  const ladder = { 1: 0.10, 2: 0.16, 3: 0.24, 4: 0.32 };
-  return ladder[weeks] ?? 0.10;
+  const fallback = { 1: 10, 2: 16, 3: 24, 4: 32 };
+  return Number(loanInterestPolicy?.weeklyRates?.[weeks] ?? fallback[weeks] ?? 10) / 100;
+}
+
+function formatAdminLoanTerm(loan = {}) {
+  const days = Number(loan.tenureDays);
+  if (Number.isInteger(days) && days > 0) return days % 7 === 0 ? `${days / 7} week${days === 7 ? '' : 's'}` : `${days} days`;
+  const weeks = Number(loan.tenureWeeks);
+  return weeks > 0 ? `${weeks} week${weeks === 1 ? '' : 's'}` : 'N/A';
 }
 
 function getCurrentLusakaDateKey() {
@@ -3969,6 +4066,10 @@ document.getElementById('applicationsList')?.addEventListener('click', event => 
 });
 
 document.getElementById('applicationsRefreshBtn')?.addEventListener('click', event => runRefresh(event.currentTarget, fetchApplications));
+document.getElementById('loanInterestRatesForm')?.addEventListener('submit', saveLoanInterestPolicy);
+[1, 2, 3, 4].map(week => `loanRateWeek${week}`).concat('loanExtensionDailyRate').forEach(id => {
+  document.getElementById(id)?.addEventListener('input', updateExtensionRatePreview);
+});
 ['applicationSearch', 'applicationStatusFilter', 'applicationDateFrom', 'applicationDateTo'].forEach(id => {
   const control = document.getElementById(id);
   control?.addEventListener(id === 'applicationSearch' ? 'input' : 'change', () => {

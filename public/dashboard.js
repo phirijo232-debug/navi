@@ -37,6 +37,8 @@ function getAdminLoanTimeline(loan) {
 }
 
 function getLoanTimeframeLabel(loan) {
+  const days = Number(loan?.tenureDays);
+  if (Number.isInteger(days) && days > 0) return days % 7 === 0 ? `${days / 7} week${days === 7 ? '' : 's'}` : `${days} days`;
   if (loan?.tenureWeeks) return `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}`;
   if (loan?.dueDate) return `Due ${formatDate(loan.dueDate)}`;
   return 'Flexible';
@@ -214,7 +216,7 @@ function renderAdminReviewDetail(loan) {
         <p><strong>Outstanding:</strong> ${formatKwacha(loan.outstanding || 0)}</p>
         <p><strong>Due date:</strong> ${formatDate(loan.dueDate)}</p>
         <p><strong>Urgency:</strong> ${formatStatus(loan.urgency || 'standard')}</p>
-        <p><strong>Tenure:</strong> ${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'}</p>
+        <p><strong>Tenure:</strong> ${getLoanTimeframeLabel(loan)}</p>
         <p><strong>Payment mode:</strong> ${loan.paymentMode || 'Not specified'}</p>
         <p><strong>Collateral:</strong> ${loan.collateralDescription || 'No description provided'}</p>
         <p><strong>Collateral grade:</strong> ${loan.collateralGrade || 'Pending review'}</p>

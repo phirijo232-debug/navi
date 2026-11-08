@@ -7,11 +7,95 @@ const auditGuardian = require('../middleware/auditLog');
 const emailService = require('../middleware/email');
 const config = require('../config');
 const dataStore = require('../middleware/dataStore');
-const { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, isAdminRole } = require('../middleware/storeScope');
+const { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, isAdminRole, isFranchiseAdmin } = require('../middleware/storeScope');
+const loanTerms = require('../services/loanTerms');
 
 const LOANS_FILE = dataStore.paths.loans;
 const USERS_FILE = dataStore.paths.users;
 const NOTIFICATIONS_FILE = dataStore.paths.notifications;
+const LOAN_INTEREST_POLICY_FILE = path.join(dataStore.DATA_DIR, 'loanInterestPolicy.json');
+
+function readLoanInterestPolicies() {
+  return dataStore.readJson(LOAN_INTEREST_POLICY_FILE, {}, value => value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function getStoreLoanInterestPolicy(storeId) {
+  const policies = readLoanInterestPolicies();
+  return loanTerms.normalizePolicy(policies[String(storeId || config.DEFAULT_STORE_ID).toLowerCase()]);
+}
+
+function resolvePolicyStore(req, res) {
+  const role = req.authUser?.role;
+  const storeId = role === 'admin' ? getRequestedStoreId(req) : getRecordStoreId(req.authUser || {});
+  const customerRead = role === 'user' && String(req.method || 'GET').toUpperCase() === 'GET';
+  if (!storeId || storeId === 'all' || !config.STORES.some(store => store.id === storeId && store.active) ||
+      (!customerRead && !canAccessStore(req, storeId))) {
+    res.status(403).json({ error: 'Access to this store loan policy is not allowed.' });
+    return null;
+  }
+  return storeId;
+}
+
+function getLoanInterestPolicy(req, res) {
+  try {
+    if (!req.authUser) return res.status(401).json({ error: 'Sign in to view loan terms.' });
+    const storeId = resolvePolicyStore(req, res);
+    if (!storeId) return;
+    const saved = readLoanInterestPolicies()[storeId] || {};
+    const policy = getStoreLoanInterestPolicy(storeId);
+    return res.json({
+      storeId,
+      weeklyRates: policy.weeklyRates,
+      extensionDailyRatePercent: policy.extensionDailyRatePercent,
+      effectiveExtensionDailyRatePercent: loanTerms.getEffectiveDailyExtensionRatePercent(policy),
+      extensionBaselineOneWeekRatePercent: policy.extensionBaselineOneWeekRatePercent,
+      minTermDays: policy.minTermDays,
+      maxTermDays: policy.maxTermDays,
+      extensionStartsAfterDays: 28,
+      lastUpdatedAt: saved.updatedAt || null,
+      ...(isFranchiseAdmin(req.authUser.role) && { updatedBy: saved.updatedBy || null })
+    });
+  } catch (err) {
+    logError(`LOAN INTEREST POLICY READ FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Loan terms are temporarily unavailable.' });
+  }
+}
+
+function updateLoanInterestPolicy(req, res) {
+  try {
+    if (!isFranchiseAdmin(req.authUser?.role)) {
+      return res.status(403).json({ error: 'Only admin or franchise_admin can update loan rates.' });
+    }
+    const storeId = resolvePolicyStore(req, res);
+    if (!storeId) return;
+    const input = req.body || {};
+    const rates = input.weeklyRates;
+    if (!rates || ![1, 2, 3, 4].every(week => Object.prototype.hasOwnProperty.call(rates, week)) ||
+        !Object.prototype.hasOwnProperty.call(input, 'extensionDailyRatePercent')) {
+      return res.status(400).json({ error: 'Provide all four weekly rates and the daily extension rate.' });
+    }
+    const nextPolicy = loanTerms.normalizePolicy(input);
+    const policies = readLoanInterestPolicies();
+    const previousPolicy = loanTerms.normalizePolicy(policies[storeId]);
+    const updatedAt = new Date().toISOString();
+    const actor = req.authUser?.email || req.authUser?.username || 'admin';
+    policies[storeId] = { ...nextPolicy, updatedAt, updatedBy: actor };
+    dataStore.writeJson(LOAN_INTEREST_POLICY_FILE, policies);
+    auditGuardian.writeAudit({
+      action: 'LOAN_INTEREST_POLICY_UPDATED', actor, targetId: storeId, ip: req.ip,
+      detail: { storeId, previousPolicy, nextPolicy }
+    });
+    return res.json({
+      ok: true, storeId, ...nextPolicy,
+      effectiveExtensionDailyRatePercent: loanTerms.getEffectiveDailyExtensionRatePercent(nextPolicy),
+      extensionStartsAfterDays: 28, updatedAt, updatedBy: actor
+    });
+  } catch (err) {
+    if (err instanceof TypeError) return res.status(400).json({ error: err.message });
+    logError(`LOAN INTEREST POLICY UPDATE FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Loan rates could not be saved. Please retry.' });
+  }
+}
 
 function addInAppNotification(recipientEmail, type, message, loanId, extra = {}) {
   const email = String(recipientEmail || '').trim().toLowerCase();
@@ -310,6 +394,15 @@ function calculateDueDateFromApproval(approvedAt, tenureWeeks) {
   const weeks = Number.parseInt(tenureWeeks, 10) || 1;
   if (![1, 2, 3, 4].includes(weeks)) throw new RangeError('Tenure must be between 1 and 4 weeks.');
   return addCalendarDays(getZambiaDateKey(approvedAt), weeks * 7);
+}
+
+function calculateDueDateFromApprovalDays(approvedAt, tenureDays) {
+  const days = Number(tenureDays);
+  const policy = loanTerms.getDefaultPolicy();
+  if (!Number.isInteger(days) || days < policy.minTermDays || days > policy.maxTermDays) {
+    throw new RangeError(`Tenure must be between ${policy.minTermDays} and ${policy.maxTermDays} days.`);
+  }
+  return addCalendarDays(getZambiaDateKey(approvedAt), days);
 }
 
 /**
@@ -744,14 +837,9 @@ function formatCurrency(value) {
 }
 
 function calculateInterest(amount, tenureWeeks) {
-  const rates = { 1: 0.10, 2: 0.16, 3: 0.24, 4: 0.32 };
-  const rate = rates[parseInt(tenureWeeks)] || 0.10;
-  const interest = Number(amount) * rate;
-  return {
-    rate: rate * 100,
-    interest: Number(interest.toFixed(2)),
-    total: Number((Number(amount) + interest).toFixed(2))
-  };
+  const weeks = Number.parseInt(tenureWeeks, 10);
+  if (![1, 2, 3, 4].includes(weeks)) throw new RangeError('Tenure must be between 1 and 4 weeks.');
+  return loanTerms.calculateInterestForDays(amount, weeks * 7, loanTerms.getDefaultPolicy());
 }
 
 function getApprovalDeadline(urgency) {
@@ -765,7 +853,7 @@ async function requestLoan(req, res) {
   try {
     const {
       email, product, amount, dueDate,
-      tenureWeeks, urgency, paymentMode,
+      urgency, paymentMode,
       nextPayment, collateralDescription, collateralGrade, agreedToTerms
     } = req.body;
 
@@ -806,9 +894,17 @@ async function requestLoan(req, res) {
       return res.status(400).json({ error: 'Loan amount must be a positive number.' });
     }
 
-    const weeks = parseInt(tenureWeeks, 10) || 1;
-    if (![1, 2, 3, 4].includes(weeks)) {
-      return res.status(400).json({ error: 'Tenure must be between 1 and 4 weeks.' });
+    let requestedDueDate;
+    let termDays;
+    try {
+      requestedDueDate = String(dueDate).slice(0, 10);
+      termDays = loanTerms.calendarDaysBetween(getZambiaDateKey(), requestedDueDate);
+    } catch {
+      return res.status(400).json({ error: 'Choose a valid custom due date.' });
+    }
+    const interestPolicy = getStoreLoanInterestPolicy(storeId);
+    if (!Number.isInteger(termDays) || termDays < interestPolicy.minTermDays || termDays > interestPolicy.maxTermDays) {
+      return res.status(400).json({ error: `Choose a term between ${interestPolicy.minTermDays} and ${interestPolicy.maxTermDays} days.` });
     }
 
     const normalizedUrgency = (urgency || 'standard').toLowerCase();
@@ -816,7 +912,13 @@ async function requestLoan(req, res) {
       return res.status(400).json({ error: 'Urgency must be low, standard, urgent, or emergency.' });
     }
 
-    const { rate, interest, total } = calculateInterest(requestedAmount, weeks);
+    let quote;
+    try {
+      quote = loanTerms.calculateInterestForDays(requestedAmount, termDays, interestPolicy);
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    const { rate, interest, total } = quote;
     const approvalDeadline = getApprovalDeadline(normalizedUrgency);
 
     const files = req.files || {};
@@ -838,12 +940,13 @@ async function requestLoan(req, res) {
       storeId,
       product,
       amount: requestedAmount,
-      tenureWeeks: weeks,
+      tenureWeeks: Math.ceil(termDays / 7),
+      tenureDays: termDays,
       interestRate: rate,
       interestAmount: interest,
       totalRepayment: total,
       outstanding: total || requestedAmount,
-      dueDate,
+      dueDate: requestedDueDate,
       urgency: normalizedUrgency,
       paymentMode: paymentMode || null,
       nextPayment: nextPayment || null,
@@ -1087,7 +1190,9 @@ async function updateLoanStatus(req, res) {
       loan.approvedAt = approvedAt.toISOString();
       // Borrowed date IS the approval date (BMF loan contract rule).
       loan.borrowedDate = getZambiaDateKey(approvedAt);
-      loan.dueDate = calculateDueDateFromApproval(approvedAt, loan.tenureWeeks);
+      loan.dueDate = loan.tenureDays
+        ? calculateDueDateFromApprovalDays(approvedAt, loan.tenureDays)
+        : calculateDueDateFromApproval(approvedAt, loan.tenureWeeks);
       rebuildPaymentLedger(loan);
     } else if (['in_progress', 'in-progress', 'start', 'started'].includes(normalizedAction) && isAdmin) {
       loan.status = 'active'; // canonical — 'in_progress' is legacy-mapped only
@@ -1501,7 +1606,8 @@ async function createAdminLoan(req, res) {
       return res.status(400).json({ error: 'Urgency must be low, standard, urgent, or emergency.' });
     }
 
-    const { rate, interest, total } = calculateInterest(requestedAmount, weeks);
+    const interestPolicy = getStoreLoanInterestPolicy(storeId);
+    const { rate, interest, total } = loanTerms.calculateInterestForDays(requestedAmount, weeks * 7, interestPolicy);
     const now = new Date();
     const approvedAt = now.toISOString();
     const borrowedDate = getZambiaDateKey(now);
@@ -1525,6 +1631,7 @@ async function createAdminLoan(req, res) {
       product,
       amount: requestedAmount,
       tenureWeeks: weeks,
+      tenureDays: weeks * 7,
       interestRate: rate,
       interestAmount: interest,
       totalRepayment: total,
@@ -1646,6 +1753,8 @@ async function createAdminLoan(req, res) {
 }
 
 module.exports = {
+  getLoanInterestPolicy,
+  updateLoanInterestPolicy,
   upload,
   getLoans,
   requestLoan,
@@ -1689,5 +1798,7 @@ module.exports = {
   daysBetween,
   getZambiaDateKey,
   addCalendarDays,
-  calculateDueDateFromApproval
+  calculateDueDateFromApproval,
+  calculateDueDateFromApprovalDays,
+  getStoreLoanInterestPolicy
 };

@@ -1,6 +1,8 @@
 ﻿// BMF 10-report pure builders — no Express, no fs, no email. Testable in isolation.
 'use strict';
 
+const loanTerms = require('./loanTerms');
+
 const REPORT_TYPES = [
   'daily',
   'all-loans',
@@ -279,11 +281,11 @@ function approvalLogRows(loans, users) {
     .sort((a, b) => String(b.approvedAt || '').localeCompare(String(a.approvedAt || '')))
     .map(l => [
       loanLabel(l), borrowerName(l, users), l.email || '',
-      Number(l.amount || 0), l.tenureWeeks || '', l.urgency || '',
+      Number(l.amount || 0), loanTerms.formatLoanTerm(l), l.urgency || '',
       toDDMMYYYY(l.approvedAt), l.reviewedBy || l.updatedBy || '', displayStatus(l)
     ]);
   return {
-    headers: ['Loan ID', 'Borrower', 'Email', 'Amount (K)', 'Tenure (wks)', 'Urgency', 'Approved Date', 'Approved By', 'Status'],
+    headers: ['Loan ID', 'Borrower', 'Email', 'Amount (K)', 'Tenure', 'Urgency', 'Approved Date', 'Approved By', 'Status'],
     rows
   };
 }

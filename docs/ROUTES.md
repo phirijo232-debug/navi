@@ -28,6 +28,8 @@ All API routes below require `x-device-token` and resolve a real user in `users.
 | URL | Authorization boundary |
 | --- | --- |
 | `GET /loans`, `GET /loans/:id`, `GET /loans/search` | Customers see their own loans in their assigned store; staff are store-scoped; main admin may request `storeId=all` |
+| `GET /loans/interest-policy` | Signed-in customers and staff read the current loan pricing policy for their own store; no rate changes are accepted here |
+| `PATCH /admin/loan-interest-policy` | Main admin may update one selected store; franchise admin may update only their assigned store; store admins and customers are denied. Changes are audited and backed up. |
 | `GET /loans/all`, `POST /loans/notify-overdue`, `POST /loans/notify-user`, `POST /loans/:id/notify-overdue` | Staff role and assigned store; main admin may span stores where the handler permits it |
 | `POST /loans/request`, `POST /loans/:id/action`, `POST /loans/payment`, `POST /admin/loans` | Authenticated customer ownership or the exact staff role required by the loan lifecycle policy |
 | `POST /loans/:id/payment-submissions` | Borrower on that loan only; submits a proof image, transaction reference, amount, and mobile/bank method as pending. It does not change the ledger or balance. |

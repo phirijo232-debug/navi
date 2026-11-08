@@ -14,6 +14,7 @@ const X = require('../services/bmfExcel');
 const P = require('../services/bmfPdf');
 const PromptReports = require('../services/bmfPromptReports');
 const PromptExcel = require('../services/bmfPromptExcel');
+const loanTerms = require('../services/loanTerms');
 
 const USERS_FILE = dataStore.paths.users;
 const LOANS_FILE = dataStore.paths.loans;
@@ -332,6 +333,8 @@ function getUserTracking(req, res) {
     interestOutstanding: Number(loan.interestOutstanding || 0),
     interestRate: loan.interestRate,
     tenureWeeks: loan.tenureWeeks,
+    tenureDays: loan.tenureDays || loanTerms.getLoanTermDays(loan),
+    tenureLabel: loanTerms.formatLoanTerm(loan),
     dueDate: loan.dueDate,
     status: loan.businessStatus
   }));
@@ -985,6 +988,8 @@ function shapeLoan(loan) {
     id: loan.id,
     amount: Number(loan.amount || 0),
     tenure: Number(loan.tenureWeeks || 0),
+    tenureDays: loan.tenureDays || loanTerms.getLoanTermDays(loan),
+    tenureLabel: loanTerms.formatLoanTerm(loan),
     interestRate: Number(loan.interestRate || 0),
     interestAmount: Number(loan.interestAmount || 0),
     totalRepayment: Number(loan.totalRepayment || 0),

@@ -21,8 +21,11 @@ test('new loan requests create a scoped admin bell notification that can be revi
 
   try {
     const response = responseRecorder();
+    const requestedDueDate = new Date();
+    requestedDueDate.setDate(requestedDueDate.getDate() + 7);
+    const dueDateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lusaka' }).format(requestedDueDate);
     await requestLoan({
-      body: { email: 'borrower@example.test', product: 'School fees', amount: '500', dueDate: '2026-11-01',
+      body: { email: 'borrower@example.test', product: 'School fees', amount: '500', dueDate: dueDateKey,
         tenureWeeks: '1', urgency: 'standard', agreedToTerms: true },
       files: { nrcFront: [{ filename: 'nrc-front.jpg' }], nrcBack: [{ filename: 'nrc-back.jpg' }] },
       authUser: { email: 'borrower@example.test', role: 'user', storeId: 'buraza' }

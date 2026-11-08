@@ -460,6 +460,7 @@
                 <option value="4">4 weeks</option>
               </select>
             </div>
+              <p class="timeframe-note">The selected date sets the term length. The loan term starts on approval; the final due date is approval date plus that duration. The daily extension rate is included only through that due date.</p>
 
             <div class="request-field-grid two-up compact-row">
               <select id="loanPaymentMode" class="auth-input">
@@ -508,7 +509,7 @@
             </select>
 
             <div class="loan-estimate-box" aria-live="polite">
-              <div><span>Rate</span> <strong id="loanRateDisplay">16%</strong></div>
+              <div><span>Rate for <span id="loanTermDisplay">14 days</span></span> <strong id="loanRateDisplay">Loading…</strong></div>
               <div><span>Interest</span> <strong id="loanInterestDisplay">K0</strong></div>
               <div><span>Total</span> <strong id="loanTotalDisplay">K0</strong></div>
               <div><span>Approval target</span> <strong id="loanApprovalDisplay">48h</strong></div>
@@ -636,32 +637,97 @@
       return date.toLocaleDateString('en-GB');
     }
 
+    function formatLoanTenure(loan) {
+      const days = Number(loan?.tenureDays);
+      if (Number.isInteger(days) && days > 0) return days % 7 === 0 ? `${days / 7} week${days === 7 ? '' : 's'}` : `${days} days`;
+      const weeks = Number(loan?.tenureWeeks);
+      return weeks > 0 ? `${weeks} week${weeks === 1 ? '' : 's'}` : 'Not provided';
+    }
+
     const dueDateInput = document.getElementById('loanDueDate');
     const tenureSelect = document.getElementById('loanTenureWeeks');
     const urgencySelect = document.getElementById('loanUrgency');
     const amountInput = document.getElementById('loanAmount');
     const timeframeButtons = document.querySelectorAll('.timeframe-mode-btn');
+    let loanInterestPolicy = null;
 
-    function getSelectedWeeksFromDate() {
-      if (!dueDateInput.value) return Number(tenureSelect.value) || 1;
-      const selectedDate = new Date(`${dueDateInput.value}T00:00:00`);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const diffDays = Math.max(1, Math.ceil((selectedDate - today) / (1000 * 60 * 60 * 24)));
-      return Math.min(4, Math.max(1, Math.ceil(diffDays / 7)));
+    function getCurrentLusakaDateKey() {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Africa/Lusaka', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(new Date());
+      const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+      return `${values.year}-${values.month}-${values.day}`;
+    }
+
+    function addDaysToDateKey(dateKey, days) {
+      const date = new Date(`${dateKey}T00:00:00Z`);
+      date.setUTCDate(date.getUTCDate() + days);
+      return date.toISOString().slice(0, 10);
+    }
+
+    function calendarDaysBetween(startDate, endDate) {
+      const start = new Date(`${startDate}T00:00:00Z`);
+      const end = new Date(`${endDate}T00:00:00Z`);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return NaN;
+      return Math.round((end.getTime() - start.getTime()) / 86400000);
+    }
+
+    function getSelectedTermDays() {
+      if (dueDateInput.disabled) return (Number(tenureSelect.value) || 1) * 7;
+      if (!dueDateInput.value) return NaN;
+      return calendarDaysBetween(getCurrentLusakaDateKey(), dueDateInput.value);
+    }
+
+    function calculateTermRatePercent(days) {
+      if (!loanInterestPolicy || !Number.isInteger(days)) return null;
+      const rates = loanInterestPolicy.weeklyRates;
+      if (days > 28) {
+        const extraRate = Number(loanInterestPolicy.effectiveExtensionDailyRatePercent) || 0;
+        return Number((Number(rates[4]) + (days - 28) * extraRate).toFixed(6));
+      }
+      const lowerWeek = Math.floor(days / 7);
+      const upperWeek = Math.ceil(days / 7);
+      if (lowerWeek === upperWeek) return Number(rates[lowerWeek]);
+      const ratio = (days - lowerWeek * 7) / 7;
+      return Number((Number(rates[lowerWeek]) +
+        (Number(rates[upperWeek]) - Number(rates[lowerWeek])) * ratio).toFixed(6));
+    }
+
+    function updateCustomDateLimits() {
+      if (!loanInterestPolicy) return;
+      const today = getCurrentLusakaDateKey();
+      dueDateInput.min = addDaysToDateKey(today, loanInterestPolicy.minTermDays);
+      dueDateInput.max = addDaysToDateKey(today, loanInterestPolicy.maxTermDays);
+      if (dueDateInput.value && (dueDateInput.value < dueDateInput.min || dueDateInput.value > dueDateInput.max)) {
+        dueDateInput.value = '';
+      }
+    }
+
+    async function loadCustomerInterestPolicy() {
+      const deviceToken = localStorage.getItem('deviceToken');
+      try {
+        const response = await fetch('/loans/interest-policy', { headers: { 'x-device-token': deviceToken || '' } });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Current loan rates could not be loaded.');
+        loanInterestPolicy = data;
+        updateCustomDateLimits();
+        updateLoanEstimateDisplay();
+      } catch (error) {
+        document.getElementById('loanRateDisplay').textContent = 'Unavailable';
+        document.getElementById('loanRequestMessage').textContent = error.message || 'Current loan rates could not be loaded.';
+      }
     }
 
     function getLoanEstimate() {
       const amount = Number(amountInput.value) || 0;
-      const weeks = dueDateInput.disabled ? (Number(tenureSelect.value) || 1) : getSelectedWeeksFromDate();
-      const rates = { 1: 10, 2: 16, 3: 24, 4: 32 };
-      const rate = rates[weeks] || 10;
-      const interest = amount * (rate / 100);
+      const days = getSelectedTermDays();
+      const rate = calculateTermRatePercent(days);
+      const interest = rate == null ? 0 : amount * rate / 100;
       const total = amount + interest;
       const approvalHours = { low: 72, standard: 48, urgent: 24, emergency: 4 };
       const urgency = (urgencySelect.value || 'standard').toLowerCase();
       const approvalTarget = approvalHours[urgency] || 48;
-      return { rate, interest, total, approvalTarget, weeks };
+      return { rate, interest, total, approvalTarget, days };
     }
 
     function setTimeframeMode(mode) {
@@ -682,8 +748,13 @@
     }
 
     function updateLoanEstimateDisplay() {
+      if (!loanInterestPolicy) {
+        document.getElementById('loanRateDisplay').textContent = 'Loading…';
+        return;
+      }
       const estimate = getLoanEstimate();
-      document.getElementById('loanRateDisplay').textContent = `${estimate.rate}%`;
+      document.getElementById('loanRateDisplay').textContent = estimate.rate == null ? '—' : `${estimate.rate.toFixed(2)}%`;
+      document.getElementById('loanTermDisplay').textContent = Number.isInteger(estimate.days) ? `${estimate.days} days` : 'Choose a date';
       document.getElementById('loanInterestDisplay').textContent = formatKwacha(estimate.interest);
       document.getElementById('loanTotalDisplay').textContent = formatKwacha(estimate.total);
       document.getElementById('loanApprovalDisplay').textContent = `${estimate.approvalTarget}h`;
@@ -703,6 +774,7 @@
 
     setTimeframeMode('weeks');
     updateLoanEstimateDisplay();
+    loadCustomerInterestPolicy();
 
     const paymentModeSelect = document.getElementById('loanPaymentMode');
     const customPaymentMode = document.getElementById('loanCustomPaymentMode');
@@ -740,7 +812,14 @@
       const collateralDescription = document.getElementById('loanCollateralDescription').value.trim();
       const collateralGrade = document.getElementById('loanCollateralGrade').value || '';
       const deviceToken = localStorage.getItem('deviceToken');
-      const computedWeeks = dueDate ? getSelectedWeeksFromDate() : selectedWeeks;
+      if (!loanInterestPolicy) {
+        messageEl.textContent = 'Current loan rates are still loading. Please wait and try again.';
+        return;
+      }
+      const termDays = getSelectedTermDays();
+      const requestedDueDate = dueDateInput.disabled
+        ? addDaysToDateKey(getCurrentLusakaDateKey(), termDays)
+        : dueDate;
       const chosenPaymentMode = paymentModeSelect.value === 'custom'
         ? (customPaymentMode.value.trim() || 'Custom')
         : paymentModeSelect.value;
@@ -752,6 +831,11 @@
 
       if (!dueDate && !selectedWeeks) {
         messageEl.textContent = 'Choose either a custom due date or a fixed duration.';
+        return;
+      }
+
+      if (!Number.isInteger(termDays) || termDays < loanInterestPolicy.minTermDays || termDays > loanInterestPolicy.maxTermDays) {
+        messageEl.textContent = `Choose a loan term between ${loanInterestPolicy.minTermDays} and ${loanInterestPolicy.maxTermDays} days.`;
         return;
       }
 
@@ -770,8 +854,9 @@
         formData.append('email', userEmail);
         formData.append('product', product);
         formData.append('amount', amount);
-        formData.append('dueDate', dueDate || new Date(Date.now() + computedWeeks * 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
-        formData.append('tenureWeeks', String(computedWeeks));
+        formData.append('dueDate', requestedDueDate);
+        formData.append('tenureDays', String(termDays));
+        formData.append('tenureWeeks', String(Math.ceil(termDays / 7)));
         formData.append('urgency', urgency);
         formData.append('agreedToTerms', String(agreedToTerms));
         formData.append('paymentMode', chosenPaymentMode || '');
@@ -806,6 +891,8 @@
           document.getElementById('loanRequestForm').reset();
           document.getElementById('loanTenureWeeks').value = '2';
           document.getElementById('loanUrgency').value = 'standard';
+          setTimeframeMode('weeks');
+          updateLoanEstimateDisplay();
           paymentModeSelect.value = '';
           toggleCustomPaymentMode();
           setTimeframeMode('weeks');
@@ -1180,7 +1267,7 @@
                 <span class="loan-badge ${status}">${formatStatusLabel(status).toUpperCase()}</span>
               </div>
               <div class="loan-meta loan-facts">
-                Amount: <strong>${formatKwacha(loan.amount)}</strong> · Interest: <strong>${formatKwacha(loan.interestAmount || 0)}</strong> · Total: <strong>${formatKwacha(total)}</strong> · Requested: <strong>${formatDateDisplay(loan.createdAt)}</strong> · Tenure: <strong>${loan.tenureWeeks ? `${loan.tenureWeeks} week${loan.tenureWeeks > 1 ? 's' : ''}` : 'Not provided'}</strong> · Urgency: <strong>${formatStatusLabel(loan.urgency || 'standard')}</strong>
+                Amount: <strong>${formatKwacha(loan.amount)}</strong> · Interest: <strong>${formatKwacha(loan.interestAmount || 0)}</strong> · Total: <strong>${formatKwacha(total)}</strong> · Requested: <strong>${formatDateDisplay(loan.createdAt)}</strong> · Tenure: <strong>${formatLoanTenure(loan)}</strong> · Urgency: <strong>${formatStatusLabel(loan.urgency || 'standard')}</strong>
               </div>
               <div class="loan-progress-meta"><span>Repaid: ${formatKwacha(paid)}</span><span>Balance: ${formatKwacha(outstanding)}</span></div>
               <div class="loan-progress" role="progressbar" aria-label="Loan repayment progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><span style="width:${progress}%"></span></div>
@@ -1719,7 +1806,7 @@
         document.getElementById('modalLoanStatus').textContent = formatStatusLabel(loan.status);
         document.getElementById('modalLoanRequested').textContent = formatDateDisplay(loan.createdAt);
         document.getElementById('modalLoanBorrowed').textContent = loan.approvedAt || loan.borrowedDate ? formatDateDisplay(loan.approvedAt || loan.borrowedDate) : 'Not yet approved';
-        document.getElementById('modalLoanTenure').textContent = loan.tenureWeeks ? `${loan.tenureWeeks} week${Number(loan.tenureWeeks) === 1 ? '' : 's'}` : 'Not provided';
+        document.getElementById('modalLoanTenure').textContent = formatLoanTenure(loan);
         document.getElementById('modalLoanPaymentMode').textContent = loan.paymentMode || 'Not provided';
         document.getElementById('modalLoanUrgency').textContent = formatStatusLabel(loan.urgency || 'standard');
         document.getElementById('modalLoanCollateral').textContent = collateralText;

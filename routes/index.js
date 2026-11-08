@@ -10,7 +10,7 @@ const {
   updateLoanStatus, getAllLoans, recordPayment, submitPaymentProof, decidePaymentSubmission,
   getNotifications, markNotificationRead,
   notifyAllOverdue, searchByReceiptId, sendLoanNotification, notifyUser,
-  createAdminLoan
+  createAdminLoan, getLoanInterestPolicy, updateLoanInterestPolicy
 } = require('../controllers/loanController');
 const {
   requestSignup, confirmSignup, resendOTP,
@@ -117,12 +117,15 @@ router.get('/reports/:scope/users/:id', viewRevenueGate, getUserTracking);
 
 router.get('/users', getAllUsers);
 
+router.patch('/admin/loan-interest-policy', updateLoanInterestPolicy);
+
 router.get('/notifications', getNotifications);
 router.patch('/notifications/:id/read', markNotificationRead);
 
 router.get('/loans', getLoans);
 router.get('/loans/all', getAllLoans);
 router.get('/loans/search', searchByReceiptId);
+router.get('/loans/interest-policy', getLoanInterestPolicy);
 router.get('/payments', viewRevenueGate, getPaymentsLedger);
 router.get('/payments/export', ...reportPremiumGate, getPaymentsReportExport);
 router.post('/loans/notify-overdue', bulkNotifyGate, notifyAllOverdue);

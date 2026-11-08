@@ -2319,6 +2319,15 @@ body.light:has(#adminDashboard:not(.hidden)) .admin-page-back:hover { color:#096
 body.light:has(#adminDashboard:not(.hidden)) .notification-item.unread { background:#edf5ff !important; }
 body.light:has(#adminDashboard:not(.hidden)) .notification-actions button[data-notification-application-action="approve"] { background:#eaf7ee; color:#1a7f37; border-color:#a8d5b5; }
 body.light:has(#adminDashboard:not(.hidden)) .notification-actions .notification-decline { background:#fff0ef; color:#cf222e; border-color:#f0b8b5; }
+.loan-rate-form { max-width:900px; }
+.loan-rate-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+.loan-rate-fields label { display:grid; gap:6px; color:var(--muted,#8b949e); font-size:13px; }
+.loan-rate-fields input { width:100%; margin:0; }
+.loan-rate-help { max-width:760px; color:var(--muted,#8b949e); font-size:13px; line-height:1.5; }
+.loan-rate-effective { color:var(--accent,#2f81f7); font-weight:600; }
+.timeframe-note { margin:4px 0 10px; color:var(--muted,#8b949e); font-size:12px; line-height:1.45; }
+body.light:has(#adminDashboard:not(.hidden)) .loan-rate-fields label,
+body.light:has(#adminDashboard:not(.hidden)) .loan-rate-help { color:var(--muted) !important; }
 @media (max-width:1023px) {
   .admin-sidebar { width:64px; padding:14px 6px 20px; }
   .admin-main-content { margin-left:64px; padding-right:16px; padding-left:16px; }

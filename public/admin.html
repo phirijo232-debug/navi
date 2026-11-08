@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>document.documentElement.classList.add(localStorage.getItem('adminTheme') === 'light' ? 'light' : 'dark');</script>
   <title>PrymeBMF Admin — Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=20261106-admin-light-theme">
+  <link rel="stylesheet" href="style.css?v=20261108-custom-tenure-rates">
   <style>
     body {
       min-height: 100vh;
@@ -685,6 +685,7 @@
           <button type="button" class="admin-nav-item" data-admin-page="portfolioReports" title="Reports Platform"><span class="admin-nav-icon icon-reports" aria-hidden="true">↗</span><span>Reports Platform</span></button>
           <span class="admin-sidebar-section">Settings</span>
           <button type="button" class="admin-nav-item" id="adminSidebarServerMode" data-admin-page="serverSettingsView" title="Server Mode"><span class="admin-nav-icon" aria-hidden="true">⚙</span><span>Server Mode</span></button>
+          <button type="button" class="admin-nav-item" id="adminSidebarLoanRates" data-admin-page="loanInterestRatesView" title="Loan Rates"><span class="admin-nav-icon" aria-hidden="true">％</span><span>Loan Rates</span></button>
           <button type="button" id="logoutBtn" class="admin-nav-item" data-dashboard-action="logout" title="Logout"><span class="admin-nav-icon icon-logout" aria-hidden="true">⇥</span><span>Logout</span></button>
         </nav>
       </aside>
@@ -837,6 +838,25 @@
           <p id="serverModeStatus" class="message-text" style="text-align:left;margin:12px 0" role="status"></p>
           <button id="serverModeBtn" class="toggle-mode admin-mode-btn" type="button">Switch Mode</button>
           <div id="serverModeConfirm" class="server-mode-confirm" hidden><span id="serverModeConfirmText"></span><button id="serverModeConfirmCancel" class="toggle-mode" type="button">Cancel</button><button id="serverModeConfirmSwitch" class="enter-btn" type="button">Switch</button></div>
+        </section>
+
+        <section id="loanInterestRatesView" class="admin-page hidden panel" aria-labelledby="loanInterestRatesTitle">
+          <h1 id="loanInterestRatesTitle">Loan Interest Rates</h1>
+          <p>Rates apply to new requests in the selected store. Existing loans keep their recorded interest. Custom-date terms stop accruing term interest on the due date.</p>
+          <p id="loanInterestRatesStatus" class="message-text" style="text-align:left;margin:12px 0" role="status" aria-live="polite"></p>
+          <form id="loanInterestRatesForm" class="auth-form loan-rate-form">
+            <div class="loan-rate-fields">
+              <label>1 week (%)<input class="modal-input" id="loanRateWeek1" type="number" min="0.01" max="100" step="0.01" required></label>
+              <label>2 weeks (%)<input class="modal-input" id="loanRateWeek2" type="number" min="0" max="100" step="0.01" required></label>
+              <label>3 weeks (%)<input class="modal-input" id="loanRateWeek3" type="number" min="0" max="100" step="0.01" required></label>
+              <label>4 weeks (%)<input class="modal-input" id="loanRateWeek4" type="number" min="0" max="100" step="0.01" required></label>
+              <label>Daily extension rate (%)<input class="modal-input" id="loanExtensionDailyRate" type="number" min="0" max="1" step="0.01" required></label>
+            </div>
+            <p class="loan-rate-help">The daily rate is added only after day 28, up to the requested due date. It scales with the 1-week rate. Grace/default charges follow their separate existing policy.</p>
+            <p id="loanExtensionEffectiveRate" class="loan-rate-effective"></p>
+            <button class="enter-btn" id="saveLoanInterestRates" type="submit">Save Rates</button>
+          </form>
+          <p id="loanInterestRatesUpdated" class="directory-status"></p>
         </section>
 
     <section id="customersView" class="admin-page hidden" aria-labelledby="customersTitle">
@@ -1098,6 +1118,6 @@
     </div>
   </div>
 
-  <script src="admin.js?v=20261103-custom-chart-timeframe"></script>
+  <script src="admin.js?v=20261108-custom-tenure-rates"></script>
 </body>
 </html>

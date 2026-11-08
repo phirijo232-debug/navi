@@ -1,5 +1,7 @@
 'use strict';
 
+const loanTerms = require('./loanTerms');
+
 const REPORTS = [
   { type: 'how-risky', title: 'How Risky Are Our Loans?', sheet: 'PAR Report', filename: 'bmf_how_risky' },
   { type: 'who-owes', title: 'Who Owes What and How Late?', sheet: 'Aging Schedule', filename: 'bmf_who_owes' },
@@ -427,6 +429,8 @@ function buildStatement(loan, users, today) {
     phone: user.phone || loan.phone || '',
     branch: loan.branch || user.branch || loan.storeId || '',
     tenureWeeks: Number(loan.tenureWeeks || 0),
+    tenureDays: loan.tenureDays || loanTerms.getLoanTermDays(loan),
+    tenureLabel: loanTerms.formatLoanTerm(loan),
     generatedAt: new Date().toISOString()
   };
 }
@@ -470,7 +474,7 @@ function buildDisbursements(loans, users, from, to, today) {
         principal: major(scheduleTotal),
         interestRate: Number(loan.interestRate),
         total: major(cents(loan.totalRepayment, 'total payable', loanReference(loan))),
-        tenure: loan.tenureWeeks ? `${loan.tenureWeeks} weeks` : '',
+        tenure: loanTerms.formatLoanTerm(loan),
         dueDate: String(loan.dueDate || '').slice(0, 10),
         collateral: loan.collateralDescription || '',
         paymentMethod: loan.paymentMode || '',

@@ -1,6 +1,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const nodemailer = require('nodemailer');
+const loanTerms = require('../services/loanTerms');
 
 let _transporter = null;
 
@@ -58,6 +59,7 @@ function buildLoanSummaryText(loanData = {}) {
   const totalRepayment = loanData.totalRepayment ?? loanData.total ?? loanData.totalAmount ?? amount;
   const interestAmount = loanData.interestAmount ?? loanData.interest ?? Math.max(0, totalRepayment - amount);
   const tenureWeeks = loanData.tenureWeeks ?? loanData.tenure ?? null;
+  const tenureLabel = loanTerms.formatLoanTerm(loanData.tenureDays ? loanData : { tenureWeeks });
   const dueDate = loanData.dueDate || loanData.due_date || 'To be confirmed';
   const urgency = loanData.urgency || 'standard';
 
@@ -69,9 +71,7 @@ function buildLoanSummaryText(loanData = {}) {
     `- Total repayment: ${formatCurrency(totalRepayment)}`
   ];
 
-  if (tenureWeeks) {
-    lines.push(`- Tenure: ${tenureWeeks} week${Number(tenureWeeks) === 1 ? '' : 's'}`);
-  }
+  if (tenureLabel !== 'Not provided') lines.push(`- Tenure: ${tenureLabel}`);
   if (dueDate) {
     lines.push(`- Due date: ${String(dueDate).slice(0, 10)}`);
   }

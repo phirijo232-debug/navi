@@ -70,6 +70,7 @@ GET  /sessions
 GET  /loans
 GET  /loans/all
 GET  /loans/search
+GET  /loans/interest-policy
 GET  /loans/:id
 POST /loans/request
 POST /loans/:id/action
@@ -109,6 +110,7 @@ GET  /invites/validate/:token
 POST /invites/validate
 POST /admin/users
 POST /admin/announcements
+PATCH /admin/loan-interest-policy
 POST /admin/backup
 GET  /admin/backups
 POST /admin/restore
@@ -226,7 +228,8 @@ Phone is MANDATORY on signup — never make it optional.
 2 weeks = 16%
 3 weeks = 24%
 4 weeks = 32%
-These are fixed BMF rates. Do not change without explicit instruction.
+These are the initial BMF defaults, stored per store in `data/loanInterestPolicy.json` and editable only by `admin` or `franchise_admin`. Weekly rates must be non-decreasing. New requests use the store's saved rates; existing loans keep their booked interest.
+Custom-date customer terms from 7 through 153 days use the weekly rate checkpoints (linear interpolation between checkpoints for non-week durations through day 28). After day 28, add the saved daily extension rate per day, scaled in proportion to the current 1-week rate. Default extension rate is 0.10 percentage points/day at a 10% 1-week rate. This extension only prices the selected loan term through its due date; it does not accrue after the due date. Do not confuse it with the separate grace/default penalty policy below.
 
 ## URGENCY LEVELS AND APPROVAL TIMEFRAMES
 Standard  = 48 hours
@@ -271,6 +274,8 @@ Announcements (POST /admin/announcements)
   admin.html must hide the announcement button from role 'admin' to match.
 HR / Employee Securities (GET/PATCH /hr/employees)
   admin + franchise_admin only.
+Loan interest policy (GET /loans/interest-policy; PATCH /admin/loan-interest-policy)
+  authenticated users read only their own store policy; updates are restricted to admin + franchise_admin and are store scoped. Store admins cannot edit rates.
 FIELD HYGIENE (GET /users — public-facing even when authed): strip ALL
   credential material — password (hash), tokens (legacy blind credentials),
   AND trustedDevices (LIVE device tokens — leaking these lets any admin-panel

@@ -288,7 +288,7 @@ function statementSheet(wb, report) {
     ['Branch', statement.branch, 'Interest Rate', statement.interestRate == null ? '' : statement.interestRate / 100],
     ['Loan Officer', statement.officer, 'Total to Pay Back', statement.total],
     ['', '', 'Dates Given / Final Due', [dateLabel(statement.loanDate), dateLabel(statement.dueDate)].filter(Boolean).join(' / ')],
-    ['', '', 'Loan Length', statement.tenureWeeks ? `${statement.tenureWeeks} weeks` : ''],
+    ['', '', 'Loan Length', statement.tenureLabel || (statement.tenureWeeks ? `${statement.tenureWeeks} weeks` : '')],
     ['', '', 'Number of Instalments', statement.installmentCount],
     ['', '', 'Loan Status', statement.status]
   ];

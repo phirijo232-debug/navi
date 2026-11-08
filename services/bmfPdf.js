@@ -216,7 +216,7 @@ function statementPdf(statement, statementDate = new Date().toISOString().slice(
       const details = [
         ['Date Money Given', dateText(statement.loanDate)],
         ['Final Payment Date', dateText(statement.dueDate)],
-        ['Loan Length', statement.tenureWeeks ? `${statement.tenureWeeks} weeks` : 'Not recorded'],
+        ['Loan Length', statement.tenureLabel || (statement.tenureWeeks ? `${statement.tenureWeeks} weeks` : 'Not recorded')],
         ['No. of Instalments', statement.installmentCount || 'Not recorded'],
         ['Status', statement.status]
       ];

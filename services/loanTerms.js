@@ -1,0 +1,124 @@
+'use strict';
+
+const DEFAULT_POLICY = Object.freeze({
+  weeklyRates: Object.freeze({ 1: 10, 2: 16, 3: 24, 4: 32 }),
+  extensionDailyRatePercent: 0.1,
+  extensionBaselineOneWeekRatePercent: 10,
+  minTermDays: 7,
+  maxTermDays: 153
+});
+
+function getDefaultPolicy() {
+  return {
+    weeklyRates: { ...DEFAULT_POLICY.weeklyRates },
+    extensionDailyRatePercent: DEFAULT_POLICY.extensionDailyRatePercent,
+    extensionBaselineOneWeekRatePercent: DEFAULT_POLICY.extensionBaselineOneWeekRatePercent,
+    minTermDays: DEFAULT_POLICY.minTermDays,
+    maxTermDays: DEFAULT_POLICY.maxTermDays
+  };
+}
+
+function normalizePolicy(input) {
+  const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const rates = source.weeklyRates && typeof source.weeklyRates === 'object' ? source.weeklyRates : {};
+  const weeklyRates = {};
+  for (const week of [1, 2, 3, 4]) {
+    const value = Number(rates[week] ?? DEFAULT_POLICY.weeklyRates[week]);
+    if (!Number.isFinite(value) || value < 0 || value > 100) throw new TypeError(`Week ${week} rate must be between 0% and 100%.`);
+    weeklyRates[week] = Number(value.toFixed(4));
+  }
+  if (weeklyRates[1] <= 0) throw new TypeError('The one-week rate must be greater than 0%.');
+  if ([1, 2, 3].some(week => weeklyRates[week] > weeklyRates[week + 1])) {
+    throw new TypeError('Weekly rates must stay the same or increase with each longer term.');
+  }
+  const extensionDailyRatePercent = Number(source.extensionDailyRatePercent ?? DEFAULT_POLICY.extensionDailyRatePercent);
+  if (!Number.isFinite(extensionDailyRatePercent) || extensionDailyRatePercent < 0 || extensionDailyRatePercent > 1) {
+    throw new TypeError('The daily extension rate must be between 0% and 1% per day.');
+  }
+  return {
+    weeklyRates,
+    extensionDailyRatePercent: Number(extensionDailyRatePercent.toFixed(4)),
+    extensionBaselineOneWeekRatePercent: DEFAULT_POLICY.extensionBaselineOneWeekRatePercent,
+    minTermDays: DEFAULT_POLICY.minTermDays,
+    maxTermDays: DEFAULT_POLICY.maxTermDays
+  };
+}
+
+function getEffectiveDailyExtensionRatePercent(policy) {
+  const normalized = normalizePolicy(policy);
+  return Number((normalized.extensionDailyRatePercent *
+    normalized.weeklyRates[1] / normalized.extensionBaselineOneWeekRatePercent).toFixed(6));
+}
+
+function getInterestRatePercentForDays(termDays, policy) {
+  const normalized = normalizePolicy(policy);
+  const days = Number(termDays);
+  if (!Number.isInteger(days) || days < normalized.minTermDays || days > normalized.maxTermDays) {
+    throw new RangeError(`Loan term must be between ${normalized.minTermDays} and ${normalized.maxTermDays} days.`);
+  }
+
+  if (days > 28) {
+    const extraDays = days - 28;
+    return Number((normalized.weeklyRates[4] + extraDays * getEffectiveDailyExtensionRatePercent(normalized)).toFixed(6));
+  }
+
+  const lowerWeek = Math.floor(days / 7);
+  const upperWeek = Math.ceil(days / 7);
+  if (lowerWeek === upperWeek) return normalized.weeklyRates[lowerWeek];
+  const lowerDay = lowerWeek * 7;
+  const ratio = (days - lowerDay) / 7;
+  return Number((normalized.weeklyRates[lowerWeek] +
+    (normalized.weeklyRates[upperWeek] - normalized.weeklyRates[lowerWeek]) * ratio).toFixed(6));
+}
+
+function calculateInterestForDays(amount, termDays, policy) {
+  const principal = Number(amount);
+  if (!Number.isFinite(principal) || principal <= 0) throw new TypeError('Loan amount must be a positive number.');
+  const rate = getInterestRatePercentForDays(termDays, policy);
+  const interest = Number((principal * rate / 100).toFixed(2));
+  return { rate, interest, total: Number((principal + interest).toFixed(2)) };
+}
+
+function getLoanTermDays(loan = {}) {
+  const days = Number(loan.tenureDays);
+  if (Number.isInteger(days) && days > 0) return days;
+  const weeks = Number(loan.tenureWeeks ?? loan.tenure);
+  return Number.isFinite(weeks) && weeks > 0 ? Math.round(weeks * 7) : 0;
+}
+
+function formatLoanTerm(loanOrDays = {}) {
+  const days = typeof loanOrDays === 'number' ? loanOrDays : getLoanTermDays(loanOrDays);
+  if (!Number.isFinite(days) || days <= 0) return 'Not provided';
+  if (days % 7 === 0) {
+    const weeks = days / 7;
+    return `${weeks} week${weeks === 1 ? '' : 's'}`;
+  }
+  return `${days} days`;
+}
+
+function dateKeyToEpochDay(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+  if (!match) throw new TypeError('A valid calendar date is required.');
+  const [, year, month, day] = match.map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    throw new TypeError('A valid calendar date is required.');
+  }
+  return Math.floor(date.getTime() / 86400000);
+}
+
+function calendarDaysBetween(startDate, endDate) {
+  return dateKeyToEpochDay(endDate) - dateKeyToEpochDay(startDate);
+}
+
+module.exports = {
+  DEFAULT_POLICY,
+  getDefaultPolicy,
+  normalizePolicy,
+  getEffectiveDailyExtensionRatePercent,
+  getInterestRatePercentForDays,
+  calculateInterestForDays,
+  getLoanTermDays,
+  formatLoanTerm,
+  calendarDaysBetween
+};

@@ -132,6 +132,17 @@ test('admin directories expose wired filters, bounded paging, and application be
   assert.match(js, /function dateMatchesRange\(value, from, to\)/);
 });
 
+test('loan rate management is role-visible and submits the current store policy', () => {
+  for (const id of ['adminSidebarLoanRates', 'loanInterestRatesView', 'loanRateWeek1', 'loanRateWeek2', 'loanRateWeek3', 'loanRateWeek4', 'loanExtensionDailyRate']) {
+    assert.ok(html.includes(`id="${id}"`), `${id} must exist in the admin page`);
+  }
+  assert.match(js, /async function loadLoanInterestPolicy\(/);
+  assert.match(js, /async function saveLoanInterestPolicy\(/);
+  assert.match(js, /fetch\('\/loans\/interest-policy'/);
+  assert.match(js, /fetch\('\/admin\/loan-interest-policy'/);
+  assert.match(js, /\['admin', 'franchise_admin'\]/);
+});
+
 test('admin dashboard controls are wired and persist an admin-only theme preference', () => {
   for (const id of [
     'adminSidebar', 'portfolioOverview', 'portfolioKpis', 'collectionsChart',
