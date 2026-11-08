@@ -1,13 +1,15 @@
 
 # BMF System Status and Hardening Register
 
-**Prepared:** 07 November 2026  
+**Prepared:** 08 November 2026  
 **Purpose:** One repository-grounded view of shipped BMF work, open work, and the files that should receive the next strengthening pass.  
 **Source rule:** This register compares `TODO.md`, `AGENTS.md`, route documentation, tests, and the newer ExecPlans. Prompt examples are design references only; no illustrative names, balances, IDs, or addresses are treated as system data.
 
 ## Executive summary
 
 NaviServer already has working customer and admin portals, loan and payment workflows, role/store authorization, OTP, audit/security features, reports, backups, health monitoring, and both JSON and SQLite storage paths. The main remaining risks are operational verification, visual browser QA, data migration decisions, input-hardening depth, and stale/conflicting project checklists.
+
+Recent update (08 November 2026): customer-requested custom loan dates now determine exact calendar-day terms. Interest is calculated from a store-scoped policy shared by the customer quote and server request handler. Admin and Franchise Admin can edit the policy; edits are validated and audited. The term begins on approval and the custom extension rate applies only through the due date. Existing grace/default penalties and already-issued loans are unchanged.
 
 This is a source-led status register, not a new security certification. The completion marks below reflect the most recent relevant plan or test record. Browser and public-host checks remain unverified unless explicitly stated.
 
@@ -20,6 +22,7 @@ These areas are marked complete by the newer plans and/or the project TODO. Thei
 | Authentication and onboarding | Login/OTP, password reset, invite-based signup, device-token protected requests, generic reset responses | `controllers/authController.js`, `middleware/security.js`, `middleware/otp.js`, `middleware/phoneNumber.js`, `middleware/shareLinks.js`, `routes/index.js`; `docs/plans/invite-enforcement.md` |
 | Loan lifecycle | Request, review, approval, decline, grace/default handling, actions, audit fields, notifications, scoped authorization | `controllers/loanController.js`, `middleware/loanNotifications.js`, `scheduler.js`; `docs/plans/loan-lifecycle.md` |
 | Tenure and due dates | New loan due dates derive from the approval date in the Lusaka calendar; one week is seven calendar days regardless of request wait time | `controllers/loanController.js`, `public/admin.js`, `test/loanWorkflow.test.js`, `test/storeScope.test.js`; `docs/plans/guardian-security-profile-cron.md` |
+| Custom-date tenure and rates | Customer-selected dates are priced as exact days; the 1-4 week tiers are preserved, custom terms interpolate through 28 days and use a configurable daily extension after that. Admin and Franchise Admin can edit validated store-scoped rates; extension interest stops at the due date. | `services/loanTerms.js`, `controllers/loanController.js`, `public/user.html`, `public/admin.html`, `public/admin.js`, `test/loanInterestPolicy.test.js`; `docs/plans/custom-loan-tenure-interest.md` |
 | Payment controls | Customer proof submissions remain pending until in-scope staff review; approved payments are recorded once in the ledger with receipt and balance fields | `controllers/loanController.js`, `controllers/fileController.js`, `public/user.html`, `public/admin.js`, `test/verifiedPayments.test.js`, `test/userPortalPayments.test.js` |
 | Customer portal and profile | Loan history, loan details, payment history/proof flow, inquiries, profile summaries, ownership-checked attachments | `public/user.html`, `public/dashboard.html`, `public/dashboard.js`, `controllers/fileController.js`; `docs/plans/admin-customer-portal-and-verified-payments.md` |
 | Admin pages and customer records | Admin directories, customer profile, Quick Screen details, table overflow handling, report entry points, scoped actions and status views | `public/admin.html`, `public/admin.js`, `public/style.css`; `docs/plans/admin-directory-access-refresh.md`, `docs/plans/guardian-security-profile-cron.md` |
@@ -83,7 +86,7 @@ Per `AGENTS.md`, do not modify `middleware/logger.js`, `middleware/otp.js`, or `
 
 ## Documentation conflicts to resolve
 
-1. `TODO.md` still marks loan request timeframe/urgency, loan history, admin loan review, and some reporting work incomplete. Newer plans describe these as implemented. Retest the current paths, then update the old checkboxes so the TODO is not misleading.
+1. `TODO.md` previously marked loan request timeframe/urgency, loan history, admin loan review, and some reporting work incomplete. Custom-date pricing and rate management are now recorded complete there; reconcile any remaining stale checkboxes against current tests before relying on the list.
 2. `docs/plans/bmf-reports.md` contains an old unchecked build plan. `docs/plans/report-system-refresh.md` records the report system as implemented and documents successful generation. Mark the older plan superseded or update it from current evidence.
 3. `docs/plans/public-internet-access.md` says the route matrix is missing and includes an older test-count note. Compare it with current tests and the newer public-access audit before carrying that status forward.
 4. Modal-close work is marked complete in the guardian plan and open in the customer portal plan. Verify once and synchronize both.
