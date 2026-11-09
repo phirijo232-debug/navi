@@ -97,8 +97,8 @@ function showBmfToast(message, kind = 'success') {
     el.style.padding = '12px 16px';
     el.style.borderRadius = '10px';
     el.style.boxShadow = '0 18px 30px rgba(0,0,0,0.2)';
-    el.style.background = kind === 'error' ? '#c0392b' : '#1f7a54';
-    el.style.color = '#fff';
+    el.style.background = kind === 'error' ? 'var(--error)' : 'var(--success)';
+    el.style.color = 'var(--on-primary)';
     el.style.fontWeight = '600';
     document.body.appendChild(el);
     return el;
@@ -106,7 +106,8 @@ function showBmfToast(message, kind = 'success') {
 
   toast.textContent = message;
   toast.dataset.kind = kind;
-  toast.style.background = kind === 'error' ? '#c0392b' : '#1f7a54';
+  toast.style.background = kind === 'error' ? 'var(--error)' : 'var(--success)';
+  toast.style.color = 'var(--on-primary)';
   toast.style.display = 'block';
   clearTimeout(adminToastTimer);
   adminToastTimer = setTimeout(() => {
@@ -1382,10 +1383,10 @@ function renderPortfolioOverview() {
     balance: sparkDays.map(day => balanceByDay.get(day.key) || 0)
   };
   const kpiData = [
-    { label: 'Cash Collected', value: formatCurrency(collectedMonth), note: `${monthPayments.length} payments this month`, color: '#2f81f7', accent: 'blue', spark: 'cash', metric: 'payments by date' },
-    { label: 'Active Loans', value: String(active.length), note: `${pendingRequests.length} requests awaiting review`, color: '#d29922', accent: 'amber', spark: 'active', metric: 'active loans by approval date' },
-    { label: 'Overdue Loans', value: String(overdue.length), note: `${formatCurrency(overdueBalance)} outstanding`, color: '#f85149', accent: 'red', spark: 'overdue', metric: 'overdue loans by due date' },
-    { label: 'Outstanding Balance', value: formatCurrency(openBalance), note: 'Across all open loans', color: '#a371f7', accent: 'purple', spark: 'balance', metric: 'open balances by approval date' }
+    { label: 'Cash Collected', value: formatCurrency(collectedMonth), note: `${monthPayments.length} payments this month`, color: '#5B94D6', accent: 'blue', spark: 'cash', metric: 'payments by date' },
+    { label: 'Active Loans', value: String(active.length), note: `${pendingRequests.length} requests awaiting review`, color: '#F0C56A', accent: 'amber', spark: 'active', metric: 'active loans by approval date' },
+    { label: 'Overdue Loans', value: String(overdue.length), note: `${formatCurrency(overdueBalance)} outstanding`, color: '#FFB4AB', accent: 'red', spark: 'overdue', metric: 'overdue loans by due date' },
+    { label: 'Outstanding Balance', value: formatCurrency(openBalance), note: 'Across all open loans', color: '#F0D0D4', accent: 'purple', spark: 'balance', metric: 'open balances by approval date' }
   ];
   kpis.innerHTML = kpiData.map(item => `
     <article class="admin-kpi-card accent-${item.accent}">
@@ -1485,10 +1486,10 @@ function renderPortfolioOverview() {
   const intervalLabel = bucketDays === 1 ? 'Daily' : bucketDays <= 7 ? 'Weekly' : 'Monthly';
   const chartSvg = `<svg class="collections-svg admin-month-chart" viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="${intervalLabel} payments received and newly approved loan amounts from ${formatDate(firstDay)} to ${formatDate(lastDay)}">
     ${grid}${xLabels}
-    <path d="${makeArea(paymentPoints)}" fill="#2f81f7" opacity=".1"></path>
-    <path d="${makeArea(loanPoints)}" fill="#3fb950" opacity=".1"></path>
-    <path d="${makeLine(paymentPoints)}" fill="none" stroke="#2f81f7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></path>
-    <path d="${makeLine(loanPoints)}" fill="none" stroke="#3fb950" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="${makeArea(paymentPoints)}" fill="#5B94D6" opacity=".1"></path>
+    <path d="${makeArea(loanPoints)}" fill="#8FDCB0" opacity=".1"></path>
+    <path d="${makeLine(paymentPoints)}" fill="none" stroke="#5B94D6" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="${makeLine(loanPoints)}" fill="none" stroke="#8FDCB0" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></path>
     ${tooltips}
   </svg>`;
   chart.innerHTML = customRangeValid || !isCustomRange
@@ -3152,7 +3153,7 @@ async function fetchAuditLog() {
     if (!response.ok) throw new Error(data.error || 'Unable to load the security audit log.');
     const status = document.getElementById('auditLogStatus');
     if (status) status.textContent = data.integrity?.valid === false ? 'Audit log integrity check found an issue. Review this with the system administrator.' : `${data.total || 0} audit records · ${data.integrity?.valid === false ? 'Integrity issue detected' : 'Integrity verified'}`;
-    list.innerHTML = (data.entries || []).map(entry => `<article class="panel" style="margin:8px 0;padding:12px;border:1px solid var(--bmf-border,#30363d);border-radius:10px;">
+    list.innerHTML = (data.entries || []).map(entry => `<article class="panel" style="margin:8px 0;padding:12px;border:1px solid var(--bmf-border,#3A4452);border-radius:10px;">
       <div class="admin-topbar"><strong>${escapeHtml(String(entry.action || '').replaceAll('_', ' '))}</strong><span>${escapeHtml(new Date(entry.timestamp).toLocaleString('en-GB', { timeZone: 'Africa/Lusaka' }))}</span></div>
       <div class="table-subtext">By ${escapeHtml(entry.actor || 'system')}${entry.targetId ? ` · Ref ${escapeHtml(entry.targetId)}` : ''}${entry.ip ? ` · ${escapeHtml(entry.ip)}` : ''}</div>
       ${entry.detail && Object.keys(entry.detail).length ? `<div class="table-subtext">${escapeHtml(JSON.stringify(entry.detail))}</div>` : ''}
@@ -3177,7 +3178,7 @@ async function fetchAccessApprovals() {
     updateSecurityMetrics();
     const status = document.getElementById('accessApprovalsStatus');
     if (status) status.textContent = `${pending.length} request${pending.length === 1 ? '' : 's'} awaiting review.`;
-    list.innerHTML = approvals.map(item => `<article class="panel" style="margin:8px 0;padding:12px;border:1px solid var(--bmf-border,#30363d);border-radius:10px;">
+    list.innerHTML = approvals.map(item => `<article class="panel" style="margin:8px 0;padding:12px;border:1px solid var(--bmf-border,#3A4452);border-radius:10px;">
       <div class="admin-topbar"><div><strong>${escapeHtml(item.requesterName || item.requesterId)}</strong><div class="table-subtext">${escapeHtml(SECURITY_PERMISSION_LABELS[item.feature] || item.feature)} · ${escapeHtml(item.storeId)} · ${escapeHtml(new Date(item.requestedAt).toLocaleString('en-GB', { timeZone: 'Africa/Lusaka' }))}</div>${item.reason ? `<div>${escapeHtml(item.reason)}</div>` : ''}</div><span class="status-badge">${escapeHtml(item.status)}</span></div>
       ${item.status === 'pending' ? `<div class="button-row"><button type="button" class="toggle-mode" data-approval-decision="approve" data-approval-id="${escapeHtml(item.id)}">Allow for 15 minutes</button><button type="button" class="toggle-mode" data-approval-decision="deny" data-approval-id="${escapeHtml(item.id)}">Deny</button></div>` : ''}
     </article>`).join('') || '<div class="directory-empty">No access requests are available.</div>';

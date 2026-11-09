@@ -7,16 +7,16 @@
   <style>
     :root {
       color-scheme: dark;
-      --qs-bg: #0d1117;
-      --qs-card: #161b22;
-      --qs-card-alt: #1c2128;
-      --qs-border: #30363d;
-      --qs-blue: #2f81f7;
-      --qs-text: #e6edf3;
-      --qs-muted: #8b949e;
-      --qs-success: #3fb950;
-      --qs-error: #f85149;
-      --qs-amber: #d29922;
+      --qs-bg: #10141A;
+      --qs-card: #1A212B;
+      --qs-card-alt: #222B38;
+      --qs-border: #3A4452;
+      --qs-blue: #5B94D6;
+      --qs-text: #E6EAF0;
+      --qs-muted: #B4BCC6;
+      --qs-success: #8FDCB0;
+      --qs-error: #FFB4AB;
+      --qs-amber: #F0C56A;
     }
 
     * { box-sizing: border-box; }
@@ -43,7 +43,7 @@
     .qs-input:focus, .qs-select:focus, button:focus-visible { outline: 2px solid var(--qs-blue); outline-offset: 2px; }
     .qs-toggle-group, .qs-mode-group { display: flex; gap: 8px; }
     .qs-toggle-btn, .qs-mode-tab { min-height: 42px; flex: 1; padding: 8px; border: 1px solid var(--qs-border); border-radius: 8px; background: transparent; color: var(--qs-muted); cursor: pointer; }
-    .qs-toggle-btn.active, .qs-mode-tab.active { border-color: var(--qs-blue); background: rgba(47, 129, 247, .12); color: var(--qs-blue); }
+    .qs-toggle-btn.active, .qs-mode-tab.active { border-color: var(--qs-blue); background: rgba(91, 148, 214, .12); color: var(--qs-blue); }
     .qs-mode-content { margin-top: 12px; }
     .qs-hidden { display: none !important; }
     .qs-estimate h2 { color: var(--qs-blue); }
@@ -57,9 +57,9 @@
     .qs-file-name { margin: 6px 0 0; color: var(--qs-success); font-size: 12px; }
     .qs-checkbox { display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; }
     .qs-checkbox input { margin-top: 4px; }
-    .qs-submit-btn, .qs-btn-secondary { width: 100%; min-height: 48px; padding: 12px; border: 0; border-radius: 8px; background: var(--qs-blue); color: #fff; font-weight: 700; cursor: pointer; }
+    .qs-submit-btn, .qs-btn-secondary { width: 100%; min-height: 48px; padding: 12px; border: 0; border-radius: 8px; background: var(--qs-blue); color: #0E1A2C; font-weight: 700; cursor: pointer; }
     .qs-submit-btn:disabled { opacity: .65; cursor: wait; }
-    .qs-btn-secondary { margin-top: 12px; border: 1px solid var(--qs-border); background: transparent; }
+    .qs-btn-secondary { margin-top: 12px; border: 1px solid var(--qs-border); background: transparent; color: var(--qs-text); }
     .qs-message { min-height: 20px; margin: 0; }
     .qs-message.error { color: var(--qs-error); }
     .qs-success-screen { display: none; margin-top: 20px; text-align: center; }
