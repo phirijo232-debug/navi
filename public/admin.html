@@ -2,10 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#5B94D6">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <script>document.documentElement.classList.add(localStorage.getItem('adminTheme') === 'light' ? 'light' : 'dark');</script>
   <title>PrymeBMF Admin — Dashboard</title>
   <link rel="stylesheet" href="style.css?v=20261108-custom-tenure-rates">
+  <script src="/client-config.js"></script>
+  <script src="/apiBase.js"></script>
   <style>
     body {
       min-height: 100vh;
@@ -653,6 +658,7 @@
     <section id="adminDashboard" class="hidden">
       <header class="admin-appbar">
         <span id="loggedInAdmin" hidden></span>
+        <button type="button" id="phoneNavBtn" class="phone-nav-btn" aria-label="Open menu" aria-expanded="false">☰</button>
         <div class="admin-brand"><strong>BMF</strong><span>· Admin</span><small>Buraza Micro Finance</small></div>
         <label class="admin-search-wrap"><span aria-hidden="true">Find:</span><input id="adminDashboardSearch" type="search" placeholder="Loans, borrowers, receipts..." aria-label="Search dashboard"></label>
         <div class="admin-user-controls">
@@ -663,6 +669,7 @@
       </header>
 
     <div class="admin-dashboard-layout">
+      <button type="button" id="navBackdrop" class="nav-backdrop" aria-label="Close menu"></button>
       <aside id="adminSidebar" class="admin-sidebar" aria-label="Admin navigation">
         <nav>
           <span class="admin-sidebar-section">Main</span>

@@ -64,4 +64,11 @@ function shareKeyGate(req, res, next) {
   }
 }
 
-module.exports = { getPublicBaseUrl, getShareKey, appendShareKey, shareKeyGate };
+// Browser bootstrap. Publishes only the public origin (ngrok or domain).
+// Never includes SHARE_PUBLIC_KEY, MASTER_KEY, or any other secret.
+function clientConfigScript() {
+  const publicOrigin = String(process.env.PUBLIC_URL || process.env.APP_URL || config.PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  return `window.BMF_API_BASE=${JSON.stringify(publicOrigin)};`;
+}
+
+module.exports = { getPublicBaseUrl, getShareKey, appendShareKey, shareKeyGate, clientConfigScript };

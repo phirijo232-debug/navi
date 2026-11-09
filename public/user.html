@@ -2,9 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#5B94D6">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>PrymeBMF — My Account</title>
   <link rel="stylesheet" href="style.css?v=20261017-shared-theme-refresh">
+  <script src="/client-config.js"></script>
+  <script src="/apiBase.js"></script>
   <style>
     body.customer-portal { background:#10141A; color:#E6EAF0; }
     .customer-portal .dashboard { width: 100%; max-width: 100vw; margin: 0; padding: 18px clamp(12px, 3vw, 24px); box-sizing: border-box; }
@@ -241,10 +246,14 @@
       .customer-portal .portal-user-controls { margin-left:auto; }
     }
     @media(max-width:650px) {
-      .customer-portal .portal-topbar { padding:8px 10px 8px 72px; }
+      .customer-portal .portal-topbar { padding:8px 10px 8px 56px; }
       .customer-portal .portal-user-name { display:none; }
-      .customer-portal .portal-topbar .loan-tabs { gap:4px; }
-      .customer-portal .portal-topbar .loan-tab { padding:9px 11px; font-size:12px; }
+      .customer-portal .portal-topbar .loan-tabs { gap:6px; }
+      .customer-portal .portal-topbar .loan-tab { min-height:44px; padding:10px 12px; font-size:14px; }
+      .customer-portal .menu-toggle { width:44px; height:44px; }
+      .customer-portal .modal { padding:8px; align-items:flex-end; }
+      .customer-portal .modal-content { width:100%; max-height:calc(100dvh - 12px); border-radius:16px 16px 0 0; }
+      .customer-portal .auth-input, .customer-portal input, .customer-portal select, .customer-portal textarea { font-size:16px; }
       .customer-portal .support-panel { padding:14px; }
       .customer-portal .support-form .request-field-grid,.customer-portal .payment-summary-grid { grid-template-columns:1fr; }
       .customer-portal .support-page-heading { align-items:flex-start; }

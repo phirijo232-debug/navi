@@ -158,7 +158,37 @@ function isPublicPath(path) {
   return false;
 }
 
+function configuredPublicOrigin() {
+  const raw = String(process.env.PUBLIC_URL || process.env.APP_URL || config.PUBLIC_URL || '').trim();
+  if (!raw) return '';
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return '';
+  }
+}
+
+// Allow the browser on the configured HTTPS origin (the ngrok host) to call
+// this API. The origin must match exactly — no wildcard, no credentials —
+// because the session is the x-device-token header, not a cookie.
+function applyConfiguredCors(req, res) {
+  const origin = String(req.headers.origin || '');
+  const allowed = configuredPublicOrigin();
+  if (!origin || !allowed || origin !== allowed) return false;
+  res.setHeader('Access-Control-Allow-Origin', allowed);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-device-token, x-business-unit');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Max-Age', '600');
+  return true;
+}
+
 function deviceAuth(req, res, next) {
+  const corsOk = applyConfiguredCors(req, res);
+  if (corsOk && req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
   if (isPublicPath(req.path)) {
     return next();
   }
@@ -167,10 +197,11 @@ function deviceAuth(req, res, next) {
   const token = req.headers['x-device-token'];
   const isPrivate = isPrivateIp(ip);
 
-  // PRIVATE (default): only LAN IPs may reach authenticated routes. PUBLIC: the
-  // server is internet-reachable, but device-token auth still applies below —
-  // public mode widens reach, it never drops authentication.
-  if (!isPrivate && getServerMode() !== 'public') {
+  // PRIVATE (default): anonymous internet clients stay blocked. PUBLIC widens
+  // reach for clients that have not logged in yet. A presented session token
+  // is still checked below — an unknown or missing token is rejected either way.
+  // This does not replace passwords, OTP, or the public/private mode toggle.
+  if (!isPrivate && getServerMode() !== 'public' && !token) {
     logError(`BLOCKED — non-local IP access attempt from ${ip}`);
     return res.status(403).send('Access denied. Connect from the local network or use a registered device token.');
   }

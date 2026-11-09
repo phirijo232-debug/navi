@@ -38,6 +38,7 @@ const {
 } = require('../controllers/reportController');
 
 const { healthRateLimiter, authRateLimiter, getServerMode, setServerMode, isFranchiseManager } = require('../middleware/security');
+const { clientConfigScript } = require('../middleware/shareLinks');
 const { signUpload } = require('../controllers/fileController');
 const {
   listPermissionGroups, createPermissionGroup, updatePermissionGroup, deletePermissionGroup,
@@ -73,6 +74,14 @@ function dispatchReportExport(req, res, next) {
 }
 
 router.get('/', (req, res) => res.send('Navi Server is running!'));
+
+// Public origin for the browser. Same-origin pages keep using relative paths.
+// No secrets are included. Not cached, so a rotated ngrok host is picked up.
+router.get('/client-config.js', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.type('application/javascript');
+  res.send(clientConfigScript());
+});
 
 router.get('/status', getStatus);
 // IMMUNE: public tier returns {status, uptime} only; the admin tier (memory, db,

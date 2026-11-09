@@ -2412,3 +2412,79 @@ body.light:has(#adminDashboard:not(.hidden)) .loan-rate-help { color:var(--muted
   .directory-date-filter .search-box { flex:1; max-width:none; }
   .customer-directory-table,.payment-history-table,.loan-directory-table { min-width:1000px; }
 }
+
+/* Phones: full-width work area, a real menu, and 44px touch targets.
+   Tables scroll sideways inside their wrappers instead of squeezing columns. */
+.phone-nav-btn, .nav-backdrop { display: none; }
+@media (max-width: 720px) {
+  .phone-nav-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    flex: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 22px;
+    cursor: pointer;
+  }
+  body:has(#adminDashboard:not(.hidden)) .admin-appbar {
+    flex-wrap: wrap;
+    min-height: 56px;
+    padding: 8px 10px 8px 10px;
+    gap: 8px;
+  }
+  body:has(#adminDashboard:not(.hidden)) .admin-appbar { position: sticky; top: 0; }
+  body:has(#adminDashboard:not(.hidden)) .admin-shell { padding: 12px 10px 28px; }
+  .admin-search-wrap { order: 5; flex: 1 1 100%; max-width: none; height: 44px; }
+  .admin-search-wrap span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+  .admin-user-controls { gap: 6px; }
+  .admin-user-controls .admin-mode-btn { min-height: 44px; }
+  body:has(#adminDashboard:not(.hidden)) .admin-sidebar {
+    top: 0;
+    width: min(300px, 88vw);
+    padding: 18px 12px 28px;
+    transform: translateX(-110%);
+    transition: transform .2s ease;
+    z-index: 260;
+  }
+  body.nav-open:has(#adminDashboard:not(.hidden)) .admin-sidebar { transform: translateX(0); }
+  .nav-backdrop { border: 0; padding: 0; }
+  body.nav-open .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 240;
+    background: rgba(0, 0, 0, .5);
+  }
+  .admin-sidebar-section { height: auto; margin: 14px 10px 6px; overflow: visible; font-size: 11px; }
+  .admin-nav-item { justify-content: flex-start; gap: 12px; min-height: 48px; padding: 0 12px; }
+  .admin-nav-item > span:last-child { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  .admin-main-content { margin-left: 0; padding: 12px 10px 32px; }
+  .admin-kpi-grid { grid-template-columns: 1fr; }
+  .chart-range-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chart-range-pills button, .admin-row-actions button, .enter-btn, .toggle-mode, .loan-tab, .menu-toggle {
+    min-height: 44px;
+  }
+  .admin-table-wrap, .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .modal { align-items: flex-end; padding: 0; }
+  .modal-content, #userModal .modal-content {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - 8px);
+    margin: 0;
+    border-radius: 16px 16px 0 0;
+    overflow-y: auto;
+  }
+  input, select, textarea, .auth-input, .search-box, .modal-input { font-size: 16px; }
+  .landing { padding: 76px 16px 28px; justify-content: flex-start; }
+  .brand { font-size: 1.65rem; letter-spacing: 1px; max-width: 100%; }
+  .dashboard { padding: 76px 12px 28px; }
+  .dash-header { align-items: flex-start; }
+  .dropdown-menu { left: 8px; right: 8px; width: auto; min-width: 0; max-height: 70dvh; overflow: auto; }
+  .dropdown-menu button { min-height: 44px; }
+  .auth-form { width: 100%; }
+  .loan-fields, .request-field-grid, .compact-row { grid-template-columns: 1fr; }
+}
