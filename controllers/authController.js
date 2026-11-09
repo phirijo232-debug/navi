@@ -262,9 +262,12 @@ function normalizeTrustedDevices(user) {
     return !uniqueByIp.has(ip) || uniqueByIp.get(ip).token === device.token;
   });
 
+  // Each successful password+OTP login may register another device. Keep the
+  // newest sessions and let the 90-day sweep drop ones that go quiet. The cap
+  // only limits storage; it is not an allowlist of pre-approved hardware.
   const normalized = preferredDevices
     .sort((a, b) => new Date(b.lastSeen || b.createdAt || 0) - new Date(a.lastSeen || a.createdAt || 0))
-    .slice(0, 5);
+    .slice(0, 20);
 
   user.trustedDevices = normalized;
   return user;

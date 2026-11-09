@@ -4103,6 +4103,19 @@ document.querySelectorAll('.directory-pagination').forEach(nav => {
   });
 });
 
+function setPhoneNav(open) {
+  document.body.classList.toggle('nav-open', open);
+  document.getElementById('phoneNavBtn')?.setAttribute('aria-expanded', String(open));
+}
+
+document.getElementById('phoneNavBtn')?.addEventListener('click', () => {
+  setPhoneNav(!document.body.classList.contains('nav-open'));
+});
+document.getElementById('navBackdrop')?.addEventListener('click', () => setPhoneNav(false));
+document.getElementById('adminSidebar')?.addEventListener('click', (event) => {
+  if (event.target.closest('.admin-nav-item')) setPhoneNav(false);
+});
+
 window.onload = () => {
   applyTheme(localStorage.getItem('adminTheme') === 'light' ? 'light' : 'dark');
   restoreSession();

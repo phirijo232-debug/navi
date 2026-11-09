@@ -1,0 +1,14 @@
+{
+  "name": "Buraza Micro Finance",
+  "short_name": "BMF",
+  "description": "Buraza Micro Finance customer and staff portal",
+  "start_url": "/login.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#10141A",
+  "theme_color": "#5B94D6",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

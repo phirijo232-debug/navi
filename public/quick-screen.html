@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#5B94D6">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>PrymeBMF — Apply for a Loan</title>
+  <script src="/client-config.js"></script>
+  <script src="/apiBase.js"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -69,8 +74,10 @@
     .qs-toast.show { opacity: 1; }
     .qs-toast.error { background: var(--qs-error); color: #fff; }
     @media (max-width: 520px) {
+      .qs-page { padding: 20px 14px 48px; }
       .qs-grid { grid-template-columns: 1fr; }
       .qs-toggle-group, .qs-mode-group { flex-direction: column; }
+      .qs-input, .qs-select, .qs-submit-btn, .qs-btn-secondary, .qs-toggle-btn, .qs-mode-tab { font-size: 16px; min-height: 48px; }
     }
   </style>
 </head>

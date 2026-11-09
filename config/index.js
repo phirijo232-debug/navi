@@ -85,6 +85,7 @@ PORT: Number(process.env.PORT) || 3000,
     '/status',
     '/health',
     '/favicon.ico',
-    '/invites/validate'
+    '/invites/validate',
+    '/client-config.js'
   ]
 };
