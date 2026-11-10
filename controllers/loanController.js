@@ -1190,9 +1190,16 @@ async function updateLoanStatus(req, res) {
       loan.approvedAt = approvedAt.toISOString();
       // Borrowed date IS the approval date (BMF loan contract rule).
       loan.borrowedDate = getZambiaDateKey(approvedAt);
-      loan.dueDate = loan.tenureDays
-        ? calculateDueDateFromApprovalDays(approvedAt, loan.tenureDays)
-        : calculateDueDateFromApproval(approvedAt, loan.tenureWeeks);
+      // FIX: read tenure as Number, default to 1 week only if truly missing;
+      // never silently fall back to 1 when the body sent 0, null, or an invalid string.
+      const tenureWeeks = Number(req.body.tenureWeeks);
+      const tenureDays  = Number(req.body.tenureDays) || tenureWeeks * 7;
+      if (!tenureWeeks || tenureWeeks < 1 || tenureWeeks > 4) {
+        return res.status(400).json({ error: 'Invalid tenure. Choose 1 to 4 weeks.' });
+      }
+      loan.dueDate = tenureDays
+        ? calculateDueDateFromApprovalDays(approvedAt, tenureDays)
+        : calculateDueDateFromApproval(approvedAt, tenureWeeks);
       rebuildPaymentLedger(loan);
     } else if (['in_progress', 'in-progress', 'start', 'started'].includes(normalizedAction) && isAdmin) {
       loan.status = 'active'; // canonical — 'in_progress' is legacy-mapped only

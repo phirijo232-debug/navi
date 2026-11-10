@@ -658,6 +658,28 @@
     const amountInput = document.getElementById('loanAmount');
     const timeframeButtons = document.querySelectorAll('.timeframe-mode-btn');
     let loanInterestPolicy = null;
+const RATES = { 1: 0.10, 2: 0.16, 3: 0.24, 4: 0.32 };
+
+function calculateInterest() {
+  const amount  = parseFloat(document.getElementById('loanAmount').value) || 0;
+  const tenure  = parseInt(document.getElementById('loanTenureWeeks').value)   || 1;
+  const rate    = RATES[tenure] || 0.10;
+  const interest = amount * rate;
+  const total    = amount + interest;
+
+  // Update display elements
+  const interestRateEl = document.getElementById('interestRate');
+  const interestAmountEl = document.getElementById('interestAmount');
+  const totalRepayableEl = document.getElementById('totalRepayable');
+
+  if (interestRateEl) interestRateEl.textContent = (rate * 100) + '%';
+  if (interestAmountEl) interestAmountEl.textContent = 'K ' + interest.toFixed(2);
+  if (totalRepayableEl) totalRepayableEl.textContent = 'K ' + total.toFixed(2);
+}
+
+// Attach event listeners for real-time calculation
+document.getElementById('loanTenureWeeks').addEventListener('change', calculateInterest);
+document.getElementById('loanAmount').addEventListener('input',  calculateInterest);
 
     function getCurrentLusakaDateKey() {
       const parts = new Intl.DateTimeFormat('en-CA', {

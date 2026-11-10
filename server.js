@@ -246,8 +246,42 @@ app.listen(config.PORT, config.HOST, () => {
   auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.SERVER_STARTED, actor: 'system', detail: { port: config.PORT } });
   const mode = typeof getServerMode === 'function' ? getServerMode() : 'private';
   console.log(`[server-mode] started in ${mode.toUpperCase()} mode`);
-  startScheduler();
-  // Hosting keep-alive: register after the scheduled application jobs.
+  startScheduler(), setImmediate(async () => {
+    try {
+      const { readData, writeData } = require('./middleware/dataStore');
+      const loans = await readData('loans');
+      const lusakaNow = new Date(Date.now() + 2 * 60 * 60 * 1000);
+      const todayStr = lusakaNow.toISOString().slice(0, 10);
+
+      let changed = false;
+      for (const loan of loans) {
+        if (loan.status !== 'active') continue;
+        if (!loan.dueDate) continue;
+        if (loan.dueDate.slice(0, 10) < todayStr) {
+          loan.status = 'overdue';
+          if (!loan.statusHistory) loan.statusHistory = [];
+          loan.statusHistory.push({
+            status: 'overdue',
+            reason: 'Loan past due date — auto-updated by system.',
+            actor: 'system',
+            source: 'cron',
+            updatedAt: new Date().toISOString()
+          });
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        await writeData('loans', loans);
+        console.log('[cron] Overdue sweep complete — statuses updated.');
+      } else {
+        console.log('[cron] Overdue sweep complete — no changes.');
+      }
+    } catch (err) {
+      console.error('[cron] Overdue sweep failed:', err.message);
+    }
+  });
+}, { timezone: 'Africa/Lusaka' });
   // Errors are intentionally silent so an unavailable self-ping never affects service.
   cron.schedule('*/10 * * * *', () => {
     setImmediate(async () => {
@@ -268,4 +302,5 @@ app.listen(config.PORT, config.HOST, () => {
   }
   // Retry any breakage alerts queued during a prior SMTP outage (fire-and-forget).
   replayPendingAlerts().catch(() => {});
-});
+
+
