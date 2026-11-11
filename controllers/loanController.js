@@ -14,6 +14,7 @@ const LOANS_FILE = dataStore.paths.loans;
 const USERS_FILE = dataStore.paths.users;
 const NOTIFICATIONS_FILE = dataStore.paths.notifications;
 const LOAN_INTEREST_POLICY_FILE = path.join(dataStore.DATA_DIR, 'loanInterestPolicy.json');
+const LOAN_INTEREST_POLICY_HISTORY_FILE = path.join(dataStore.DATA_DIR, 'loanInterestPolicyHistory.json');
 
 function readLoanInterestPolicies() {
   return dataStore.readJson(LOAN_INTEREST_POLICY_FILE, {}, value => value && typeof value === 'object' && !Array.isArray(value));
@@ -64,6 +65,10 @@ function getLoanInterestPolicy(req, res) {
 function getPublicLoanRates(req, res) {
   try {
     const storeId = config.DEFAULT_STORE_ID || 'buraza';
+    const policies = readLoanInterestPolicies();
+    if (!policies[storeId]) {
+      return res.status(503).json({ error: 'Loan rates have not been configured yet. Please contact BMF.' });
+    }
     const policy = getStoreLoanInterestPolicy(storeId);
     return res.json({
       weeklyRates: policy.weeklyRates,
@@ -74,7 +79,7 @@ function getPublicLoanRates(req, res) {
     });
   } catch (err) {
     logError(`PUBLIC LOAN RATES READ FAILED: ${err.message}`);
-    return res.status(503).json({ error: 'Loan rates temporarily unavailable.' });
+    return res.status(503).json({ error: 'Loan rates are temporarily unavailable. Please contact BMF.' });
   }
 }
 
@@ -93,9 +98,18 @@ function updateLoanInterestPolicy(req, res) {
     }
     const nextPolicy = loanTerms.normalizePolicy(input);
     const policies = readLoanInterestPolicies();
-    const previousPolicy = loanTerms.normalizePolicy(policies[storeId]);
     const updatedAt = new Date().toISOString();
     const actor = req.authUser?.email || req.authUser?.username || 'admin';
+
+    // Archive previous rates to history before overwriting — never deleted
+    if (policies[storeId]) {
+      const history = dataStore.readJson(LOAN_INTEREST_POLICY_HISTORY_FILE, {}, v => v && typeof v === 'object');
+      if (!Array.isArray(history[storeId])) history[storeId] = [];
+      history[storeId].push({ ...policies[storeId], archivedAt: updatedAt, replacedBy: actor });
+      dataStore.writeJson(LOAN_INTEREST_POLICY_HISTORY_FILE, history);
+    }
+
+    const previousPolicy = policies[storeId] ? loanTerms.normalizePolicy(policies[storeId]) : null;
     policies[storeId] = { ...nextPolicy, updatedAt, updatedBy: actor };
     dataStore.writeJson(LOAN_INTEREST_POLICY_FILE, policies);
     auditGuardian.writeAudit({

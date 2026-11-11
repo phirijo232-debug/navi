@@ -362,7 +362,7 @@
         </div>
 
         <!-- ── Live estimate ── -->
-        <div class="estimate-box" id="estimateBox">
+        <div class="estimate-box" id="estimateBox" style="opacity:0.4">
           <div class="est-row">
             <span class="est-label">Interest rate</span>
             <span class="est-val" id="estRate">16%</span>
@@ -507,23 +507,36 @@
     // ── Estimate calculation ──────────────────────────────────────────────────
     const APPROVAL_HOURS = { low: 72, standard: 48, urgent: 24, emergency: 4 };
 
-    // Live rates fetched from server — falls back to BMF defaults if fetch fails
-    let loanRates = { weeklyRates: { 1: 10, 2: 16, 3: 24, 4: 32 }, extensionDailyRatePercent: 0.1, maxTermDays: 153, extensionStartsAfterDays: 28 };
+    // Live rates fetched from server — NO hardcoded fallback
+    // If rates are unavailable the estimate box shows a clear message
+    let loanRates = null;
+    let ratesLoaded = false;
 
     async function loadPublicRates() {
       try {
         const res = await fetch('/loans/public-rates');
-        if (!res.ok) return;
         const data = await res.json().catch(() => null);
-        if (data && data.weeklyRates) {
-          loanRates = data;
-          updateEstimate();
+        if (!res.ok || !data || !data.weeklyRates) {
+          showRatesUnavailable(data?.error || 'Loan rates are currently unavailable. Please contact BMF directly.');
+          return;
         }
-      } catch (_) { /* use fallback */ }
+        loanRates = data;
+        ratesLoaded = true;
+        document.getElementById('estimateBox').style.opacity = '1';
+        updateEstimate();
+      } catch (_) {
+        showRatesUnavailable('Unable to load loan rates. Please check your connection or contact BMF.');
+      }
+    }
+
+    function showRatesUnavailable(msg) {
+      const box = document.getElementById('estimateBox');
+      box.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:12px 0;color:#f85149;font-size:13px;font-weight:600;">${msg}</div>`;
     }
 
     // Calculate interest for any number of days — mirrors loanTerms.js exactly
     function calcInterestForDays(amount, days) {
+      if (!loanRates) return 0;
       const extAfter = loanRates.extensionStartsAfterDays || 28;
       const dailyExt = (loanRates.extensionDailyRatePercent || 0.1) / 100;
       const wr = loanRates.weeklyRates || {};
@@ -560,6 +573,7 @@
     }
 
     function updateEstimate() {
+      if (!ratesLoaded) return; // wait for server rates before calculating
       const amount  = Number(document.getElementById('qsAmount').value) || 0;
       const days    = getEffectiveDays();
       const interest = calcInterestForDays(amount, days);

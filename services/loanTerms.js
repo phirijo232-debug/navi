@@ -1,29 +1,49 @@
 'use strict';
 
-const DEFAULT_POLICY = Object.freeze({
-  weeklyRates: Object.freeze({ 1: 10, 2: 16, 3: 24, 4: 32 }),
-  extensionDailyRatePercent: 0.1,
+// SHAPE_POLICY defines validation bounds and fixed structural values only.
+// It is NEVER used as a fallback for missing rates — if no rates have been
+// saved by the admin, the system must surface an error, not silently serve
+// these numbers. All rate values must come from loanInterestPolicy.json.
+const SHAPE_POLICY = Object.freeze({
   extensionBaselineOneWeekRatePercent: 10,
   minTermDays: 7,
   maxTermDays: 153
 });
 
+// Kept for external consumers that import DEFAULT_POLICY by name.
+// Contains only the structural (non-rate) fields — never use its rate values.
+const DEFAULT_POLICY = Object.freeze({
+  weeklyRates: Object.freeze({ 1: 0, 2: 0, 3: 0, 4: 0 }), // zeroed — never fall back to these
+  extensionDailyRatePercent: 0,
+  extensionBaselineOneWeekRatePercent: SHAPE_POLICY.extensionBaselineOneWeekRatePercent,
+  minTermDays: SHAPE_POLICY.minTermDays,
+  maxTermDays: SHAPE_POLICY.maxTermDays
+});
+
 function getDefaultPolicy() {
+  // Returns structural shape only. Callers must not use this for loan calculations.
   return {
-    weeklyRates: { ...DEFAULT_POLICY.weeklyRates },
-    extensionDailyRatePercent: DEFAULT_POLICY.extensionDailyRatePercent,
-    extensionBaselineOneWeekRatePercent: DEFAULT_POLICY.extensionBaselineOneWeekRatePercent,
-    minTermDays: DEFAULT_POLICY.minTermDays,
-    maxTermDays: DEFAULT_POLICY.maxTermDays
+    weeklyRates: { 1: null, 2: null, 3: null, 4: null },
+    extensionDailyRatePercent: null,
+    extensionBaselineOneWeekRatePercent: SHAPE_POLICY.extensionBaselineOneWeekRatePercent,
+    minTermDays: SHAPE_POLICY.minTermDays,
+    maxTermDays: SHAPE_POLICY.maxTermDays
   };
 }
 
 function normalizePolicy(input) {
-  const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  // Throws if input is missing or incomplete — no silent fallback to any default rates.
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new TypeError('No loan interest rates have been configured for this store. An admin must set the rates before loans can be processed.');
+  }
+  const source = input;
   const rates = source.weeklyRates && typeof source.weeklyRates === 'object' ? source.weeklyRates : {};
   const weeklyRates = {};
   for (const week of [1, 2, 3, 4]) {
-    const value = Number(rates[week] ?? DEFAULT_POLICY.weeklyRates[week]);
+    if (!Object.prototype.hasOwnProperty.call(rates, week) && !Object.prototype.hasOwnProperty.call(rates, String(week))) {
+      throw new TypeError(`Week ${week} rate is missing. All four weekly rates must be set by an admin.`);
+    }
+    const value = Number(rates[week] ?? rates[String(week)]);
     if (!Number.isFinite(value) || value < 0 || value > 100) throw new TypeError(`Week ${week} rate must be between 0% and 100%.`);
     weeklyRates[week] = Number(value.toFixed(4));
   }
@@ -31,16 +51,19 @@ function normalizePolicy(input) {
   if ([1, 2, 3].some(week => weeklyRates[week] > weeklyRates[week + 1])) {
     throw new TypeError('Weekly rates must stay the same or increase with each longer term.');
   }
-  const extensionDailyRatePercent = Number(source.extensionDailyRatePercent ?? DEFAULT_POLICY.extensionDailyRatePercent);
+  if (!Object.prototype.hasOwnProperty.call(source, 'extensionDailyRatePercent')) {
+    throw new TypeError('The daily extension rate is missing. An admin must set it before loans can be processed.');
+  }
+  const extensionDailyRatePercent = Number(source.extensionDailyRatePercent);
   if (!Number.isFinite(extensionDailyRatePercent) || extensionDailyRatePercent < 0 || extensionDailyRatePercent > 1) {
     throw new TypeError('The daily extension rate must be between 0% and 1% per day.');
   }
   return {
     weeklyRates,
     extensionDailyRatePercent: Number(extensionDailyRatePercent.toFixed(4)),
-    extensionBaselineOneWeekRatePercent: DEFAULT_POLICY.extensionBaselineOneWeekRatePercent,
-    minTermDays: DEFAULT_POLICY.minTermDays,
-    maxTermDays: DEFAULT_POLICY.maxTermDays
+    extensionBaselineOneWeekRatePercent: SHAPE_POLICY.extensionBaselineOneWeekRatePercent,
+    minTermDays: SHAPE_POLICY.minTermDays,
+    maxTermDays: SHAPE_POLICY.maxTermDays
   };
 }
 
