@@ -61,6 +61,23 @@ function getLoanInterestPolicy(req, res) {
   }
 }
 
+function getPublicLoanRates(req, res) {
+  try {
+    const storeId = config.DEFAULT_STORE_ID || 'buraza';
+    const policy = getStoreLoanInterestPolicy(storeId);
+    return res.json({
+      weeklyRates: policy.weeklyRates,
+      extensionDailyRatePercent: policy.extensionDailyRatePercent,
+      minTermDays: policy.minTermDays,
+      maxTermDays: policy.maxTermDays,
+      extensionStartsAfterDays: 28
+    });
+  } catch (err) {
+    logError(`PUBLIC LOAN RATES READ FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Loan rates temporarily unavailable.' });
+  }
+}
+
 function updateLoanInterestPolicy(req, res) {
   try {
     if (!isFranchiseAdmin(req.authUser?.role)) {
@@ -1761,6 +1778,7 @@ async function createAdminLoan(req, res) {
 
 module.exports = {
   getLoanInterestPolicy,
+  getPublicLoanRates,
   updateLoanInterestPolicy,
   upload,
   getLoans,

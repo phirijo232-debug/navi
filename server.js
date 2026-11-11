@@ -232,7 +232,6 @@ if (startupRepairs.length) {
   console.warn(`Navi Server data repair: ${startupRepairs.join('; ')}`);
 }
 
-// Startup data validation — catches corrupt JSON before accepting traffic
 const startupProblems = validateStartup();
 if (startupProblems.length) {
   console.error(`Navi Server startup validation FAILED: ${startupProblems.length} problem(s) found.`);
@@ -246,7 +245,10 @@ app.listen(config.PORT, config.HOST, () => {
   auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.SERVER_STARTED, actor: 'system', detail: { port: config.PORT } });
   const mode = typeof getServerMode === 'function' ? getServerMode() : 'private';
   console.log(`[server-mode] started in ${mode.toUpperCase()} mode`);
-  startScheduler(), setImmediate(async () => {
+
+  startScheduler();
+
+  setImmediate(async () => {
     try {
       const { readData, writeData } = require('./middleware/dataStore');
       const loans = await readData('loans');
@@ -281,8 +283,8 @@ app.listen(config.PORT, config.HOST, () => {
       console.error('[cron] Overdue sweep failed:', err.message);
     }
   });
-}, { timezone: 'Africa/Lusaka' });
-  // Errors are intentionally silent so an unavailable self-ping never affects service.
+
+  // Keep-alive self-ping every 10 minutes
   cron.schedule('*/10 * * * *', () => {
     setImmediate(async () => {
       try {
@@ -293,14 +295,14 @@ app.listen(config.PORT, config.HOST, () => {
       }
     });
   });
-  // IMMUNE: start heartbeat + outage detection (also fires the boot-time
-  // "server was offline" catch-up alert if the previous run died).
+
+  // Start heartbeat + outage detection
   try {
     startHealthWatch();
   } catch (err) {
     console.error(`Health watch failed to start: ${err.message}`);
   }
-  // Retry any breakage alerts queued during a prior SMTP outage (fire-and-forget).
+
+  // Retry any alerts queued during a prior SMTP outage
   replayPendingAlerts().catch(() => {});
-
-
+});

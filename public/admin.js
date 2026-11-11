@@ -500,13 +500,9 @@ async function saveLoanInterestPolicy(event) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Could not save loan rates.');
-    loanInterestPolicy = data;
+    if (status) status.textContent = 'Loan rates saved. Refreshing display…';
+    await loadLoanInterestPolicy(true);
     if (status) status.textContent = `Loan rates saved for ${data.storeId}. New requests will use these rates.`;
-    const updated = document.getElementById('loanInterestRatesUpdated');
-    if (updated) updated.textContent = `Last updated ${new Date(data.updatedAt).toLocaleString('en-GB')} by ${data.updatedBy}.`;
-    updateExtensionRatePreview();
-    updateAddLoanPreview();
-    if (typeof renderApplications === 'function' && allApplications.length) renderApplications();
     showBmfToast('Loan rates updated successfully.');
   } catch (err) {
     if (status) status.textContent = err.message || 'Could not save loan rates.';

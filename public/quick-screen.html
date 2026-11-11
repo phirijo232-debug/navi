@@ -1,316 +1,670 @@
+<!--
+  ╔══════════════════════════════════════════════════════════════════════════╗
+  ║  PrymeBMF QUICK SCREEN — LAYER 1 / FIRST DOOR                          ║
+  ║                                                                          ║
+  ║  This is the entry point of the PrymeBMF borrower journey.              ║
+  ║  It is a PUBLIC page — no login, no account, no share key required.     ║
+  ║                                                                          ║
+  ║  HOW THE LAYERS WORK:                                                   ║
+  ║                                                                          ║
+  ║  LAYER 1 — Quick Screen (this page, /quick-screen)                      ║
+  ║    Anyone can knock on this door. They submit their name, email,         ║
+  ║    NRC number, loan details, and photo documents. No account needed.    ║
+  ║    Their application lands in applications.json for admin review.       ║
+  ║                                                                          ║
+  ║  ADMIN REVIEW (between Layer 1 and Layer 2)                             ║
+  ║    The BMF admin sees the submission in the admin panel, reviews the    ║
+  ║    documents, and chooses: Approve, Reject, or Request More Info.       ║
+  ║    On Approve — the system generates a unique invite link with the      ║
+  ║    applicant's email pre-filled and emails it to them.                  ║
+  ║                                                                          ║
+  ║  LAYER 2 — Account Creation (/signup.html?key=...&email=...)            ║
+  ║    The applicant uses the invite link to create their BMF account.      ║
+  ║    This door is locked — only works with a valid share key.             ║
+  ║                                                                          ║
+  ║  LAYER 3 — Borrower Portal (/user.html)                                 ║
+  ║    The second room. Full loan management: view loans, make requests,    ║
+  ║    record payments, see history. Requires a login session.              ║
+  ║    After 4 loans the borrower has full history visibility.              ║
+  ║                                                                          ║
+  ║  Route:  quick-screen → admin approval → invite link → signup → portal ║
+  ╚══════════════════════════════════════════════════════════════════════════╝
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PrymeBMF — Apply for a Loan</title>
+  <title>PrymeBMF Quick Screen — Apply for a Loan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
   <style>
-    :root {
-      color-scheme: dark;
-      --qs-bg: #10141A;
-      --qs-card: #1A212B;
-      --qs-card-alt: #222B38;
-      --qs-border: #3A4452;
-      --qs-blue: #5B94D6;
-      --qs-text: #E6EAF0;
-      --qs-muted: #B4BCC6;
-      --qs-success: #8FDCB0;
-      --qs-error: #FFB4AB;
-      --qs-amber: #F0C56A;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    html, body { background: #0d1117; color: #e6edf3; min-height: 100vh; }
+
+    .qs-wrap {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px clamp(16px, 4vw, 24px) 60px;
     }
 
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--qs-bg); color: var(--qs-text); font-family: Arial, sans-serif; }
-    button, input, select { font: inherit; }
-    .qs-page { max-width: 680px; min-height: 100vh; margin: 0 auto; padding: 32px 20px 72px; }
-    .qs-header { margin-bottom: 28px; }
-    .qs-back { display: inline-block; margin-bottom: 18px; color: var(--qs-blue); text-decoration: none; }
-    .qs-logo { margin: 0; font-size: 2rem; }
-    .qs-subtitle { margin: 8px 0 24px; color: var(--qs-muted); }
-    .qs-stepper { display: flex; gap: 12px; }
-    .qs-step { height: 4px; flex: 1; position: relative; border-radius: 4px; background: var(--qs-card-alt); }
-    .qs-step-fill { width: 33%; height: 100%; border-radius: inherit; background: var(--qs-blue); }
-    .qs-step-label { position: absolute; top: 9px; width: 100%; color: var(--qs-muted); font-size: 11px; text-align: center; }
-    .qs-step-label.active { color: var(--qs-blue); }
-    .qs-form { display: grid; gap: 18px; margin-top: 32px; }
-    .qs-section, .qs-estimate, .qs-success-screen { padding: 20px; border: 1px solid var(--qs-border); border-radius: 12px; background: var(--qs-card); }
-    .qs-section h2, .qs-estimate h2 { margin: 0 0 16px; font-size: 1.15rem; }
-    .qs-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 14px; }
-    .qs-field { display: grid; gap: 8px; margin-top: 14px; }
-    .qs-grid .qs-field { margin-top: 0; }
-    .qs-label { color: var(--qs-muted); font-size: 13px; font-weight: 600; }
-    .qs-input, .qs-select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--qs-border); border-radius: 8px; background: var(--qs-bg); color: var(--qs-text); }
-    .qs-input:focus, .qs-select:focus, button:focus-visible { outline: 2px solid var(--qs-blue); outline-offset: 2px; }
-    .qs-toggle-group, .qs-mode-group { display: flex; gap: 8px; }
-    .qs-toggle-btn, .qs-mode-tab { min-height: 42px; flex: 1; padding: 8px; border: 1px solid var(--qs-border); border-radius: 8px; background: transparent; color: var(--qs-muted); cursor: pointer; }
-    .qs-toggle-btn.active, .qs-mode-tab.active { border-color: var(--qs-blue); background: rgba(91, 148, 214, .12); color: var(--qs-blue); }
-    .qs-mode-content { margin-top: 12px; }
-    .qs-hidden { display: none !important; }
-    .qs-estimate h2 { color: var(--qs-blue); }
-    .qs-est-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--qs-border); }
-    .qs-est-row:last-child { border-bottom: 0; }
-    .qs-est-row .label { color: var(--qs-muted); }
-    .qs-est-row .value { font-weight: 700; }
-    .qs-est-row .value.amber { color: var(--qs-amber); }
-    .qs-file-zone { position: relative; padding: 16px; border: 2px dashed var(--qs-border); border-radius: 10px; text-align: center; }
-    .qs-file-zone input { width: 100%; color: var(--qs-muted); }
-    .qs-file-name { margin: 6px 0 0; color: var(--qs-success); font-size: 12px; }
-    .qs-checkbox { display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; }
-    .qs-checkbox input { margin-top: 4px; }
-    .qs-submit-btn, .qs-btn-secondary { width: 100%; min-height: 48px; padding: 12px; border: 0; border-radius: 8px; background: var(--qs-blue); color: #0E1A2C; font-weight: 700; cursor: pointer; }
-    .qs-submit-btn:disabled { opacity: .65; cursor: wait; }
-    .qs-btn-secondary { margin-top: 12px; border: 1px solid var(--qs-border); background: transparent; color: var(--qs-text); }
-    .qs-message { min-height: 20px; margin: 0; }
-    .qs-message.error { color: var(--qs-error); }
-    .qs-success-screen { display: none; margin-top: 20px; text-align: center; }
-    .qs-success-icon { color: var(--qs-success); font-size: 36px; }
-    .qs-app-id { display: inline-block; padding: 10px 14px; border: 1px solid var(--qs-border); border-radius: 8px; color: var(--qs-blue); font-family: monospace; font-weight: 700; }
-    .qs-toast { position: fixed; top: 16px; left: 50%; z-index: 2; max-width: calc(100vw - 32px); padding: 12px 18px; transform: translateX(-50%); border-radius: 8px; background: var(--qs-card-alt); opacity: 0; pointer-events: none; }
-    .qs-toast.show { opacity: 1; }
-    .qs-toast.error { background: var(--qs-error); color: #fff; }
-    @media (max-width: 520px) {
-      .qs-grid { grid-template-columns: 1fr; }
-      .qs-toggle-group, .qs-mode-group { flex-direction: column; }
+    .qs-header { text-align: center; margin-bottom: 32px; }
+    .qs-header .brand { font-size: 22px; font-weight: 800; color: #2f81f7; letter-spacing: -0.02em; margin-bottom: 6px; }
+    .qs-header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .qs-header p { color: #8b949e; font-size: 15px; max-width: 440px; margin: 0 auto; line-height: 1.5; }
+
+    .qs-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 14px;
+      padding: clamp(24px, 5vw, 40px);
+      width: 100%;
+      max-width: 560px;
+    }
+
+    .section-divider {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #8b949e;
+      border-bottom: 1px solid #30363d;
+      padding-bottom: 8px;
+      margin: 24px 0 18px;
+    }
+    .section-divider:first-of-type { margin-top: 0; }
+
+    /* ── Field ── */
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #8b949e;
+      margin-bottom: 6px;
+    }
+    .field label .req { color: #f85149; margin-left: 2px; }
+    .qs-input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 11px 14px;
+      color: #e6edf3;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+      appearance: none;
+    }
+    .qs-input:focus { border-color: #2f81f7; }
+    .qs-input::placeholder { color: #484f58; }
+    select.qs-input { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b949e' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+
+    .two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* ── Timeframe toggle ── */
+    .timeframe-toggle {
+      display: inline-flex;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .tf-btn {
+      background: transparent;
+      border: none;
+      color: #8b949e;
+      padding: 9px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .tf-btn.active { background: #2f81f7; color: #fff; }
+    .tf-btn:not(.active):hover { background: #1c2128; color: #e6edf3; }
+
+    /* ── Estimate box ── */
+    .estimate-box {
+      background: #1c2128;
+      border: 1px solid #30363d;
+      border-radius: 9px;
+      padding: 16px 18px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 18px;
+      margin: 8px 0 18px;
+    }
+    .estimate-box .est-row { display: flex; justify-content: space-between; align-items: center; }
+    .estimate-box .est-label { font-size: 12px; color: #8b949e; }
+    .estimate-box .est-val { font-size: 14px; font-weight: 700; color: #e6edf3; }
+    .estimate-box .est-val.green { color: #3fb950; }
+    .estimate-box .est-total {
+      grid-column: 1 / -1;
+      border-top: 1px solid #30363d;
+      padding-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .estimate-box .est-total .est-label { font-size: 13px; font-weight: 600; color: #e6edf3; }
+    .estimate-box .est-total .est-val   { font-size: 18px; color: #2f81f7; }
+
+    /* ── Uploads ── */
+    .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .upload-box {
+      background: #0d1117;
+      border: 2px dashed #30363d;
+      border-radius: 8px;
+      padding: 16px 10px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .upload-box:hover { border-color: #2f81f7; }
+    .upload-box.has-file { border-color: #3fb950; border-style: solid; }
+    .upload-box input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .upload-box .u-icon { font-size: 20px; margin-bottom: 5px; }
+    .upload-box .u-label { font-size: 12px; font-weight: 600; color: #e6edf3; line-height: 1.3; }
+    .upload-box .u-hint  { font-size: 11px; color: #8b949e; margin-top: 3px; }
+    .upload-box .u-check { display: none; font-size: 12px; color: #3fb950; font-weight: 700; margin-top: 3px; }
+    .upload-box.has-file .u-check { display: block; }
+    .upload-box.has-file .u-hint  { display: none; }
+    .upload-box.required-flash { border-color: #f85149 !important; }
+
+    /* ── Terms ── */
+    .terms-details { margin: 4px 0 16px; }
+    .terms-details summary {
+      font-size: 13px;
+      color: #8b949e;
+      cursor: pointer;
+      user-select: none;
+      padding: 6px 0;
+    }
+    .terms-details ul { padding: 10px 0 6px 18px; }
+    .terms-details li { font-size: 13px; color: #8b949e; margin-bottom: 6px; line-height: 1.5; }
+    .checkbox-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #8b949e;
+      cursor: pointer;
+    }
+    .checkbox-row input[type="checkbox"] { margin-top: 2px; flex-shrink: 0; accent-color: #2f81f7; width: 16px; height: 16px; }
+
+    /* ── Submit ── */
+    .qs-submit {
+      width: 100%;
+      background: #2f81f7;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 13px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .qs-submit:hover { background: #3b93f9; }
+    .qs-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .qs-error {
+      color: #f85149;
+      font-size: 13px;
+      margin-top: 10px;
+      text-align: center;
+      min-height: 18px;
+    }
+    .qs-footer-note { margin-top: 20px; text-align: center; font-size: 13px; color: #8b949e; }
+    .qs-footer-note a { color: #2f81f7; text-decoration: none; }
+    .qs-footer-note a:hover { text-decoration: underline; }
+
+    /* ── Success overlay ── */
+    .qs-success-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(13,17,23,0.88);
+      backdrop-filter: blur(4px);
+    }
+    .qs-success-overlay.hidden { display: none; }
+    .qs-success-box {
+      background: #161b22;
+      border: 1px solid #238636;
+      border-radius: 14px;
+      padding: 36px 28px;
+      max-width: 360px;
+      width: 90vw;
+      text-align: center;
+    }
+    .qs-success-icon  { font-size: 48px; margin-bottom: 14px; }
+    .qs-success-title { font-size: 18px; font-weight: 700; color: #3fb950; margin-bottom: 10px; }
+    .qs-success-msg   { color: #8b949e; font-size: 14px; line-height: 1.5; margin-bottom: 20px; }
+    .qs-success-close {
+      background: #238636; color: #fff; border: none;
+      border-radius: 8px; padding: 11px 24px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .qs-success-close:hover { background: #3fb950; }
+
+    @media (max-width: 480px) {
+      .two-up { grid-template-columns: 1fr; }
+      .upload-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .estimate-box { grid-template-columns: 1fr; }
+      .estimate-box .est-total { grid-column: 1; }
     }
   </style>
 </head>
 <body>
-  <main class="qs-page">
-    <header class="qs-header">
-      <a class="qs-back" href="index.html">← Back to Home</a>
-      <h1 class="qs-logo">Pryme Vertex</h1>
-      <p class="qs-subtitle">Apply for a loan in 3 steps</p>
-      <div class="qs-stepper" aria-label="Application steps">
-        <div class="qs-step"><div class="qs-step-fill"></div><span class="qs-step-label active">1. Details</span></div>
-        <div class="qs-step"><span class="qs-step-label">2. Documents</span></div>
-        <div class="qs-step"><span class="qs-step-label">3. Submit</span></div>
-      </div>
-    </header>
 
-    <form id="applyForm" class="qs-form">
-      <p id="qsMessage" class="qs-message" role="status" aria-live="polite"></p>
-      <section class="qs-section">
-        <h2>Your Details</h2>
-        <div class="qs-grid">
-          <div class="qs-field">
-            <label class="qs-label" for="fullName">Full Name *</label>
-            <input type="text" id="fullName" class="qs-input" autocomplete="name" required>
-          </div>
-          <div class="qs-field">
-            <label class="qs-label" for="email">Email Address *</label>
-            <input type="email" id="email" class="qs-input" autocomplete="email" required>
-          </div>
-          <div class="qs-field">
-            <label class="qs-label" for="nrcNumber">NRC Number *</label>
-            <input type="text" id="nrcNumber" class="qs-input" placeholder="123456/78/1" pattern="[0-9]{6}/[0-9]{2}/[0-9]" required>
-          </div>
-          <div class="qs-field">
-            <label class="qs-label" for="phone">Zambian Mobile Number *</label>
-            <input type="tel" id="phone" class="qs-input" placeholder="+260977000000" pattern="(\\+?260|0)(?:(?:9[5-7]|7[6-7]|57)[0-9]{7}|26[0-9]{7})" required>
-          </div>
-        </div>
-      </section>
+  <!-- ── Success overlay ── -->
+  <div id="qsSuccessOverlay" class="qs-success-overlay hidden">
+    <div class="qs-success-box">
+      <div class="qs-success-icon">✅</div>
+      <h2 class="qs-success-title">Request Submitted</h2>
+      <p class="qs-success-msg">
+        Your quick screen application has been received by BMF.<br><br>
+        We will review your details and send you a response at the email address you provided.
+      </p>
+      <button class="qs-success-close" onclick="window.location.href='login.html'">Back to Login</button>
+    </div>
+  </div>
 
-      <section class="qs-section">
-        <h2>Loan Details</h2>
-        <div class="qs-field">
-          <label class="qs-label" for="loanProduct">Loan Purpose *</label>
-          <select id="loanProduct" class="qs-select" required>
-            <option value="">Select purpose</option>
-            <option value="Business Capital">Business Capital</option>
-            <option value="Emergency">Emergency</option>
-            <option value="School Fees">School Fees</option>
-            <option value="Medical">Medical</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-        <div class="qs-grid">
-          <div class="qs-field">
-            <label class="qs-label" for="loanAmount">Amount (K) *</label>
-            <input type="number" id="loanAmount" class="qs-input" min="100" step="100" required>
+  <div class="qs-wrap">
+    <div class="qs-header">
+      <div class="brand">PrymeBMF</div>
+      <h1>Quick Screen</h1>
+      <p>Start your loan application in minutes. Fill in your details and we'll get back to you within 48 hours.</p>
+    </div>
+
+    <div class="qs-card">
+      <form id="qsForm" enctype="multipart/form-data" novalidate>
+
+        <!-- ── Personal details ── -->
+        <div class="section-divider">Your Details</div>
+
+        <div class="two-up">
+          <div class="field">
+            <label for="qsFullName">Full name <span class="req">*</span></label>
+            <input type="text" id="qsFullName" name="fullName" class="qs-input" placeholder="e.g. James Phiri" required autocomplete="name">
           </div>
-          <div class="qs-field">
-            <span class="qs-label">Urgency *</span>
-            <div class="qs-toggle-group" role="group" aria-label="Application urgency">
-              <button type="button" class="qs-toggle-btn active" data-urgency="standard">Standard</button>
-              <button type="button" class="qs-toggle-btn" data-urgency="urgent">Urgent</button>
-              <button type="button" class="qs-toggle-btn" data-urgency="emergency">Emergency</button>
-            </div>
-            <small>Standard: 48 hours · Urgent: 24 hours · Emergency: 4 hours</small>
+          <div class="field">
+            <label for="qsEmail">Email address <span class="req">*</span></label>
+            <input type="email" id="qsEmail" name="email" class="qs-input" placeholder="e.g. james@email.com" required autocomplete="email">
           </div>
         </div>
-        <div class="qs-field">
-          <span class="qs-label">Repayment Timeframe *</span>
-          <div class="qs-mode-group" role="group" aria-label="Repayment timeframe type">
-            <button type="button" class="qs-mode-tab active" data-mode="weeks">Fixed Weeks</button>
-            <button type="button" class="qs-mode-tab" data-mode="date">Custom Due Date</button>
+
+        <div class="two-up">
+          <div class="field">
+            <label for="qsNrc">NRC number <span class="req">*</span></label>
+            <input type="text" id="qsNrc" name="nrcNumber" class="qs-input" placeholder="e.g. 123456/78/9" required>
           </div>
-          <div id="weeksMode" class="qs-mode-content">
-            <label class="qs-label" for="loanTenure">Number of Weeks</label>
-            <select id="loanTenure" class="qs-select">
+          <div class="field">
+            <label for="qsPhone">Phone number <span class="req">*</span></label>
+            <input type="tel" id="qsPhone" name="phone" class="qs-input" placeholder="e.g. 0977123456" required autocomplete="tel">
+          </div>
+        </div>
+
+        <!-- ── Loan details ── -->
+        <div class="section-divider">Loan Details</div>
+
+        <div class="two-up">
+          <div class="field">
+            <label for="qsPurpose">Loan purpose <span class="req">*</span></label>
+            <input type="text" id="qsPurpose" name="product" class="qs-input" placeholder="e.g. Business stock" required>
+          </div>
+          <div class="field">
+            <label for="qsAmount">Amount requested (K) <span class="req">*</span></label>
+            <input type="number" id="qsAmount" name="amount" class="qs-input" placeholder="e.g. 5000" min="1" step="any" required>
+          </div>
+        </div>
+
+        <!-- Timeframe -->
+        <div class="field">
+          <label>Repayment timeframe <span class="req">*</span></label>
+          <div class="timeframe-toggle" role="group" aria-label="Timeframe mode">
+            <button type="button" class="tf-btn active" id="tfWeeksBtn" data-mode="weeks">Fixed weeks</button>
+            <button type="button" class="tf-btn" id="tfDateBtn" data-mode="date">Custom date</button>
+          </div>
+        </div>
+
+        <div class="two-up">
+          <!-- Weeks select (visible by default) -->
+          <div class="field" id="weeksField">
+            <label for="qsTenure">Duration <span class="req">*</span></label>
+            <select id="qsTenure" name="tenureWeeks" class="qs-input" required>
               <option value="1">1 week</option>
-              <option value="2">2 weeks</option>
+              <option value="2" selected>2 weeks</option>
               <option value="3">3 weeks</option>
               <option value="4">4 weeks</option>
             </select>
           </div>
-          <div id="dateMode" class="qs-mode-content qs-hidden">
-            <label class="qs-label" for="loanDueDate">Due Date</label>
-            <input type="date" id="loanDueDate" class="qs-input" disabled>
+          <!-- Custom date (hidden by default) -->
+          <div class="field" id="dateField" style="display:none">
+            <label for="qsDueDate">Due date <span class="req">*</span></label>
+            <input type="date" id="qsDueDate" name="dueDate" class="qs-input">
+          </div>
+
+          <div class="field">
+            <label for="qsUrgency">Urgency</label>
+            <select id="qsUrgency" name="urgency" class="qs-input">
+              <option value="low">Low</option>
+              <option value="standard" selected>Standard</option>
+              <option value="urgent">Urgent</option>
+              <option value="emergency">Emergency</option>
+            </select>
           </div>
         </div>
-      </section>
 
-      <section class="qs-estimate" aria-live="polite">
-        <h2>Estimate</h2>
-        <div class="qs-est-row"><span class="label">Interest rate</span><span class="value" id="estRate">10%</span></div>
-        <div class="qs-est-row"><span class="label">Interest amount</span><span class="value" id="estInterest">K 0.00</span></div>
-        <div class="qs-est-row"><span class="label">Total to repay</span><span class="value amber" id="estTotal">K 0.00</span></div>
-        <div class="qs-est-row"><span class="label">Approval target</span><span class="value" id="estApproval">Within 48 hours</span></div>
-      </section>
-
-      <section class="qs-section">
-        <h2>Documents</h2>
-        <p>Upload clear photos of both sides of your NRC. Collateral photos are optional.</p>
-        <div class="qs-grid">
-          <div class="qs-field"><label class="qs-label" for="nrcFront">NRC Front *</label><div class="qs-file-zone"><input type="file" id="nrcFront" accept="image/jpeg,image/png,image/webp" required></div><p id="fileNameNrcFront" class="qs-file-name"></p></div>
-          <div class="qs-field"><label class="qs-label" for="nrcBack">NRC Back *</label><div class="qs-file-zone"><input type="file" id="nrcBack" accept="image/jpeg,image/png,image/webp" required></div><p id="fileNameNrcBack" class="qs-file-name"></p></div>
-          <div class="qs-field"><label class="qs-label" for="collateralFront">Collateral Front (optional)</label><div class="qs-file-zone"><input type="file" id="collateralFront" accept="image/jpeg,image/png,image/webp"></div><p id="fileNameCollateralFront" class="qs-file-name"></p></div>
-          <div class="qs-field"><label class="qs-label" for="collateralBack">Collateral Back (optional)</label><div class="qs-file-zone"><input type="file" id="collateralBack" accept="image/jpeg,image/png,image/webp"></div><p id="fileNameCollateralBack" class="qs-file-name"></p></div>
+        <!-- ── Live estimate ── -->
+        <div class="estimate-box" id="estimateBox">
+          <div class="est-row">
+            <span class="est-label">Interest rate</span>
+            <span class="est-val" id="estRate">16%</span>
+          </div>
+          <div class="est-row">
+            <span class="est-label">Interest amount</span>
+            <span class="est-val" id="estInterest">K 0.00</span>
+          </div>
+          <div class="est-row">
+            <span class="est-label">Principal only</span>
+            <span class="est-val" id="estPrincipal">K 0.00</span>
+          </div>
+          <div class="est-row">
+            <span class="est-label">Approval target</span>
+            <span class="est-val" id="estApproval">48 h</span>
+          </div>
+          <div class="est-total">
+            <span class="est-label">Total repayment</span>
+            <span class="est-val green" id="estTotal">K 0.00</span>
+          </div>
         </div>
-      </section>
 
-      <label class="qs-checkbox">
-        <input type="checkbox" id="terms" required>
-        <span>I agree to the BMF terms and conditions and confirm the information provided is accurate.</span>
-      </label>
-      <button type="submit" id="applyBtn" class="qs-submit-btn">Submit Application</button>
-      <div id="qsLoader" class="qs-hidden" role="status">Submitting application…</div>
-    </form>
+        <!-- ── Documents ── -->
+        <div class="section-divider">Documents</div>
+        <p style="font-size:13px; color:#8b949e; margin-bottom:14px; line-height:1.5">Upload clear images of your NRC (both sides, required) and collateral photos (optional). JPG / PNG / WEBP, max 5 MB each.</p>
 
-    <section id="qsSuccess" class="qs-success-screen" role="status" aria-live="polite">
-      <div class="qs-success-icon" aria-hidden="true">✓</div>
-      <h2>Application Submitted</h2>
-      <p>Thank you, <span id="qsSuccessName"></span>. Your application has been received and is under review.</p>
-      <p class="qs-app-id">Application ID: <span id="qsSuccessId"></span></p>
-      <p>We’ll contact you within the approval timeframe.</p>
-      <a class="qs-btn-secondary" href="login.html">Go to Login</a>
-    </section>
-  </main>
-  <div id="qsToast" class="qs-toast" role="status" aria-live="polite"></div>
+        <div class="upload-grid">
+          <div class="upload-box" id="boxNrcFront">
+            <input type="file" id="qsNrcFront" name="nrcFront" accept="image/jpeg,image/png,image/webp" required>
+            <div class="u-icon">🪪</div>
+            <div class="u-label">NRC Front</div>
+            <div class="u-hint">Required</div>
+            <div class="u-check">✓ Attached</div>
+          </div>
+          <div class="upload-box" id="boxNrcBack">
+            <input type="file" id="qsNrcBack" name="nrcBack" accept="image/jpeg,image/png,image/webp" required>
+            <div class="u-icon">🪪</div>
+            <div class="u-label">NRC Back</div>
+            <div class="u-hint">Required</div>
+            <div class="u-check">✓ Attached</div>
+          </div>
+          <div class="upload-box" id="boxColFront">
+            <input type="file" id="qsColFront" name="collateralFront" accept="image/*">
+            <div class="u-icon">📷</div>
+            <div class="u-label">Collateral Front</div>
+            <div class="u-hint">Optional</div>
+            <div class="u-check">✓ Attached</div>
+          </div>
+          <div class="upload-box" id="boxColBack">
+            <input type="file" id="qsColBack" name="collateralBack" accept="image/*">
+            <div class="u-icon">📷</div>
+            <div class="u-label">Collateral Back</div>
+            <div class="u-hint">Optional</div>
+            <div class="u-check">✓ Attached</div>
+          </div>
+        </div>
+
+        <!-- ── Terms ── -->
+        <div class="section-divider">Terms</div>
+        <details class="terms-details">
+          <summary>Read terms &amp; conditions</summary>
+          <ul>
+            <li>I confirm the loan purpose and amount are true and necessary for my stated need.</li>
+            <li>I understand the approved amount, interest rate, total repayment, and due date are based on my selected timeframe and urgency.</li>
+            <li>I agree to repay the full approved amount on or before the agreed due date.</li>
+            <li>I understand all submitted information and documents may be reviewed by the BMF admin team.</li>
+            <li>I accept that approval is subject to review and that BMF may request additional information before processing.</li>
+            <li>I will not misrepresent my identity, documents, or repayment ability.</li>
+          </ul>
+        </details>
+        <label class="checkbox-row">
+          <input type="checkbox" id="qsAgree" required>
+          <span>I have read, understood, and agree to these terms and conditions.</span>
+        </label>
+
+        <button type="submit" class="qs-submit" id="qsSubmitBtn">Submit Application</button>
+        <p class="qs-error" id="qsError"></p>
+      </form>
+
+      <p class="qs-footer-note">
+        Already have an account? <a href="login.html">Sign in here</a>
+      </p>
+    </div>
+  </div>
 
   <script>
-    let selectedUrgency = 'standard';
-    let selectedMode = 'weeks';
-    const form = document.getElementById('applyForm');
-    const params = new URLSearchParams(window.location.search);
-    const preEmail = params.get('email') || '';
-    const preName = params.get('name') || '';
-
-    if (preEmail) {
-      document.getElementById('email').value = preEmail;
-      document.getElementById('email').readOnly = true;
-    }
-    if (preName) document.getElementById('fullName').value = preName;
-
-    function showToast(message, kind = 'success') {
-      const toast = document.getElementById('qsToast');
-      toast.textContent = message;
-      toast.className = `qs-toast ${kind} show`;
-      setTimeout(() => toast.classList.remove('show'), 4000);
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function fmtK(n) {
+      return 'K ' + (Number(n) || 0).toLocaleString('en-ZM', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    function setMessage(message, isError = false) {
-      const element = document.getElementById('qsMessage');
-      element.textContent = message;
-      element.classList.toggle('error', isError);
+    // ── Upload boxes ──────────────────────────────────────────────────────────
+    [
+      ['qsNrcFront',  'boxNrcFront'],
+      ['qsNrcBack',   'boxNrcBack'],
+      ['qsColFront',  'boxColFront'],
+      ['qsColBack',   'boxColBack']
+    ].forEach(([inputId, boxId]) => {
+      const input = document.getElementById(inputId);
+      const box   = document.getElementById(boxId);
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (file && file.size > 5 * 1024 * 1024) {
+          input.value = '';
+          box.classList.remove('has-file');
+          showError('Each image must be 5 MB or smaller.');
+          return;
+        }
+        box.classList.toggle('has-file', !!file);
+        box.classList.remove('required-flash');
+        showError('');
+      });
+    });
+
+    // ── Timeframe mode ────────────────────────────────────────────────────────
+    let timeframeMode = 'weeks'; // 'weeks' | 'date'
+
+    document.getElementById('tfWeeksBtn').addEventListener('click', () => setTfMode('weeks'));
+    document.getElementById('tfDateBtn').addEventListener('click',  () => setTfMode('date'));
+
+    function setTfMode(mode) {
+      timeframeMode = mode;
+      const isDate = mode === 'date';
+
+      document.getElementById('tfWeeksBtn').classList.toggle('active', !isDate);
+      document.getElementById('tfDateBtn').classList.toggle('active',  isDate);
+
+      document.getElementById('weeksField').style.display = isDate ? 'none' : '';
+      document.getElementById('dateField').style.display  = isDate ? '' : 'none';
+
+      // Clear the inactive field so it doesn't interfere with submission
+      if (isDate) {
+        document.getElementById('qsTenure').value = '2';   // reset weeks but keep it valid
+        document.getElementById('qsDueDate').value = '';
+      } else {
+        document.getElementById('qsDueDate').value = '';
+      }
+
+      updateEstimate();
+    }
+
+    // ── Estimate calculation ──────────────────────────────────────────────────
+    const APPROVAL_HOURS = { low: 72, standard: 48, urgent: 24, emergency: 4 };
+
+    // Live rates fetched from server — falls back to BMF defaults if fetch fails
+    let loanRates = { weeklyRates: { 1: 10, 2: 16, 3: 24, 4: 32 }, extensionDailyRatePercent: 0.1, maxTermDays: 153, extensionStartsAfterDays: 28 };
+
+    async function loadPublicRates() {
+      try {
+        const res = await fetch('/loans/public-rates');
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (data && data.weeklyRates) {
+          loanRates = data;
+          updateEstimate();
+        }
+      } catch (_) { /* use fallback */ }
+    }
+
+    // Calculate interest for any number of days — mirrors loanTerms.js exactly
+    function calcInterestForDays(amount, days) {
+      const extAfter = loanRates.extensionStartsAfterDays || 28;
+      const dailyExt = (loanRates.extensionDailyRatePercent || 0.1) / 100;
+      const wr = loanRates.weeklyRates || {};
+      if (days <= 7)  return amount * ((wr[1] || 10) / 100);
+      if (days <= 14) return amount * ((wr[2] || 16) / 100);
+      if (days <= 21) return amount * ((wr[3] || 24) / 100);
+      if (days <= extAfter) return amount * ((wr[4] || 32) / 100);
+      // Extension: 4-week rate + daily extension rate for each day beyond 28
+      return amount * (((wr[4] || 32) / 100) + (days - extAfter) * dailyExt);
+    }
+
+    function getEffectiveDays() {
+      if (timeframeMode === 'date') {
+        const d = document.getElementById('qsDueDate').value;
+        if (!d) return 14; // default 2 weeks until date picked
+        const today = new Date(); today.setHours(0,0,0,0);
+        const due   = new Date(d + 'T00:00:00');
+        const diffDays = Math.max(1, Math.ceil((due - today) / 864e5));
+        const maxDays = loanRates.maxTermDays || 153;
+        return Math.min(diffDays, maxDays);
+      }
+      return (Number(document.getElementById('qsTenure').value) || 2) * 7;
+    }
+
+    function getRateLabel(days) {
+      const extAfter = loanRates.extensionStartsAfterDays || 28;
+      const wr = loanRates.weeklyRates || {};
+      if (days <= 7)  return (wr[1] || 10) + '%';
+      if (days <= 14) return (wr[2] || 16) + '%';
+      if (days <= 21) return (wr[3] || 24) + '%';
+      if (days <= extAfter) return (wr[4] || 32) + '%';
+      const dailyExt = loanRates.extensionDailyRatePercent || 0.1;
+      return (wr[4] || 32) + '% + ' + dailyExt + '%/day ext.';
     }
 
     function updateEstimate() {
-      const rates = { 1: 0.10, 2: 0.16, 3: 0.24, 4: 0.32 };
-      const hours = { standard: 48, urgent: 24, emergency: 4 };
-      const weeks = Number(document.getElementById('loanTenure').value) || 1;
-      const amount = Number(document.getElementById('loanAmount').value) || 0;
-      const interest = amount * rates[weeks];
-      document.getElementById('estRate').textContent = `${(rates[weeks] * 100).toFixed(0)}%`;
-      document.getElementById('estInterest').textContent = `K ${interest.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      document.getElementById('estTotal').textContent = `K ${(amount + interest).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      document.getElementById('estApproval').textContent = `Within ${hours[selectedUrgency]} hours`;
+      const amount  = Number(document.getElementById('qsAmount').value) || 0;
+      const days    = getEffectiveDays();
+      const interest = calcInterestForDays(amount, days);
+      const total    = amount + interest;
+      const urgency  = document.getElementById('qsUrgency').value || 'standard';
+
+      document.getElementById('estRate').textContent      = getRateLabel(days);
+      document.getElementById('estInterest').textContent  = fmtK(interest);
+      document.getElementById('estPrincipal').textContent = fmtK(amount);
+      document.getElementById('estApproval').textContent  = (APPROVAL_HOURS[urgency] || 48) + ' h';
+      document.getElementById('estTotal').textContent     = fmtK(total);
     }
 
-    document.querySelectorAll('[data-urgency]').forEach(button => {
-      button.addEventListener('click', () => {
-        selectedUrgency = button.dataset.urgency;
-        document.querySelectorAll('[data-urgency]').forEach(item => item.classList.toggle('active', item === button));
-        updateEstimate();
-      });
+    ['qsAmount', 'qsTenure', 'qsDueDate', 'qsUrgency'].forEach(id => {
+      document.getElementById(id)?.addEventListener('input',  updateEstimate);
+      document.getElementById(id)?.addEventListener('change', updateEstimate);
     });
 
-    document.querySelectorAll('[data-mode]').forEach(button => {
-      button.addEventListener('click', () => {
-        selectedMode = button.dataset.mode;
-        document.querySelectorAll('[data-mode]').forEach(item => item.classList.toggle('active', item === button));
-        const useWeeks = selectedMode === 'weeks';
-        document.getElementById('weeksMode').classList.toggle('qs-hidden', !useWeeks);
-        document.getElementById('loanTenure').disabled = !useWeeks;
-        document.getElementById('dateMode').classList.toggle('qs-hidden', useWeeks);
-        document.getElementById('loanDueDate').disabled = useWeeks;
-        document.getElementById('loanDueDate').required = !useWeeks;
-        updateEstimate();
-      });
-    });
-
-    document.querySelectorAll('#nrcFront, #nrcBack, #collateralFront, #collateralBack').forEach(input => {
-      input.addEventListener('change', () => {
-        const name = input.files[0]?.name || '';
-        const suffix = input.id.charAt(0).toUpperCase() + input.id.slice(1);
-        document.getElementById(`fileName${suffix}`).textContent = name;
-      });
-    });
-
-    document.getElementById('loanAmount').addEventListener('input', updateEstimate);
-    document.getElementById('loanTenure').addEventListener('change', updateEstimate);
+    loadPublicRates(); // fetch live rates on page load
     updateEstimate();
 
-    form.addEventListener('submit', async event => {
-      event.preventDefault();
-      setMessage('');
-      const button = document.getElementById('applyBtn');
-      const loader = document.getElementById('qsLoader');
-      const formData = new FormData();
-      formData.append('fullName', document.getElementById('fullName').value.trim());
-      formData.append('email', document.getElementById('email').value.trim());
-      formData.append('nrcNumber', document.getElementById('nrcNumber').value.trim());
-      formData.append('phone', document.getElementById('phone').value.trim());
-      formData.append('product', document.getElementById('loanProduct').value);
-      formData.append('amount', document.getElementById('loanAmount').value);
-      formData.append('urgency', selectedUrgency);
-      formData.append('agreedToTerms', 'true');
-      if (selectedMode === 'weeks') formData.append('tenureWeeks', document.getElementById('loanTenure').value);
-      else formData.append('dueDate', document.getElementById('loanDueDate').value);
-      ['nrcFront', 'nrcBack', 'collateralFront', 'collateralBack'].forEach(id => {
-        const file = document.getElementById(id).files[0];
-        if (file) formData.append(id, file);
-      });
+    // ── Error helper ──────────────────────────────────────────────────────────
+    function showError(msg) { document.getElementById('qsError').textContent = msg; }
 
-      button.disabled = true;
-      loader.classList.remove('qs-hidden');
+    // ── Form submit ───────────────────────────────────────────────────────────
+    document.getElementById('qsForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      showError('');
+
+      const fullName  = document.getElementById('qsFullName').value.trim();
+      const email     = document.getElementById('qsEmail').value.trim();
+      const nrcNumber = document.getElementById('qsNrc').value.trim();
+      const phone     = document.getElementById('qsPhone').value.trim();
+      const product   = document.getElementById('qsPurpose').value.trim();
+      const amount    = document.getElementById('qsAmount').value.trim();
+      const urgency   = document.getElementById('qsUrgency').value;
+      const agreed    = document.getElementById('qsAgree').checked;
+      const nrcFront  = document.getElementById('qsNrcFront').files[0];
+      const nrcBack   = document.getElementById('qsNrcBack').files[0];
+
+      // Validation
+      if (!fullName)  return showError('Please enter your full name.');
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showError('Please enter a valid email address.');
+      if (!nrcNumber) return showError('Please enter your NRC number.');
+      if (!phone)     return showError('Please enter your phone number.');
+      if (!product)   return showError('Please enter a loan purpose.');
+      if (!amount || Number(amount) <= 0) return showError('Please enter a valid amount.');
+
+      // Timeframe validation
+      if (timeframeMode === 'date') {
+        const d = document.getElementById('qsDueDate').value;
+        if (!d) return showError('Please pick a due date or switch to fixed weeks.');
+        if (new Date(d + 'T00:00:00') <= new Date()) return showError('Due date must be in the future.');
+      }
+
+      if (!nrcFront || !nrcBack) {
+        if (!nrcFront) document.getElementById('boxNrcFront').classList.add('required-flash');
+        if (!nrcBack)  document.getElementById('boxNrcBack').classList.add('required-flash');
+        return showError('Please attach both NRC front and back images.');
+      }
+      if (!agreed) return showError('Please agree to the terms and conditions before submitting.');
+
+      const days = getEffectiveDays();
+      const weeks = Math.round(days / 7);
+      const computedDueDate = timeframeMode === 'date'
+        ? document.getElementById('qsDueDate').value
+        : new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+
+      const formData = new FormData();
+      formData.append('fullName',    fullName);
+      formData.append('email',       email);
+      formData.append('nrcNumber',   nrcNumber);
+      formData.append('phone',       phone);
+      formData.append('product',     product);
+      formData.append('amount',      amount);
+      formData.append('urgency',     urgency);
+      formData.append('tenureWeeks', String(weeks));
+      formData.append('tenureDays',  String(days));
+      formData.append('dueDate',     computedDueDate);
+      formData.append('agreedToTerms', 'true');
+      // Reason logged on the admin side
+      formData.append('source', 'quick_screen');
+
+      formData.append('nrcFront', nrcFront);
+      formData.append('nrcBack',  nrcBack);
+
+      const colFront = document.getElementById('qsColFront').files[0];
+      const colBack  = document.getElementById('qsColBack').files[0];
+      if (colFront) formData.append('collateralFront', colFront);
+      if (colBack)  formData.append('collateralBack',  colBack);
+
+      const btn = document.getElementById('qsSubmitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Submitting…';
+
       try {
-        const response = await fetch('/api/apply', { method: 'POST', body: formData });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || 'Application submission failed.');
-        document.getElementById('applyForm').classList.add('qs-hidden');
-        document.getElementById('qsSuccessName').textContent = formData.get('fullName');
-        document.getElementById('qsSuccessId').textContent = data.applicationId || '';
-        document.getElementById('qsSuccess').style.display = 'block';
-        showToast('Application submitted successfully.');
-      } catch (error) {
-        const message = error.message || 'Connection error. Please try again.';
-        setMessage(message, true);
-        showToast(message, 'error');
+        const res  = await fetch('/api/apply', { method: 'POST', body: formData });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return showError(data.error || 'Submission failed. Please try again.');
+        document.getElementById('qsSuccessOverlay').classList.remove('hidden');
+      } catch {
+        showError('Unable to submit. Please check your connection and try again.');
       } finally {
-        button.disabled = false;
-        loader.classList.add('qs-hidden');
+        btn.disabled = false;
+        btn.textContent = 'Submit Application';
       }
     });
   </script>
