@@ -5,7 +5,7 @@ const https = require('https');
 const cron = require('node-cron');
 const config = require('./config');
 const { logError, logAccess, replayPendingAlerts } = require('./middleware/logger');
-const { helmet, deviceAuth, rateLimiter, authRateLimiter, getServerMode } = require('./middleware/security');
+const { helmet, deviceAuth, rateLimiter, authRateLimiter, getServerMode, healthRateLimiter } = require('./middleware/security');
 const { verifyOTP, sendOTP } = require('./middleware/otp');
 const { trackSession } = require('./controllers/sessionController');
 const { serveFile } = require('./controllers/fileController');
@@ -185,6 +185,11 @@ app.use('/api/apply', (req, res, next) => {
   if (req.method !== 'POST') return next();
   return applyRouter(req, res, next);
 });
+
+// Public loan rates — no auth required. Quick-screen page fetches this without
+// a device token. Must be mounted BEFORE deviceAuth. Rate-limited the same way
+// as /health so it cannot be hammered even from localhost.
+app.get('/loans/public-rates', healthRateLimiter, require('./controllers/loanController').getPublicLoanRates);
 
 app.use((req, res, next) => {
   res.on('finish', () => {
