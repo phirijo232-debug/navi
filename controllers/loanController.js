@@ -454,16 +454,19 @@ function deriveLoanStatus(loan, today = getZambiaDateKey()) {
   const dueDate = String(loan.dueDate || '').slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return stored === 'paid' ? 'paid' : 'active';
 
-  // An agreed manual grace window wins over the default clock window.
+  // If admin explicitly set grace or defaulted, honour that — it overrides the clock.
+  if (stored === 'grace' || stored === 'defaulted') return stored;
+
+  // An agreed manual grace window (admin set graceUntil) also wins over the clock.
   const agreedGraceUntil = String(loan.graceUntil || '').slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(agreedGraceUntil)) {
     return today <= agreedGraceUntil ? 'grace' : 'defaulted';
   }
 
+  // Clock-based status: overdue only — never auto-promote to grace or defaulted.
+  // Admin must manually move a loan to grace before penalty accrual starts.
   const daysToDue = daysBetween(today, dueDate);
-  if (daysToDue < -config.DEFAULT_GRACE_DAYS) return 'defaulted';
-  if (daysToDue < 0) return 'grace';
-  if (daysToDue <= config.GRACE_PERIOD_DAYS) return 'grace';
+  if (daysToDue < 0) return 'overdue';
   return 'active';
 }
 
@@ -498,8 +501,10 @@ function applyGraceAccrual(loan, today = getZambiaDateKey()) {
     if (!loan || Number(loan.outstanding || 0) <= 0) return loan;
     if (normalizeStatus(loan.status) === 'liquidated') return loan;
 
-    const live = deriveLoanStatus(loan, today);
-    if (live !== 'grace' && live !== 'defaulted') return loan;
+    // Only accrue on loans the admin has explicitly moved to grace or defaulted.
+    // Overdue loans do NOT auto-accrue — admin must manually set status to grace first.
+    const stored = normalizeStatus(loan.status);
+    if (stored !== 'grace' && stored !== 'defaulted') return loan;
 
     const rate = Number(loan.graceDailyRate) > 0 ? Number(loan.graceDailyRate) : GRACE_DAILY_RATE;
 
