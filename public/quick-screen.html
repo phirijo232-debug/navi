@@ -47,8 +47,8 @@
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      padding: 40px clamp(16px, 4vw, 24px) 60px;
+      align-items: stretch;
+      padding: 40px clamp(16px, 3vw, 32px) 60px;
     }
 
     .qs-header { text-align: center; margin-bottom: 32px; }
@@ -62,7 +62,7 @@
       border-radius: 14px;
       padding: clamp(24px, 5vw, 40px);
       width: 100%;
-      max-width: 560px;
+      max-width: 100%;
     }
 
     .section-divider {
@@ -154,27 +154,32 @@
     .estimate-box .est-total .est-val   { font-size: 18px; color: #2f81f7; }
 
     /* ── Uploads ── */
-    .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; }
     .upload-box {
       background: #0d1117;
       border: 2px dashed #30363d;
-      border-radius: 8px;
-      padding: 16px 10px;
+      border-radius: 10px;
+      padding: 28px 16px;
       text-align: center;
       cursor: pointer;
       position: relative;
       transition: border-color 0.15s, background 0.15s;
+      min-height: 140px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
-    .upload-box:hover { border-color: #2f81f7; }
-    .upload-box.has-file { border-color: #3fb950; border-style: solid; }
+    .upload-box:hover { border-color: #2f81f7; background: #161b22; }
+    .upload-box.has-file { border-color: #3fb950; border-style: solid; background: #0d1f12; }
     .upload-box input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-    .upload-box .u-icon { font-size: 20px; margin-bottom: 5px; }
-    .upload-box .u-label { font-size: 12px; font-weight: 600; color: #e6edf3; line-height: 1.3; }
-    .upload-box .u-hint  { font-size: 11px; color: #8b949e; margin-top: 3px; }
-    .upload-box .u-check { display: none; font-size: 12px; color: #3fb950; font-weight: 700; margin-top: 3px; }
+    .upload-box .u-icon { font-size: 28px; margin-bottom: 8px; }
+    .upload-box .u-label { font-size: 13px; font-weight: 600; color: #e6edf3; line-height: 1.3; }
+    .upload-box .u-hint  { font-size: 12px; color: #8b949e; margin-top: 5px; }
+    .upload-box .u-check { display: none; font-size: 12px; color: #3fb950; font-weight: 700; margin-top: 5px; }
     .upload-box.has-file .u-check { display: block; }
     .upload-box.has-file .u-hint  { display: none; }
-    .upload-box.required-flash { border-color: #f85149 !important; }
+    .upload-box.required-flash { border-color: #f85149 !important; background: #1f0f0f !important; }
 
     /* ── Terms ── */
     .terms-details { margin: 4px 0 16px; }
@@ -329,7 +334,6 @@
           <label>Repayment timeframe <span class="req">*</span></label>
           <div class="timeframe-toggle" role="group" aria-label="Timeframe mode">
             <button type="button" class="tf-btn active" id="tfWeeksBtn" data-mode="weeks">Fixed weeks</button>
-            <button type="button" class="tf-btn" id="tfDateBtn" data-mode="date">Custom date</button>
           </div>
         </div>
 
@@ -344,10 +348,7 @@
               <option value="4">4 weeks</option>
             </select>
           </div>
-          <!-- Custom date (hidden by default) -->
-          <div class="field" id="dateField" style="display:none">
-            <label for="qsDueDate">Due date <span class="req">*</span></label>
-            <input type="date" id="qsDueDate" name="dueDate" class="qs-input">
+          <!-- Custom date removed — fixed weeks only for public applications. Admin panel handles extensions. -->
           </div>
 
           <div class="field">
@@ -387,7 +388,7 @@
 
         <!-- ── Documents ── -->
         <div class="section-divider">Documents</div>
-        <p style="font-size:13px; color:#8b949e; margin-bottom:14px; line-height:1.5">Upload clear images of your NRC (both sides, required) and collateral photos (optional). JPG / PNG / WEBP, max 5 MB each.</p>
+        <p style="font-size:13px; color:#8b949e; margin-bottom:14px; line-height:1.5">Upload clear images of your NRC (both sides) and collateral photos (both sides). All four images are required. JPG / PNG / WEBP, max 5 MB each.</p>
 
         <div class="upload-grid">
           <div class="upload-box" id="boxNrcFront">
@@ -405,17 +406,17 @@
             <div class="u-check">✓ Attached</div>
           </div>
           <div class="upload-box" id="boxColFront">
-            <input type="file" id="qsColFront" name="collateralFront" accept="image/*">
-            <div class="u-icon">📷</div>
+            <input type="file" id="qsColFront" name="collateralFront" accept="image/*" required>
+            <div class="u-icon">📦</div>
             <div class="u-label">Collateral Front</div>
-            <div class="u-hint">Optional</div>
+            <div class="u-hint">Required</div>
             <div class="u-check">✓ Attached</div>
           </div>
           <div class="upload-box" id="boxColBack">
-            <input type="file" id="qsColBack" name="collateralBack" accept="image/*">
-            <div class="u-icon">📷</div>
+            <input type="file" id="qsColBack" name="collateralBack" accept="image/*" required>
+            <div class="u-icon">📦</div>
             <div class="u-label">Collateral Back</div>
-            <div class="u-hint">Optional</div>
+            <div class="u-hint">Required</div>
             <div class="u-check">✓ Attached</div>
           </div>
         </div>
@@ -477,32 +478,7 @@
       });
     });
 
-    // ── Timeframe mode ────────────────────────────────────────────────────────
-    let timeframeMode = 'weeks'; // 'weeks' | 'date'
-
-    document.getElementById('tfWeeksBtn').addEventListener('click', () => setTfMode('weeks'));
-    document.getElementById('tfDateBtn').addEventListener('click',  () => setTfMode('date'));
-
-    function setTfMode(mode) {
-      timeframeMode = mode;
-      const isDate = mode === 'date';
-
-      document.getElementById('tfWeeksBtn').classList.toggle('active', !isDate);
-      document.getElementById('tfDateBtn').classList.toggle('active',  isDate);
-
-      document.getElementById('weeksField').style.display = isDate ? 'none' : '';
-      document.getElementById('dateField').style.display  = isDate ? '' : 'none';
-
-      // Clear the inactive field so it doesn't interfere with submission
-      if (isDate) {
-        document.getElementById('qsTenure').value = '2';   // reset weeks but keep it valid
-        document.getElementById('qsDueDate').value = '';
-      } else {
-        document.getElementById('qsDueDate').value = '';
-      }
-
-      updateEstimate();
-    }
+    // ── Timeframe mode — fixed weeks only (custom date is admin-panel only) ──
 
     // ── Estimate calculation ──────────────────────────────────────────────────
     const APPROVAL_HOURS = { low: 72, standard: 48, urgent: 24, emergency: 4 };
@@ -549,15 +525,6 @@
     }
 
     function getEffectiveDays() {
-      if (timeframeMode === 'date') {
-        const d = document.getElementById('qsDueDate').value;
-        if (!d) return 14; // default 2 weeks until date picked
-        const today = new Date(); today.setHours(0,0,0,0);
-        const due   = new Date(d + 'T00:00:00');
-        const diffDays = Math.max(1, Math.ceil((due - today) / 864e5));
-        const maxDays = loanRates.maxTermDays || 153;
-        return Math.min(diffDays, maxDays);
-      }
       return (Number(document.getElementById('qsTenure').value) || 2) * 7;
     }
 
@@ -587,7 +554,7 @@
       document.getElementById('estTotal').textContent     = fmtK(total);
     }
 
-    ['qsAmount', 'qsTenure', 'qsDueDate', 'qsUrgency'].forEach(id => {
+    ['qsAmount', 'qsTenure', 'qsUrgency'].forEach(id => {
       document.getElementById(id)?.addEventListener('input',  updateEstimate);
       document.getElementById(id)?.addEventListener('change', updateEstimate);
     });
@@ -622,25 +589,26 @@
       if (!product)   return showError('Please enter a loan purpose.');
       if (!amount || Number(amount) <= 0) return showError('Please enter a valid amount.');
 
-      // Timeframe validation
-      if (timeframeMode === 'date') {
-        const d = document.getElementById('qsDueDate').value;
-        if (!d) return showError('Please pick a due date or switch to fixed weeks.');
-        if (new Date(d + 'T00:00:00') <= new Date()) return showError('Due date must be in the future.');
-      }
+      // Fixed weeks only — no custom date on public applications.
+
+      const colFront = document.getElementById('qsColFront').files[0];
+      const colBack  = document.getElementById('qsColBack').files[0];
 
       if (!nrcFront || !nrcBack) {
         if (!nrcFront) document.getElementById('boxNrcFront').classList.add('required-flash');
         if (!nrcBack)  document.getElementById('boxNrcBack').classList.add('required-flash');
         return showError('Please attach both NRC front and back images.');
       }
+      if (!colFront || !colBack) {
+        if (!colFront) document.getElementById('boxColFront').classList.add('required-flash');
+        if (!colBack)  document.getElementById('boxColBack').classList.add('required-flash');
+        return showError('Please attach both collateral front and back images.');
+      }
       if (!agreed) return showError('Please agree to the terms and conditions before submitting.');
 
       const days = getEffectiveDays();
       const weeks = Math.round(days / 7);
-      const computedDueDate = timeframeMode === 'date'
-        ? document.getElementById('qsDueDate').value
-        : new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+      const computedDueDate = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
 
       const formData = new FormData();
       formData.append('fullName',    fullName);
@@ -660,10 +628,8 @@
       formData.append('nrcFront', nrcFront);
       formData.append('nrcBack',  nrcBack);
 
-      const colFront = document.getElementById('qsColFront').files[0];
-      const colBack  = document.getElementById('qsColBack').files[0];
-      if (colFront) formData.append('collateralFront', colFront);
-      if (colBack)  formData.append('collateralBack',  colBack);
+      formData.append('collateralFront', colFront);
+      formData.append('collateralBack',  colBack);
 
       const btn = document.getElementById('qsSubmitBtn');
       btn.disabled = true;

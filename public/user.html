@@ -240,6 +240,35 @@
       .customer-portal .portal-topbar .loan-tabs { order:3; flex-basis:100%; }
       .customer-portal .portal-user-controls { margin-left:auto; }
     }
+    /* ── Loan request form — full-width to match quick-screen ── */
+    .customer-portal #requestSection .panel {
+      max-width: 100% !important;
+      width: 100% !important;
+      box-sizing: border-box;
+    }
+    #loanRequestForm.auth-form,
+    .customer-portal #loanRequestForm {
+      max-width: 100% !important;
+      width: 100% !important;
+      box-sizing: border-box;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
+    .customer-portal #loanRequestForm .request-field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      width: 100%;
+    }
+    .customer-portal #loanRequestForm .auth-input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .customer-portal #loanRequestForm .loan-estimate-box {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
     @media(max-width:650px) {
       .customer-portal .portal-topbar { padding:8px 10px 8px 72px; }
       .customer-portal .portal-user-name { display:none; }
@@ -247,6 +276,7 @@
       .customer-portal .portal-topbar .loan-tab { padding:9px 11px; font-size:12px; }
       .customer-portal .support-panel { padding:14px; }
       .customer-portal .support-form .request-field-grid,.customer-portal .payment-summary-grid { grid-template-columns:1fr; }
+      .customer-portal #loanRequestForm .request-field-grid { grid-template-columns:1fr; }
       .customer-portal .support-page-heading { align-items:flex-start; }
     }
   </style>
@@ -435,96 +465,263 @@
       </div>
 
       <div id="requestSection" class="screen-section hidden">
-        <div class="panel">
+        <!-- Quick-screen style: full-width, no max-width cap, same design language -->
+        <style>
+          /* ── Request form — QS design system ── */
+          #requestSection { width:100%; }
+          #requestSection .qs-panel {
+            background: var(--portal-card, #161b22);
+            border: 1px solid var(--portal-border, #30363d);
+            border-radius: 14px;
+            padding: clamp(24px,4vw,40px);
+            width: 100%;
+            box-sizing: border-box;
+          }
+          #requestSection .qs-panel h2 {
+            font-size: 20px; font-weight: 700; margin: 0 0 20px;
+          }
+          #requestSection .qs-divider {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .08em; color: #8b949e;
+            border-bottom: 1px solid var(--portal-border, #30363d);
+            padding-bottom: 8px; margin: 24px 0 18px;
+          }
+          #requestSection .qs-divider:first-of-type { margin-top: 0; }
+          #requestSection .qs-two-up {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;
+          }
+          #requestSection .qs-field { display: flex; flex-direction: column; gap: 6px; }
+          #requestSection .qs-field label {
+            font-size: 13px; font-weight: 500; color: #8b949e;
+          }
+          #requestSection .qs-field label .req { color: #f85149; margin-left: 2px; }
+          #requestSection .qs-in {
+            width: 100%; background: #0d1117; border: 1px solid #30363d;
+            border-radius: 8px; padding: 11px 14px; color: #e6edf3;
+            font-size: 14px; outline: none; transition: border-color 0.15s;
+            appearance: none; box-sizing: border-box; font-family: inherit;
+          }
+          body.light #requestSection .qs-in {
+            background: #f4f6f8; border-color: #d5dce3; color: #1a2330;
+          }
+          #requestSection .qs-in:focus { border-color: #2f81f7; }
+          #requestSection .qs-in::placeholder { color: #484f58; }
+          #requestSection select.qs-in {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b949e' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
+          }
+          /* estimate box — QS grid style */
+          #requestSection .qs-estimate {
+            background: #1c2128; border: 1px solid #30363d;
+            border-radius: 9px; padding: 16px 18px;
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 10px 18px; margin: 8px 0 20px;
+          }
+          body.light #requestSection .qs-estimate { background: #f4f6f8; border-color: #d5dce3; }
+          #requestSection .qs-estimate .er { display: flex; justify-content: space-between; align-items: center; }
+          #requestSection .qs-estimate .el { font-size: 12px; color: #8b949e; }
+          #requestSection .qs-estimate .ev { font-size: 14px; font-weight: 700; color: #e6edf3; }
+          #requestSection .qs-estimate .et {
+            grid-column: 1 / -1; border-top: 1px solid #30363d;
+            padding-top: 10px; display: flex; justify-content: space-between; align-items: center;
+          }
+          #requestSection .qs-estimate .et .el { font-size: 13px; font-weight: 600; color: #e6edf3; }
+          #requestSection .qs-estimate .et .ev { font-size: 18px; color: #2f81f7; }
+          /* upload grid — QS style */
+          #requestSection .qs-upload-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; margin-bottom: 16px;
+          }
+          #requestSection .qs-upload-box {
+            background: #0d1117; border: 2px dashed #30363d; border-radius: 10px;
+            padding: 28px 16px; text-align: center; cursor: pointer; position: relative;
+            transition: border-color 0.15s, background 0.15s; min-height: 140px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+          }
+          body.light #requestSection .qs-upload-box { background: #f4f6f8; border-color: #d5dce3; }
+          #requestSection .qs-upload-box:hover { border-color: #2f81f7; background: #161b22; }
+          #requestSection .qs-upload-box.has-file { border-color: #3fb950; border-style: solid; background: #0d1f12; }
+          #requestSection .qs-upload-box.req-flash { border-color: #f85149 !important; background: #1f0f0f !important; }
+          #requestSection .qs-upload-box input[type="file"] {
+            position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+          }
+          #requestSection .qs-upload-box .u-icon  { font-size: 28px; margin-bottom: 8px; }
+          #requestSection .qs-upload-box .u-label { font-size: 13px; font-weight: 600; color: #e6edf3; }
+          #requestSection .qs-upload-box .u-hint  { font-size: 12px; color: #8b949e; margin-top: 5px; }
+          #requestSection .qs-upload-box .u-check { display: none; font-size: 12px; color: #3fb950; font-weight: 700; margin-top: 5px; }
+          #requestSection .qs-upload-box.has-file .u-check { display: block; }
+          #requestSection .qs-upload-box.has-file .u-hint  { display: none; }
+          /* terms + checkbox */
+          #requestSection .qs-terms { margin: 4px 0 16px; }
+          #requestSection .qs-terms summary { font-size: 13px; color: #8b949e; cursor: pointer; padding: 6px 0; user-select: none; }
+          #requestSection .qs-terms ul { padding: 10px 0 6px 18px; }
+          #requestSection .qs-terms li { font-size: 13px; color: #8b949e; margin-bottom: 6px; line-height: 1.5; }
+          #requestSection .qs-check-row {
+            display: flex; align-items: flex-start; gap: 10px; margin-bottom: 20px;
+            font-size: 13px; color: #8b949e; cursor: pointer;
+          }
+          #requestSection .qs-check-row input { margin-top: 2px; flex-shrink: 0; accent-color: #2f81f7; width: 16px; height: 16px; }
+          /* submit btn */
+          #requestSection .qs-submit-btn {
+            width: 100%; background: #2f81f7; color: #fff; border: none;
+            border-radius: 8px; padding: 13px; font-size: 15px; font-weight: 700;
+            cursor: pointer; transition: background 0.15s; font-family: inherit;
+          }
+          #requestSection .qs-submit-btn:hover { background: #3b93f9; }
+          #requestSection .qs-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+          #requestSection .qs-msg { margin-top: 12px; font-size: 13px; text-align: center; min-height: 18px; }
+          #requestSection .qs-msg.err { color: #f85149; }
+          #requestSection .qs-msg.ok  { color: #3fb950; }
+          @media(max-width:600px) {
+            #requestSection .qs-two-up { grid-template-columns: 1fr; }
+            #requestSection .qs-upload-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+            #requestSection .qs-estimate { grid-template-columns: 1fr; }
+            #requestSection .qs-estimate .et { grid-column: 1; }
+          }
+        </style>
+
+        <div class="qs-panel">
           <h2>Request New Loan</h2>
-          <form id="loanRequestForm" class="auth-form" enctype="multipart/form-data">
-            <div class="request-field-grid">
-              <input type="text" id="loanProduct" placeholder="Loan purpose" required class="auth-input">
-              <input type="number" id="loanAmount" placeholder="Amount" min="1" required class="auth-input">
+          <form id="loanRequestForm" enctype="multipart/form-data" novalidate>
+
+            <!-- ── Loan details ── -->
+            <div class="qs-divider">Loan Details</div>
+            <div class="qs-two-up">
+              <div class="qs-field">
+                <label for="loanProduct">Loan purpose <span class="req">*</span></label>
+                <input type="text" id="loanProduct" class="qs-in" placeholder="e.g. Business stock" required>
+              </div>
+              <div class="qs-field">
+                <label for="loanAmount">Amount requested (K) <span class="req">*</span></label>
+                <input type="number" id="loanAmount" class="qs-in" placeholder="e.g. 5000" min="1" step="any" required>
+              </div>
             </div>
 
-            <div class="request-field-grid two-up">
-              <div class="timeframe-field">
-                <label class="field-label" for="loanDueDate">Timeframe</label>
-                <div class="timeframe-toggle" role="group" aria-label="Choose timeframe mode">
-                  <button type="button" class="timeframe-mode-btn active" data-mode="weeks">Weeks</button>
-                  <button type="button" class="timeframe-mode-btn" data-mode="date">Custom date</button>
+            <div class="qs-two-up">
+              <div class="qs-field">
+                <label>Repayment timeframe <span class="req">*</span></label>
+                <div style="display:inline-flex;background:#0d1117;border:1px solid #30363d;border-radius:8px;overflow:hidden;margin-top:2px;">
+                  <button type="button" style="background:#2f81f7;color:#fff;border:none;padding:9px 16px;font-size:13px;font-weight:600;cursor:default;">Fixed weeks</button>
                 </div>
               </div>
-              <select id="loanUrgency" class="auth-input">
-                <option value="low">Low urgency</option>
-                <option value="standard" selected>Standard</option>
-                <option value="urgent">Urgent</option>
-                <option value="emergency">Emergency</option>
-              </select>
-            </div>
-
-            <div class="request-field-grid two-up compact-row">
-              <input type="date" id="loanDueDate" class="auth-input" disabled>
-              <select id="loanTenureWeeks" class="auth-input">
-                <option value="1">1 week</option>
-                <option value="2" selected>2 weeks</option>
-                <option value="3">3 weeks</option>
-                <option value="4">4 weeks</option>
-              </select>
-            </div>
-              <p class="timeframe-note">The selected date sets the term length. The loan term starts on approval; the final due date is approval date plus that duration. The daily extension rate is included only through that due date.</p>
-
-            <div class="request-field-grid two-up compact-row">
-              <select id="loanPaymentMode" class="auth-input">
-                <option value="">Payment mode (optional)</option>
-                <option value="cash">Cash</option>
-                <option value="bank_transfer">Bank transfer</option>
-                <option value="mobile_money">Mobile money</option>
-                <option value="salary_deduction">Salary deduction</option>
-                <option value="custom">Custom</option>
-              </select>
-              <input type="text" id="loanCustomPaymentMode" class="auth-input hidden" placeholder="Custom payment mode">
-            </div>
-
-            <input type="text" id="loanCollateralDescription" class="auth-input" placeholder="Collateral description">
-
-            <div class="upload-stack">
-              <div class="upload-field-wrap">
-                <label class="field-label" for="loanNrcFront">NRC front image (clear and readable) *</label>
-                <input type="file" id="loanNrcFront" accept="image/jpeg,image/png,image/webp" required class="auth-input file-input">
-                <img id="loanNrcFrontPreview" class="document-preview hidden" alt="NRC front preview">
-              </div>
-              <div class="upload-field-wrap">
-                <label class="field-label" for="loanNrcBack">NRC back image (clear and readable) *</label>
-                <input type="file" id="loanNrcBack" accept="image/jpeg,image/png,image/webp" required class="auth-input file-input">
-                <img id="loanNrcBackPreview" class="document-preview hidden" alt="NRC back preview">
+              <div class="qs-field">
+                <label for="loanUrgency">Urgency</label>
+                <select id="loanUrgency" class="qs-in">
+                  <option value="low">Low</option>
+                  <option value="standard" selected>Standard</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="emergency">Emergency</option>
+                </select>
               </div>
             </div>
 
-            <div class="upload-stack">
-              <div class="upload-field-wrap">
-                <label class="field-label" for="loanCollateralFront">Collateral front image</label>
-                <input type="file" id="loanCollateralFront" accept="image/*" class="auth-input file-input">
+            <div class="qs-two-up">
+              <div class="qs-field">
+                <label for="loanTenureWeeks">Duration <span class="req">*</span></label>
+                <select id="loanTenureWeeks" class="qs-in" required>
+                  <option value="1">1 week</option>
+                  <option value="2" selected>2 weeks</option>
+                  <option value="3">3 weeks</option>
+                  <option value="4">4 weeks</option>
+                </select>
               </div>
-              <div class="upload-field-wrap">
-                <label class="field-label" for="loanCollateralBack">Collateral back image</label>
-                <input type="file" id="loanCollateralBack" accept="image/*" class="auth-input file-input">
+              <div class="qs-field">
+                <label for="loanPaymentMode">Payment mode</label>
+                <select id="loanPaymentMode" class="qs-in">
+                  <option value="">Optional</option>
+                  <option value="cash">Cash</option>
+                  <option value="bank_transfer">Bank transfer</option>
+                  <option value="mobile_money">Mobile money</option>
+                  <option value="salary_deduction">Salary deduction</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+            </div>
+            <input type="date" id="loanDueDate" class="qs-in" disabled style="display:none">
+            <input type="text" id="loanCustomPaymentMode" class="qs-in hidden" placeholder="Custom payment mode" style="margin-bottom:16px;">
+
+            <div class="qs-two-up" style="margin-bottom:16px;">
+              <div class="qs-field" style="grid-column:1/-1;">
+                <label for="loanCollateralDescription">Collateral description</label>
+                <input type="text" id="loanCollateralDescription" class="qs-in" placeholder="Describe what you're offering as collateral">
               </div>
             </div>
 
-            <select id="loanCollateralGrade" class="auth-input">
-              <option value="">Collateral grade (optional)</option>
-              <option value="A">A</option>
-              <option value="B">B</option>
-              <option value="C">C</option>
-              <option value="D">D</option>
-            </select>
-
-            <div class="loan-estimate-box" aria-live="polite">
-              <div><span>Rate for <span id="loanTermDisplay">14 days</span></span> <strong id="loanRateDisplay">Loading…</strong></div>
-              <div><span>Interest</span> <strong id="loanInterestDisplay">K0</strong></div>
-              <div><span>Total</span> <strong id="loanTotalDisplay">K0</strong></div>
-              <div><span>Approval target</span> <strong id="loanApprovalDisplay">48h</strong></div>
+            <div class="qs-two-up" style="margin-bottom:0;">
+              <div class="qs-field" style="grid-column:1/-1;">
+                <label for="loanCollateralGrade">Collateral grade (optional)</label>
+                <select id="loanCollateralGrade" class="qs-in">
+                  <option value="">Select grade</option>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                  <option value="D">D</option>
+                </select>
+              </div>
             </div>
 
-            <details class="terms-box" aria-live="polite">
-              <summary>Read more</summary>
+            <!-- ── Live estimate ── -->
+            <div class="qs-estimate" id="loanEstimateBox" style="margin-top:20px;opacity:0.5;">
+              <div class="er">
+                <span class="el">Interest rate</span>
+                <span class="ev" id="loanRateDisplay">Loading…</span>
+              </div>
+              <div class="er">
+                <span class="el">Interest amount</span>
+                <span class="ev" id="loanInterestDisplay">K 0.00</span>
+              </div>
+              <div class="er">
+                <span class="el">Principal only</span>
+                <span class="ev" id="loanTermDisplay">K 0.00</span>
+              </div>
+              <div class="er">
+                <span class="el">Approval target</span>
+                <span class="ev" id="loanApprovalDisplay">48 h</span>
+              </div>
+              <div class="et">
+                <span class="el">Total repayment</span>
+                <span class="ev" id="loanTotalDisplay">K 0.00</span>
+              </div>
+            </div>
+
+            <!-- ── Documents ── -->
+            <div class="qs-divider">Documents</div>
+            <p style="font-size:13px;color:#8b949e;margin-bottom:14px;line-height:1.5;">Upload clear images of your NRC (both sides) and collateral photos (both sides). All four images are required. JPG / PNG / WEBP, max 5 MB each.</p>
+
+            <div class="qs-upload-grid">
+              <div class="qs-upload-box" id="boxLoanNrcFront">
+                <input type="file" id="loanNrcFront" name="nrcFront" accept="image/jpeg,image/png,image/webp" required>
+                <div class="u-icon">🪪</div>
+                <div class="u-label">NRC Front</div>
+                <div class="u-hint">Required</div>
+                <div class="u-check">✓ Attached</div>
+              </div>
+              <div class="qs-upload-box" id="boxLoanNrcBack">
+                <input type="file" id="loanNrcBack" name="nrcBack" accept="image/jpeg,image/png,image/webp" required>
+                <div class="u-icon">🪪</div>
+                <div class="u-label">NRC Back</div>
+                <div class="u-hint">Required</div>
+                <div class="u-check">✓ Attached</div>
+              </div>
+              <div class="qs-upload-box" id="boxLoanColFront">
+                <input type="file" id="loanCollateralFront" name="collateralFront" accept="image/*" required>
+                <div class="u-icon">📦</div>
+                <div class="u-label">Collateral Front</div>
+                <div class="u-hint">Required</div>
+                <div class="u-check">✓ Attached</div>
+              </div>
+              <div class="qs-upload-box" id="boxLoanColBack">
+                <input type="file" id="loanCollateralBack" name="collateralBack" accept="image/*" required>
+                <div class="u-icon">📦</div>
+                <div class="u-label">Collateral Back</div>
+                <div class="u-hint">Required</div>
+                <div class="u-check">✓ Attached</div>
+              </div>
+            </div>
+
+            <!-- ── Terms ── -->
+            <div class="qs-divider">Terms</div>
+            <details class="qs-terms">
+              <summary>Read terms &amp; conditions</summary>
               <ul>
                 <li>I confirm the loan purpose and amount requested are true and necessary for my stated need.</li>
                 <li>I understand the approved amount, interest rate, total repayment, and repayment due date are based on my selected timeframe and urgency.</li>
@@ -534,14 +731,14 @@
                 <li>I will not misrepresent my identity, documents, or repayment ability. BMF will review my NRC images for this loan request.</li>
               </ul>
             </details>
-
-            <label class="checkbox-row">
+            <label class="qs-check-row">
               <input type="checkbox" id="loanAgreeTerms" required>
               <span>I have read, understood, and agree to these terms and conditions before submitting this request.</span>
             </label>
-            <button type="submit" class="enter-btn">Submit Request</button>
+
+            <button type="submit" class="qs-submit-btn" id="loanSubmitBtn">Submit Request</button>
           </form>
-          <p id="loanRequestMessage" class="message-text"></p>
+          <p id="loanRequestMessage" class="qs-msg"></p>
         </div>
       </div>
     </div>
@@ -599,6 +796,21 @@
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
     }
+    // Used by inline onchange on the new card-style upload boxes
+    function previewDoc(input, previewId, labelId) {
+      const file = input.files?.[0];
+      const preview = document.getElementById(previewId);
+      const label   = document.getElementById(labelId);
+      if (!file) { preview?.classList.add('hidden'); return; }
+      if (file.size > 5 * 1024 * 1024) {
+        input.value = '';
+        showBmfToast('Image must be 5 MB or smaller.', 'error');
+        return;
+      }
+      if (preview) { preview.src = URL.createObjectURL(file); preview.classList.remove('hidden'); }
+      if (label)   { label.textContent = file.name; }
+    }
+
     function previewDocument(inputId, previewId) {
       const input = document.getElementById(inputId);
       const preview = document.getElementById(previewId);
@@ -615,8 +827,28 @@
         preview.classList.remove('hidden');
       });
     }
-    previewDocument('loanNrcFront', 'loanNrcFrontPreview');
-    previewDocument('loanNrcBack', 'loanNrcBackPreview');
+    // Wire QS-style upload boxes for the loan request form
+    [
+      ['loanNrcFront',       'boxLoanNrcFront'],
+      ['loanNrcBack',        'boxLoanNrcBack'],
+      ['loanCollateralFront','boxLoanColFront'],
+      ['loanCollateralBack', 'boxLoanColBack'],
+    ].forEach(([inputId, boxId]) => {
+      const input = document.getElementById(inputId);
+      const box   = document.getElementById(boxId);
+      if (!input || !box) return;
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (file && file.size > 5 * 1024 * 1024) {
+          input.value = '';
+          box.classList.remove('has-file');
+          showBmfToast('Each image must be 5 MB or smaller.', 'error');
+          return;
+        }
+        box.classList.toggle('has-file', !!file);
+        box.classList.remove('req-flash');
+      });
+    });
 
 
     document.getElementById('welcomeName').textContent = username;
@@ -658,28 +890,7 @@
     const amountInput = document.getElementById('loanAmount');
     const timeframeButtons = document.querySelectorAll('.timeframe-mode-btn');
     let loanInterestPolicy = null;
-const RATES = { 1: 0.10, 2: 0.16, 3: 0.24, 4: 0.32 };
-
-function calculateInterest() {
-  const amount  = parseFloat(document.getElementById('loanAmount').value) || 0;
-  const tenure  = parseInt(document.getElementById('loanTenureWeeks').value)   || 1;
-  const rate    = RATES[tenure] || 0.10;
-  const interest = amount * rate;
-  const total    = amount + interest;
-
-  // Update display elements
-  const interestRateEl = document.getElementById('interestRate');
-  const interestAmountEl = document.getElementById('interestAmount');
-  const totalRepayableEl = document.getElementById('totalRepayable');
-
-  if (interestRateEl) interestRateEl.textContent = (rate * 100) + '%';
-  if (interestAmountEl) interestAmountEl.textContent = 'K ' + interest.toFixed(2);
-  if (totalRepayableEl) totalRepayableEl.textContent = 'K ' + total.toFixed(2);
-}
-
-// Attach event listeners for real-time calculation
-document.getElementById('loanTenureWeeks').addEventListener('change', calculateInterest);
-document.getElementById('loanAmount').addEventListener('input',  calculateInterest);
+    // Interest calculation uses live loanInterestPolicy fetched below — no hardcoded rates.
 
     function getCurrentLusakaDateKey() {
       const parts = new Intl.DateTimeFormat('en-CA', {
@@ -723,16 +934,6 @@ document.getElementById('loanAmount').addEventListener('input',  calculateIntere
         (Number(rates[upperWeek]) - Number(rates[lowerWeek])) * ratio).toFixed(6));
     }
 
-    function updateCustomDateLimits() {
-      if (!loanInterestPolicy) return;
-      const today = getCurrentLusakaDateKey();
-      dueDateInput.min = addDaysToDateKey(today, loanInterestPolicy.minTermDays);
-      dueDateInput.max = addDaysToDateKey(today, loanInterestPolicy.maxTermDays);
-      if (dueDateInput.value && (dueDateInput.value < dueDateInput.min || dueDateInput.value > dueDateInput.max)) {
-        dueDateInput.value = '';
-      }
-    }
-
     async function loadCustomerInterestPolicy() {
       const deviceToken = localStorage.getItem('deviceToken');
       try {
@@ -740,7 +941,6 @@ document.getElementById('loanAmount').addEventListener('input',  calculateIntere
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || 'Current loan rates could not be loaded.');
         loanInterestPolicy = data;
-        updateCustomDateLimits();
         updateLoanEstimateDisplay();
       } catch (error) {
         document.getElementById('loanRateDisplay').textContent = 'Unavailable';
@@ -760,34 +960,35 @@ document.getElementById('loanAmount').addEventListener('input',  calculateIntere
       return { rate, interest, total, approvalTarget, days };
     }
 
-    function setTimeframeMode(mode) {
-      const isDateMode = mode === 'date';
-      dueDateInput.disabled = !isDateMode;
-      dueDateInput.setAttribute('aria-disabled', String(!isDateMode));
-      if (!isDateMode) {
-        dueDateInput.value = '';
-      }
-      tenureSelect.disabled = isDateMode;
-      tenureSelect.setAttribute('aria-disabled', String(isDateMode));
-
-      timeframeButtons.forEach(button => {
-        const isActive = button.dataset.mode === mode;
-        button.classList.toggle('active', isActive);
-        button.setAttribute('aria-pressed', String(isActive));
+    // Fixed weeks only — custom date removed (admin panel only).
+    function setTimeframeMode() {
+      dueDateInput.disabled = true;
+      dueDateInput.setAttribute('aria-disabled', 'true');
+      dueDateInput.value = '';
+      tenureSelect.disabled = false;
+      tenureSelect.setAttribute('aria-disabled', 'false');
+      timeframeButtons.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === 'weeks');
+        btn.setAttribute('aria-pressed', String(btn.dataset.mode === 'weeks'));
       });
     }
 
     function updateLoanEstimateDisplay() {
+      const box = document.getElementById('loanEstimateBox');
       if (!loanInterestPolicy) {
         document.getElementById('loanRateDisplay').textContent = 'Loading…';
+        if (box) box.style.opacity = '0.5';
         return;
       }
+      if (box) box.style.opacity = '1';
       const estimate = getLoanEstimate();
+      const amount = Number(amountInput.value) || 0;
       document.getElementById('loanRateDisplay').textContent = estimate.rate == null ? '—' : `${estimate.rate.toFixed(2)}%`;
-      document.getElementById('loanTermDisplay').textContent = Number.isInteger(estimate.days) ? `${estimate.days} days` : 'Choose a date';
+      // loanTermDisplay = principal (matches QS estimate layout: Principal only row)
+      document.getElementById('loanTermDisplay').textContent = formatKwacha(amount);
       document.getElementById('loanInterestDisplay').textContent = formatKwacha(estimate.interest);
       document.getElementById('loanTotalDisplay').textContent = formatKwacha(estimate.total);
-      document.getElementById('loanApprovalDisplay').textContent = `${estimate.approvalTarget}h`;
+      document.getElementById('loanApprovalDisplay').textContent = `${estimate.approvalTarget} h`;
     }
 
     amountInput.addEventListener('input', updateLoanEstimateDisplay);
@@ -795,14 +996,7 @@ document.getElementById('loanAmount').addEventListener('input',  calculateIntere
     dueDateInput.addEventListener('change', updateLoanEstimateDisplay);
     urgencySelect.addEventListener('change', updateLoanEstimateDisplay);
 
-    timeframeButtons.forEach(button => {
-      button.addEventListener('click', () => {
-        setTimeframeMode(button.dataset.mode);
-        updateLoanEstimateDisplay();
-      });
-    });
-
-    setTimeframeMode('weeks');
+    setTimeframeMode();
     updateLoanEstimateDisplay();
     loadCustomerInterestPolicy();
 
@@ -893,18 +1087,35 @@ document.getElementById('loanAmount').addEventListener('input',  calculateIntere
         formData.append('collateralDescription', collateralDescription || '');
         formData.append('collateralGrade', collateralGrade || '');
 
-        const frontFile = document.getElementById('loanCollateralFront').files[0];
-        const backFile = document.getElementById('loanCollateralBack').files[0];
-        const nrcFront = document.getElementById('loanNrcFront').files[0];
-        const nrcBack = document.getElementById('loanNrcBack').files[0];
-        if (!nrcFront || !nrcBack || nrcFront.size > 5 * 1024 * 1024 || nrcBack.size > 5 * 1024 * 1024) {
-          messageEl.textContent = 'Attach both NRC images. Each image must be 5 MB or smaller.';
+        const nrcFront     = document.getElementById('loanNrcFront').files[0];
+        const nrcBack      = document.getElementById('loanNrcBack').files[0];
+        const frontFile    = document.getElementById('loanCollateralFront').files[0];
+        const backFile     = document.getElementById('loanCollateralBack').files[0];
+        const MAX = 5 * 1024 * 1024;
+
+        // All 4 documents are required — flash the QS upload boxes
+        if (!nrcFront || !nrcBack) {
+          if (!nrcFront) document.getElementById('boxLoanNrcFront')?.classList.add('req-flash');
+          if (!nrcBack)  document.getElementById('boxLoanNrcBack')?.classList.add('req-flash');
+          messageEl.textContent = 'Both NRC images (front and back) are required.';
+          messageEl.className = 'qs-msg err';
           return;
         }
-        if (frontFile) formData.append('collateralFront', frontFile);
-        if (backFile) formData.append('collateralBack', backFile);
+        if (!frontFile || !backFile) {
+          if (!frontFile) document.getElementById('boxLoanColFront')?.classList.add('req-flash');
+          if (!backFile)  document.getElementById('boxLoanColBack')?.classList.add('req-flash');
+          messageEl.textContent = 'Both collateral images (front and back) are required.';
+          messageEl.className = 'qs-msg err';
+          return;
+        }
+        if (nrcFront.size > MAX || nrcBack.size > MAX || frontFile.size > MAX || backFile.size > MAX) {
+          messageEl.textContent = 'Each image must be 5 MB or smaller.';
+          return;
+        }
         formData.append('nrcFront', nrcFront);
         formData.append('nrcBack', nrcBack);
+        formData.append('collateralFront', frontFile);
+        formData.append('collateralBack', backFile);
 
         const res = await fetch('/loans/request', {
           method: 'POST',
@@ -914,23 +1125,28 @@ document.getElementById('loanAmount').addEventListener('input',  calculateIntere
         const data = await res.json();
         if (data.error) {
           messageEl.textContent = data.error;
+          messageEl.className = 'qs-msg err';
           if (res.status === 409) showRequestLockBox();
         } else {
-          messageEl.textContent = data.message || 'Request submitted.';
+          messageEl.textContent = data.message || 'Request submitted successfully.';
+          messageEl.className = 'qs-msg ok';
           showBmfToast(data.message || 'BMF success: loan request submitted.');
           document.getElementById('loanRequestForm').reset();
+          // Reset upload boxes
+          ['boxLoanNrcFront','boxLoanNrcBack','boxLoanColFront','boxLoanColBack'].forEach(id => {
+            document.getElementById(id)?.classList.remove('has-file','req-flash');
+          });
           document.getElementById('loanTenureWeeks').value = '2';
           document.getElementById('loanUrgency').value = 'standard';
-          setTimeframeMode('weeks');
+          setTimeframeMode();
           updateLoanEstimateDisplay();
           paymentModeSelect.value = '';
           toggleCustomPaymentMode();
-          setTimeframeMode('weeks');
-          updateLoanEstimateDisplay();
           loadLoans(currentHistoryFilter);
         }
       } catch (err) {
         messageEl.textContent = 'Unable to send loan request. Try again later.';
+        messageEl.className = 'qs-msg err';
       }
     });
 

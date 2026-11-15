@@ -13,7 +13,7 @@ const routes = require('./routes');
 const applyRouter = require('./routes/apply');
 const usersRouter = require('./routes/users');
 const { startScheduler } = require('./scheduler');
-const { ensureDataIntegrity } = require('./middleware/dataStore');
+const { ensureDataIntegrity, readJson, writeJson } = require('./middleware/dataStore');
 const { startHealthWatch } = require('./middleware/healthWatch');
 const { errorAudit, captureOrigin, appendAudit } = require('./middleware/errorAudit');
 const { isPrivateControlClient } = require('./middleware/localControl');
@@ -255,8 +255,7 @@ app.listen(config.PORT, config.HOST, () => {
 
   setImmediate(async () => {
     try {
-      const { readData, writeData } = require('./middleware/dataStore');
-      const loans = await readData('loans');
+      const loans = await readJson('loans');
       const lusakaNow = new Date(Date.now() + 2 * 60 * 60 * 1000);
       const todayStr = lusakaNow.toISOString().slice(0, 10);
 
@@ -279,7 +278,7 @@ app.listen(config.PORT, config.HOST, () => {
       }
 
       if (changed) {
-        await writeData('loans', loans);
+        await writeJson('loans', loans);
         console.log('[cron] Overdue sweep complete — statuses updated.');
       } else {
         console.log('[cron] Overdue sweep complete — no changes.');
