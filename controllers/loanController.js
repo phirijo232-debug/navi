@@ -623,9 +623,11 @@ function rebuildPaymentLedger(loan, existingPaymentIds = new Set()) {
 }
 const UPLOAD_DIR = path.join(__dirname, '../public/uploads');
 
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
+// On Vercel the code folder is read-only and uploads go to Supabase storage,
+// so a failed mkdir here must not stop the server from starting.
+try {
+  if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+} catch { /* read-only file system */ }
 
 const diskUploadStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),

@@ -42,6 +42,8 @@ function receiveQuickLoan(req, res, next) {
 }
 
 function ensureApplicationsFile() {
+  // In Supabase mode there is no local file; writing [] here would wipe the list.
+  if (supabaseApi.enabled()) return;
   try {
     if (!fs.existsSync(APPLICATIONS_FILE)) {
       dataStore.writeJson(APPLICATIONS_FILE, []);
@@ -53,9 +55,7 @@ function ensureApplicationsFile() {
 
 function readApplications() {
   try {
-    const raw = fs.readFileSync(APPLICATIONS_FILE, 'utf8');
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
+    return dataStore.readJson(APPLICATIONS_FILE, [], Array.isArray);
   } catch (err) {
     if (err.code !== 'ENOENT') logError(`APPLICATIONS READ FAILED: ${err.message}`);
     return [];

@@ -29,7 +29,7 @@ function headerRow(ws, rowNum, headers, fillArgb, fontColorArgb) {
   headers.forEach((h, i) => {
     const cell = row.getCell(i + 1);
     cell.value = h;
-    styleHeaderCell(cell, fillArgb, fontColorArgb);
+    styleHeaderCell(cell, 'FF1A1C16', fontColorArgb || 'FFF2F2F0');
   });
   row.height = 35;
   row.commit();
@@ -60,8 +60,8 @@ function titleBanner(ws, text, colCount) {
   ws.mergeCells(1, 1, 2, colCount);
   const cell = ws.getRow(1).getCell(1);
   cell.value = String(text || '').toUpperCase();
-  cell.font = { name: ARIAL, size: 14, bold: true };
-  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+  cell.font = { name: ARIAL, size: 14, bold: true, color: { argb: 'FFF2F2F0' } };
+  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F1014' } };
   cell.alignment = { horizontal: 'center', vertical: 'middle' };
   cell.border = BORDER_ALL;
   ws.getRow(1).height = 37;

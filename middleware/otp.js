@@ -124,12 +124,13 @@ function generateOTP(key, forceNew = false) {
 async function sendOTP(purpose = 'Account Verification', targetEmail = null, forceNew = false, recipientOverride = null) {
   const normalizedEmail = normalizeEmailAddress(targetEmail);
   const key = buildOtpKey(normalizedEmail, purpose);
-  const otp = generateOTP(key, forceNew);
   const recipient = normalizeEmailAddress(recipientOverride) || normalizedEmail || process.env.GMAIL_USER;
 
+  // Check mail settings before a code is stored, so no unsent code is left behind.
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD || !recipient) {
     throw new Error('OTP email configuration is incomplete.');
   }
+  const otp = generateOTP(key, forceNew);
 
   try {
     await transporter.sendMail({
@@ -143,6 +144,7 @@ async function sendOTP(purpose = 'Account Verification', targetEmail = null, for
   } catch (error) {
     delete otpStore[key];
     issuedPlain.delete(key);
+    if (supabaseApi.enabled()) supabaseApi.deleteOtp(key);
     throw error;
   }
 }

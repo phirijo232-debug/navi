@@ -63,9 +63,10 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://challenges.cloudflare.com"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      connectSrc: ["'self'"],
+      frameSrc: ["https://challenges.cloudflare.com"],
+      connectSrc: ["'self'", "https://challenges.cloudflare.com"],
     }
   }
 }));
@@ -111,10 +112,37 @@ app.get('/uploads/:filename', serveFile);
 // duplicate file). Both mount before deviceAuth so public visitors can
 // reach the login page with a valid ?key=.
 app.use(shareKeyGate);
-app.get('/signin.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+
+const PUBLIC_DIR = path.join(__dirname, 'public');
+const PAGE_REDIRECTS = {
+  '/admin.html': '/admin',
+  '/login.html': '/login',
+  '/signin.html': '/login',
+  '/dashboard.html': '/admin',
+  '/dashboard': '/admin',
+  '/quick-screen': '/',
+  '/quick-screen.html': '/',
+  '/index.html': '/',
+  '/user.html': '/account',
+  '/signup.html': '/signup',
+  '/forgot-password.html': '/forgot-password'
+};
+
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  const destination = PAGE_REDIRECTS[req.path];
+  if (!destination) return next();
+  const query = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+  return res.redirect(302, `${destination}${query}`);
 });
-app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'login.html')));
+app.get('/account', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'user.html')));
+app.get('/signup', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'signup.html')));
+app.get('/forgot-password', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'forgot-password.html')));
+
+app.use(express.static(PUBLIC_DIR));
 
 function hasValidAdminKey(req) {
   const headerKey = req.headers['x-admin-key'] || req.headers['x-shutdown-key'];
@@ -182,9 +210,10 @@ app.post('/internal-shutdown', (req, res) => {
 // Share-key gate: protects the public signup entry page (?key= required when SHARE_PUBLIC_KEY is set).
 app.use(shareKeyGate);
 
-// Public quick-screen loan application (no auth required).
+// Public quick-screen loan application (no auth required). The canonical URL is /.
 app.get('/quick-screen', (req, res) => {
-  res.sendFile(path.resolve(__dirname, 'public', 'quick-screen.html'));
+  const query = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+  res.redirect(302, `/${query}`);
 });
 
 // Public loan application submissions do not require a device token. Mount the
@@ -259,7 +288,7 @@ if (!supabaseStorage) {
     console.error(`Navi Server startup validation FAILED: ${startupProblems.length} problem(s) found.`);
     startupProblems.forEach(p => console.error(`  - ${p}`));
     console.error('Server will not start until data files are repaired.');
-    process.exit(1);
+    if (!process.env.NODE_TEST_CONTEXT) process.exit(1);
   }
 }
 

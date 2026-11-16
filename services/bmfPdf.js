@@ -29,10 +29,19 @@ function formatPdfDate(value) {
 }
 
 function header(doc, title, dateStr, period) {
-  doc.font('Helvetica-Bold').fontSize(13).text('BURAZA MICRO FINANCE (BMF)', { align: 'center' });
-  doc.font('Helvetica').fontSize(10).text('Pryme Vertex Holdings', { align: 'center' });
-  doc.moveDown(0.3);
-  doc.font('Helvetica-Bold').fontSize(12).text(title, { align: 'center' });
+  const top = doc.page.margins.top - 28;
+  doc.save();
+  doc.rect(0, 0, doc.page.width, 36).fill('#0F1014');
+  doc.fillColor('#F2F2F0').font('Helvetica-Bold').fontSize(11)
+    .text('BURAZA MICRO FINANCE', doc.page.margins.left, 12, {
+      width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
+      align: 'left',
+      lineBreak: false
+    });
+  doc.restore();
+  doc.fillColor('#0F1014');
+  doc.y = Math.max(doc.page.margins.top, top + 44);
+  doc.font('Helvetica-Bold').fontSize(14).text(title, { align: 'left' });
   const periodLabel = period && (period.from || period.to)
     ? `Period: ${period.from ? formatPdfDate(period.from) : 'Beginning'} to ${period.to ? formatPdfDate(period.to) : 'Current'} · As at ${formatPdfDate(dateStr)}`
     : `As at: ${formatPdfDate(dateStr)}`;
@@ -85,7 +94,8 @@ function table(doc, headers, rows, opts = {}) {
   };
   drawRow(headers, true, false);
   if (!rows.length) {
-    doc.font('Helvetica-Oblique').fontSize(9).text(opts.emptyText || '(No records)', { align: 'center' });
+    doc.font('Helvetica').fontSize(9).fillColor('#3E423C').text(opts.emptyText || 'No records for this period.', { align: 'center' });
+    doc.fillColor('#0F1014');
     doc.moveDown(0.5);
     return;
   }

@@ -3,15 +3,15 @@
 const loanTerms = require('./loanTerms');
 
 const REPORTS = [
-  { type: 'how-risky', title: 'How Risky Are Our Loans?', sheet: 'PAR Report', filename: 'bmf_how_risky' },
-  { type: 'who-owes', title: 'Who Owes What and How Late?', sheet: 'Aging Schedule', filename: 'bmf_who_owes' },
-  { type: 'full-history', title: 'One Borrower\'s Full History', sheet: 'Loan Statement', filename: 'bmf_full_history', loanRequired: true },
-  { type: 'all-loans', title: 'All Loans We Gave Out This Period', sheet: 'Disbursement Register', filename: 'bmf_all_loans' },
-  { type: 'schedule', title: 'Payment Schedule Per Loan', sheet: 'Repayment Schedule', filename: 'bmf_schedule', loanRequired: true },
-  { type: 'collection', title: 'How Well Is Money Being Collected?', sheet: 'Collection Efficiency', filename: 'bmf_collection' },
-  { type: 'problem-loans', title: 'Problem Loans & Write-Offs', sheet: 'Default Register', filename: 'bmf_problem_loans' },
-  { type: 'daily-cashbook', title: 'Daily Money In and Out', sheet: 'Cash Collections', filename: 'bmf_daily_cashbook' },
-  { type: 'officer-scorecard', title: 'Officer Scorecard', sheet: 'Officer Scorecard', filename: 'bmf_officer_scorecard' }
+  { type: 'how-risky', title: 'Loan risk / arrears report', sheet: 'PAR Report', filename: 'bmf_how_risky' },
+  { type: 'who-owes', title: 'Borrower arrears by age', sheet: 'Aging Schedule', filename: 'bmf_who_owes' },
+  { type: 'full-history', title: 'Borrower statement', sheet: 'Loan Statement', filename: 'bmf_full_history', loanRequired: true },
+  { type: 'all-loans', title: 'Loans issued', sheet: 'Disbursement Register', filename: 'bmf_all_loans' },
+  { type: 'schedule', title: 'Payment schedule', sheet: 'Repayment Schedule', filename: 'bmf_schedule', loanRequired: true },
+  { type: 'collection', title: 'Collections performance', sheet: 'Collection Efficiency', filename: 'bmf_collection' },
+  { type: 'problem-loans', title: 'Problem loans and write-offs', sheet: 'Default Register', filename: 'bmf_problem_loans' },
+  { type: 'daily-cashbook', title: 'Daily cashbook', sheet: 'Cash Collections', filename: 'bmf_daily_cashbook' },
+  { type: 'officer-scorecard', title: 'Officer scorecard', sheet: 'Officer Scorecard', filename: 'bmf_officer_scorecard' }
 ];
 
 const REPORT_ALIASES = {

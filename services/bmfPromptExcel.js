@@ -4,24 +4,26 @@ const ExcelJS = require('exceljs');
 const P = require('./bmfPromptReports');
 
 const C = {
-  navy: 'FF0D1117',
-  card: 'FF161B22',
-  alternate: 'FF1C2128',
-  blue: 'FF2F81F7',
-  yellow: 'FFFFFF00',
-  green: 'FF3FB950',
-  amber: 'FFD29922',
-  red: 'FFF85149',
-  purple: 'FFA371F7',
-  white: 'FFE6EDF3',
-  muted: 'FF8B949E'
+  navy: 'FF0F1014',
+  card: 'FFF7F7F4',
+  alternate: 'FFECECE7',
+  blue: 'FF1A1C16',
+  yellow: 'FFC6F432',
+  green: 'FFD7E8C2',
+  amber: 'FFF3E2B0',
+  red: 'FFF3D0CB',
+  purple: 'FFE4E2DC',
+  white: 'FF0F1014',
+  onDark: 'FFF2F2F0',
+  muted: 'FF3E423C'
 };
 const MONEY = '"K "#,##0.00;[Red]("K "#,##0.00)';
 const PERCENT = '0.0%';
 const FONT = 'Arial';
 
 function style(cell, { fill, color, bold = false, italic = false, align = 'left', size = 10, format } = {}) {
-  cell.font = { name: FONT, size, bold, italic, color: { argb: color || C.white } };
+  const fontColor = color || (fill === C.navy ? C.onDark : C.white);
+  cell.font = { name: FONT, size, bold, italic, color: { argb: fontColor } };
   cell.alignment = { vertical: 'middle', horizontal: align, wrapText: true };
   cell.border = {
     top: { style: 'thin', color: { argb: C.alternate } },
@@ -40,7 +42,7 @@ function setValue(cell, value, options = {}) {
 
 function setFormula(cell, formula, result, options = {}) {
   cell.value = { formula, result: result == null ? '' : result };
-  style(cell, { ...options, color: C.blue });
+  style(cell, { ...options, color: options.color || (options.fill === C.navy ? C.onDark : C.blue) });
 }
 
 function dateValue(value) {
@@ -65,17 +67,17 @@ function dateLabel(value) {
 function makeHeader(ws, title, subtitle, report, columnCount = 13) {
   const lastColumn = String.fromCharCode(64 + columnCount);
   ws.mergeCells(`A1:${lastColumn}1`);
-  setValue(ws.getCell('A1'), 'BURAZA MICRO FINANCE · PRYME VERTEX HOLDINGS', {
-    fill: C.navy, bold: true, size: 15
+  setValue(ws.getCell('A1'), 'BURAZA MICRO FINANCE', {
+    fill: C.navy, color: C.onDark, bold: true, size: 15
   });
   ws.mergeCells(`A2:${lastColumn}2`);
-  setValue(ws.getCell('A2'), title.toUpperCase(), { fill: C.navy, bold: true, size: 13 });
+  setValue(ws.getCell('A2'), title.toUpperCase(), { fill: C.navy, color: C.onDark, bold: true, size: 13 });
   ws.mergeCells(`A3:${lastColumn}3`);
   const period = report.from || report.to
     ? `Period: ${report.from ? dateLabel(report.from) : 'Beginning'} to ${report.to ? dateLabel(report.to) : 'Current'}`
     : `As at ${dateLabel(report.today)}`;
-  setValue(ws.getCell('A3'), `${subtitle} · ${period} · Generated ${report.generatedAt}`, {
-    fill: C.card, color: C.muted, italic: true
+  setValue(ws.getCell('A3'), `${subtitle}. ${period}. Generated ${report.generatedAt}`, {
+    fill: C.card, color: C.muted
   });
   ws.getRow(1).height = 28;
   ws.getRow(2).height = 25;
@@ -121,17 +123,17 @@ function directorySheet(wb, report) {
   const ws = wb.addWorksheet('Report Directory');
   ws.columns = [{ width: 5 }, { width: 35 }, { width: 52 }, { width: 28 }, { width: 18 }];
   ws.mergeCells('A1:E1');
-  setValue(ws.getCell('A1'), 'BURAZA MICRO FINANCE', { fill: C.navy, bold: true, size: 16 });
+  setValue(ws.getCell('A1'), 'BURAZA MICRO FINANCE', { fill: C.navy, color: C.onDark, bold: true, size: 16 });
   ws.mergeCells('A2:E2');
-  setValue(ws.getCell('A2'), 'PRYME VERTEX HOLDINGS', { fill: C.navy, color: C.muted, size: 11 });
+  setValue(ws.getCell('A2'), 'Loan reports', { fill: C.navy, color: C.onDark, size: 11 });
   ws.mergeCells('A3:E3');
   const month = new Date(`${report.today}T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-  setValue(ws.getCell('A3'), `Loan Management Reports — ${month}`, { fill: C.navy, color: C.muted, italic: true, size: 11 });
+  setValue(ws.getCell('A3'), `Reports for ${month}`, { fill: C.navy, color: C.onDark, size: 11 });
   ws.getRow(1).height = 30;
   ws.getRow(2).height = 23;
   ws.getRow(3).height = 23;
   setValue(ws.getCell('A5'), 'REPORT DIRECTORY', { fill: C.yellow, color: C.navy, bold: true });
-  ['#', 'Plain-English Report Name', 'What It Shows', 'Who Should Read It'].forEach((value, index) =>
+  ['#', 'Report', 'What it shows', 'Who should read it'].forEach((value, index) =>
     setValue(ws.getRow(6).getCell(index + 1), value, { fill: C.card, bold: true }));
   const descriptions = [
     ['Shows overdue loans by risk bucket and loss reserve', 'Management / Board'],
@@ -169,7 +171,7 @@ function directorySheet(wb, report) {
 function parSheet(wb, report) {
   const ws = wb.addWorksheet('PAR Report');
   const headers = ['Loan ID', 'Borrower Name', 'Loan Officer', 'Amount Given Out', 'Total They Must Pay', 'Still Outstanding', 'Total Paid So Far', 'Days Overdue', 'Amount Overdue', 'Risk Bucket', 'Loss Reserve %', 'Loss Reserve Amount', 'Loan Status'];
-  makeHeader(ws, 'How Risky Are Our Loans? — Portfolio at Risk', 'CGAP standard aging buckets', report, headers.length);
+  makeHeader(ws, 'Loan risk / arrears report', 'Aging buckets and loss reserve', report, headers.length);
   tableHeader(ws, 5, headers);
   const rows = report.parRows.map(item => [
     item.loanId, item.borrower, item.officer, item.principal, item.payable, item.outstanding,
@@ -222,7 +224,7 @@ function parSheet(wb, report) {
 function agingSheet(wb, report) {
   const ws = wb.addWorksheet('Aging Schedule');
   const headers = ['Loan ID', 'Borrower Name', 'Total They Must Pay', 'Still Outstanding', 'Not Yet Late (Current)', '1–7 Days Late', '8–30 Days Late', '31–60 Days Late', '61–90 Days Late', '91–180 Days Late', 'Over 180 Days Late', 'Total Arrears', 'Loan Status'];
-  makeHeader(ws, 'Who Owes What and How Late? — Loan Aging Schedule', 'Arrears by days late', report, headers.length);
+  makeHeader(ws, 'Borrower arrears by age', 'Arrears by days late', report, headers.length);
   tableHeader(ws, 5, headers);
   const rows = report.agingRows.map((item, index) => [
     item.loanId, item.borrower, item.payable, item.outstanding,
@@ -267,7 +269,7 @@ function statementSheet(wb, report) {
   const statement = report.statement;
   ws.columns = [{ width: 8 }, { width: 19 }, { width: 35 }, { width: 24 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 13 }, { width: 24 }];
   ws.mergeCells('A1:I1');
-  setValue(ws.getCell('A1'), 'BURAZA MICRO FINANCE — ONE BORROWER\'S FULL HISTORY', { fill: C.navy, bold: true, size: 15 });
+  setValue(ws.getCell('A1'), 'BURAZA MICRO FINANCE. BORROWER STATEMENT', { fill: C.navy, bold: true, size: 15 });
   ws.mergeCells('A3:I3');
   setValue(ws.getCell('A3'), 'Full record of recorded payments and current balance. Missing schedule data is not inferred.', { fill: C.card, color: C.muted, italic: true });
   if (!statement) {
@@ -371,7 +373,7 @@ function statementSheet(wb, report) {
 function disbursementSheet(wb, report) {
   const ws = wb.addWorksheet('Disbursement Register');
   const headers = ['#', 'Date Given', 'Loan ID', 'Borrower Name', 'National ID', 'Phone', 'Loan Officer', 'Purpose of Loan', 'Amount Given Out', 'Interest Rate', 'Total to Pay Back', 'Loan Length', 'Final Due Date', 'Collateral Held', 'Payment Method', 'Approval Reference', 'Running Total Given Out'];
-  makeHeader(ws, 'All Loans We Gave Out This Period — Disbursement Register', 'Issued loans · audit trail', report, headers.length);
+  makeHeader(ws, 'Loans issued', 'Issued loans and audit trail', report, headers.length);
   tableHeader(ws, 5, headers);
   const rows = report.disbursements.map((item, index) => [
     item.rowNumber, item.date, item.loanId, item.borrower, item.nrc, item.phone,
@@ -411,7 +413,7 @@ function scheduleSheet(wb, report) {
   const ws = wb.addWorksheet('Repayment Schedule');
   ws.columns = [{ width: 15 }, { width: 20 }, { width: 21 }, { width: 18 }, { width: 18 }, { width: 20 }, { width: 20 }, { width: 20 }, { width: 17 }];
   ws.mergeCells('A1:I1');
-  setValue(ws.getCell('A1'), 'PAYMENT SCHEDULE PER LOAN — REPAYMENT SCHEDULE', { fill: C.navy, bold: true, size: 14 });
+  setValue(ws.getCell('A1'), 'PAYMENT SCHEDULE', { fill: C.navy, bold: true, size: 14 });
   setValue(ws.getCell('A3'), 'Loan ID', { fill: C.card, bold: true });
   ws.mergeCells('B3:C3');
   setValue(ws.getCell('B3'), report.schedule ? report.schedule.loanId : 'Select a loan in the report card', { fill: C.card });
@@ -504,7 +506,7 @@ function installmentAmountForExcel(item) {
 function collectionSheet(wb, report) {
   const ws = wb.addWorksheet('Collection Efficiency');
   const headers = ['Officer Name', 'Branch', 'Active Loans', 'Total Portfolio Value', 'Amount Due This Period', 'Amount Collected This Period', 'Collection Rate', 'On-Time Rate', 'Missed Payments', 'Missed Amount', 'PAR > 30 Days', 'New Loans Started', 'Loans Closed', 'Rating'];
-  makeHeader(ws, 'How Well Is Money Being Collected? — Collection Efficiency', 'Loan officer performance', report, headers.length);
+  makeHeader(ws, 'Collections performance', 'Loan officer performance', report, headers.length);
   tableHeader(ws, 5, headers);
   report.collections.forEach((item, index) => {
     const row = index + 6;
@@ -537,7 +539,7 @@ function collectionSheet(wb, report) {
 function defaultsSheet(wb, report) {
   const ws = wb.addWorksheet('Default Register');
   const headers = ['Loan ID', 'Borrower', 'Amount Given Out', 'Total They Owed', 'Last Payment Date', 'Last Payment Amount', 'Days Since Last Payment', 'Outstanding at Default', 'Date Written Off', 'Reason for Write-Off', 'Authorised By', 'Recovery Action Taken', 'Amount Recovered', 'Net Loss', 'Status'];
-  makeHeader(ws, 'Problem Loans & Write-Offs — Default Register', 'Defaulted loans and recorded recoveries', report, headers.length);
+  makeHeader(ws, 'Problem loans and write-offs', 'Defaulted loans and recorded recoveries', report, headers.length);
   tableHeader(ws, 5, headers);
   report.defaults.forEach((item, index) => {
     const row = index + 6;
@@ -575,7 +577,7 @@ function defaultsSheet(wb, report) {
 function cashbookSheet(wb, report) {
   const ws = wb.addWorksheet('Cash Collections');
   const headers = ['Date', 'Loan ID', 'Borrower', 'Receipt Number', 'Officer', 'Amount Received (Money In)', 'Goes to Principal', 'Goes to Interest', 'Goes to Penalty', 'Money Paid Out (Disbursement)', 'Net Cash This Row', 'Running Cash Total', 'Notes'];
-  makeHeader(ws, 'Daily Money In and Out — Cash Collections Register', 'System-recorded activity · cashbook reconciliation', report, headers.length);
+  makeHeader(ws, 'Daily cashbook', 'Recorded receipts and disbursements', report, headers.length);
   tableHeader(ws, 5, headers);
   report.cashbook.entries.forEach((item, index) => {
     const row = index + 6;
@@ -625,7 +627,7 @@ function cashbookSheet(wb, report) {
 function officerSheet(wb, report) {
   const ws = wb.addWorksheet('Officer Scorecard');
   const headers = ['Officer Name', 'Branch', 'Active Loans', 'Portfolio Value', 'Disbursed This Month', 'Collected This Month', 'Collection Rate', 'On-Time Rate', 'Overdue Loans', 'PAR > 30 Days', 'Defaults', 'New Loans Started', 'Loans Closed', 'Client Visits', 'Ranking'];
-  makeHeader(ws, 'Officer Scorecard — Loan Officer Performance', 'Key performance indicators and portfolio summary', report, headers.length);
+  makeHeader(ws, 'Officer scorecard', 'Lending and collection figures by officer', report, headers.length);
   tableHeader(ws, 5, headers);
   const rankable = report.officers.map(row => row.collectionRate).filter(value => value != null);
   report.officers.forEach((item, index) => {
