@@ -14,7 +14,7 @@ test('customer portal follows the demo navigation and keeps each support task in
     assert.match(userPage, new RegExp(`data-support-tab="${tab}"`));
     assert.match(userPage, new RegExp(`data-support-panel="${tab}"`));
   }
-  assert.match(userPage, /data-support-tab="record-payment">💸 Record Payment/);
+  assert.match(userPage, /data-support-tab="record-payment">Record Payment/);
   assert.match(userPage, /function setSupportPanel\(panelKey/);
   assert.match(userPage, /button\.addEventListener\('click', \(\) => setSupportPanel\(button\.dataset\.supportTab\)\)/);
   assert.match(userPage, /id="paymentSummary"/);
@@ -45,7 +45,7 @@ test('loan details modal has reliable accessible close controls', () => {
   assert.match(userPage, /document\.addEventListener\('keydown', event =>[\s\S]*event\.key === 'Escape' && modal\?\.classList\.contains\('active'\)[\s\S]*closeLoanModal\(\)/);
   assert.match(userPage, /m\.setAttribute\('aria-hidden', 'true'\)/);
   assert.match(userPage, /modal\.setAttribute\('aria-hidden', 'false'\)/);
-  assert.match(userPage, /\.customer-portal \.modal-content \{[^}]*max-height:calc\(100vh - 24px\)[^}]*background:#1A212B[^}]*opacity:1/s);
+  assert.match(userPage, /\.customer-portal \.modal-content \{[^}]*max-height:calc\(100vh - 24px\)[^}]*background:#1A1C22[^}]*opacity:1/s);
 });
 
 test('payment selection shows the selected loan balance read-only and submits only the proof', () => {

@@ -1,4 +1,17 @@
 {
+  "redirects": [
+    { "source": "/admin.html", "destination": "/admin", "permanent": false },
+    { "source": "/login.html", "destination": "/login", "permanent": false },
+    { "source": "/signin.html", "destination": "/login", "permanent": false },
+    { "source": "/dashboard.html", "destination": "/admin", "permanent": false },
+    { "source": "/dashboard", "destination": "/admin", "permanent": false },
+    { "source": "/quick-screen", "destination": "/", "permanent": false },
+    { "source": "/quick-screen.html", "destination": "/", "permanent": false },
+    { "source": "/index.html", "destination": "/", "permanent": false },
+    { "source": "/user.html", "destination": "/account", "permanent": false },
+    { "source": "/signup.html", "destination": "/signup", "permanent": false },
+    { "source": "/forgot-password.html", "destination": "/forgot-password", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
   ],

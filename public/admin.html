@@ -4,622 +4,31 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>document.documentElement.classList.add(localStorage.getItem('adminTheme') === 'light' ? 'light' : 'dark');</script>
-  <title>PrymeBMF Admin — Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=20261108-custom-tenure-rates">
-  <style>
-    body {
-      min-height: 100vh;
-      background: #10141A;
-      color: #E6EAF0;
-    }
-    .admin-shell {
-      position: relative;
-      z-index: 1;
-      width: 100%;
-      max-width: 100vw;
-      margin: 0;
-      padding: 24px clamp(16px, 4vw, 32px) 60px;
-      box-sizing: border-box;
-    }
-    @media (max-width: 640px) {
-      .admin-shell {
-        padding: 16px 12px 50px;
-      }
-    }
-    .panel {
-      background: #1A212B;
-      border: 1px solid #3A4452;
-      border-radius: 18px;
-      box-shadow: 0 18px 40px rgba(0,0,0,0.28);
-      backdrop-filter: blur(12px);
-    }
-    body.light .panel {
-      background: rgba(255,255,255,0.9);
-      border-color: rgba(85, 97, 112, 0.22);
-      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
-    }
-    .brand-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 36px;
-    }
-    .brand-mark {
-      color: inherit;
-      font-size: 1.2rem;
-      font-weight: 800;
-      text-decoration: none;
-    }
-    .store-context {
-      font-size: 0.9rem;
-      opacity: 0.75;
-    }
-    .screen-title {
-      margin-bottom: 8px;
-      font-size: clamp(1.6rem, 4vw, 2.2rem);
-    }
-    .store-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-      margin-top: 22px;
-    }
-    .store-card {
-      min-height: 150px;
-      padding: 20px;
-      color: inherit;
-      text-align: left;
-      cursor: pointer;
-      transition: transform 0.2s ease, border-color 0.2s ease;
-    }
-    .store-card:hover:not(:disabled) {
-      transform: translateY(-2px);
-      border-color: rgba(180, 188, 198,0.7);
-    }
-    .store-card:disabled {
-      cursor: not-allowed;
-      opacity: 0.5;
-    }
-    .store-card h2 { margin-bottom: 8px; }
-    .store-status {
-      display: inline-block;
-      margin-top: 14px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-    .admin-auth {
-      max-width: 420px;
-      margin: 0 auto;
-      padding: 26px 20px 24px;
-    }
-    .auth-form {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      width: 100%;
-      margin-top: 18px;
-    }
-    .auth-input, .search-box, .modal-input {
-      width: 100%;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: transparent;
-      color: inherit;
-      padding: 12px 14px;
-      font-size: 15px;
-    }
-    body.light .auth-input,
-    body.light .search-box,
-    body.light .modal-input {
-      border-color: rgba(0,0,0,0.2);
-      color: #1A2330;
-    }
-    .header-actions {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-    .admin-topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin: 18px 0 20px;
-      flex-wrap: wrap;
-    }
-    .admin-topbar h1 {
-      font-size: clamp(2rem, 4vw, 3rem);
-      letter-spacing: 1px;
-    }
-    .button-row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .report-library {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 18px;
-      margin-top: 18px;
-    }
-    .report-card {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      padding: 20px 18px;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(255,255,255,0.03);
-    }
-    body.light .report-card {
-      border-color: rgba(0,0,0,0.08);
-      background: rgba(85, 97, 112, 0.05);
-    }
-    .report-card h3 {
-      margin: 0;
-      font-size: 1.08rem;
-      line-height: 1.4;
-    }
-    .report-card p {
-      margin: 0;
-      font-size: 0.92rem;
-      opacity: 0.82;
-    }
-    .report-fields {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-    .report-fields .wide {
-      grid-column: 1 / -1;
-    }
-    .report-card input,
-    .report-card select {
-      width: 100%;
-      box-sizing: border-box;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.16);
-      background: transparent;
-      color: inherit;
-      padding: 10px 12px;
-      font-size: 0.95rem;
-    }
-    body.light .report-card input,
-    body.light .report-card select {
-      border-color: rgba(0,0,0,0.12);
-      color: #1A2330;
-    }
-    .report-actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: auto;
-    }
-    .report-actions button {
-      flex: 1;
-      min-width: 130px;
-    }
-    .report-card .last-generated {
-      font-size: 0.82rem;
-      opacity: 0.75;
-      margin-top: 4px;
-    }
-    .toolbar {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      margin-bottom: 18px;
-      flex-wrap: wrap;
-    }
-    .user-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 18px;
-    }
-    .user-card {
-      padding: 18px 16px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(255,255,255,0.03);
-      cursor: pointer;
-      transition: transform 0.2s ease, border-color 0.2s ease;
-      width: 100%;
-      color: inherit;
-      font: inherit;
-      text-align: left;
-    }
-    body.light .user-card {
-      border-color: rgba(0,0,0,0.08);
-      background: rgba(85, 97, 112, 0.06);
-    }
-    .user-card:hover {
-      transform: translateY(-2px);
-      border-color: rgba(180, 188, 198,0.8);
-    }
-    .user-card h3 {
-      margin-bottom: 8px;
-      font-size: 1.1rem;
-    }
-    .user-meta {
-      margin: 4px 0;
-      opacity: 0.82;
-      font-size: 0.92rem;
-    }
-    .modal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 1000;
-      background: rgba(16, 20, 26, 0.72);
-      padding: 18px;
-      overflow-y: auto;
-    }
-    .modal-content {
-      width: min(920px, 100%);
-      margin: 60px auto;
-      padding: 22px 20px 20px;
-      border-radius: 16px;
-      background: rgba(16, 20, 26, 0.98);
-      border: 1px solid rgba(255,255,255,0.12);
-      position: relative;
-    }
-    body.light .modal-content {
-      background: rgba(255,255,255,0.98);
-      border-color: rgba(0,0,0,0.08);
-    }
-    .close {
-      position: absolute;
-      top: 12px;
-      right: 16px;
-      font-size: 2rem;
-      cursor: pointer;
-      line-height: 1;
-      opacity: 0.8;
-    }
-    .loan-item {
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 12px;
-      padding: 14px;
-      margin-top: 12px;
-      background: rgba(255,255,255,0.03);
-    }
-    body.light .loan-item {
-      border-color: rgba(0,0,0,0.08);
-      background: rgba(26, 35, 48, 0.02);
-    }
-    .loan-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 10px;
-    }
-    .status-tag {
-      display: inline-block;
-      padding: 5px 9px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .status-pending { background: rgba(240, 197, 106,0.18); color: #ffd56a; }
-    .status-approved { background: rgba(40,167,69,0.15); color: #82e6a2; }
-    .status-declined { background: rgba(220,53,69,0.15); color: #ff9ca9; }
-    .status-overdue { background: rgba(255,103,103,0.16); color: #ff9d9d; }
-    .status-in_progress { background: rgba(0,123,255,0.15); color: #9ec8ff; }
-    .status-paid { background: rgba(23,162,184,0.16); color: #7fe6ec; }
-    .status-active { background: rgba(40,167,69,0.15); color: #82e6a2; }
-    .status-grace { background: rgba(255,152,0,0.16); color: #ffcc80; }
-    .status-defaulted { background: rgba(220,53,69,0.18); color: #ff9ca9; }
-    .status-liquidated { background: rgba(240, 208, 212,0.20); color: #F0D0D4; }
-    /* Selected customer modal spans the full screen width. */
-    #userModal { display: none; align-items: flex-start; justify-content: center; }
-    #userModal[aria-hidden="false"] { display: flex; }
-    #userModal .modal-content { width: calc(100vw - 36px); max-width: 1125px; max-height: calc(100vh - 24px); overflow-y: auto; margin: 12px auto; padding: 20px; background: var(--bmf-surface, #1A212B); opacity: 1; }
-    #userModal .close { z-index: 2; width: 38px; height: 38px; border: 1px solid var(--bmf-border, #3A4452); border-radius: 8px; background: var(--bmf-surface, #1A212B); color: inherit; }
-    .customer-profile-heading, .customer-profile-section { border: 1px solid var(--bmf-border, rgba(255,255,255,.12)); border-radius: 10px; padding: 16px; margin: 12px 0; background: var(--bmf-surface, rgba(255,255,255,.025)); }
-    .customer-profile-heading { border-left: 4px solid var(--bmf-blue, #5B94D6); }
-    .customer-profile-heading h2 { margin: 0 48px 6px 0; }
-    .customer-profile-fields, .customer-profile-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 10px; margin-top: 12px; }
-    .customer-profile-field, .customer-profile-kpi { min-width: 0; padding: 11px 12px; border: 1px solid var(--bmf-border, rgba(255,255,255,.12)); border-radius: 8px; overflow-wrap: anywhere; }
-    .customer-profile-field small, .customer-profile-kpi small { display: block; opacity: .72; margin-bottom: 5px; }
-    .customer-profile-field strong, .customer-profile-kpi strong { display: block; overflow-wrap: anywhere; }
-    .customer-profile-kpi strong { font-size: 1.15rem; }
-    .customer-application-summary { border: 1px solid var(--bmf-border, rgba(255,255,255,.12)); border-radius: 8px; padding: 12px; margin-top: 10px; overflow-wrap: anywhere; }
-    .customer-application-summary p { margin: 7px 0; }
-    .timeframe-filters { margin-top: 6px; }
-    .timeframe-custom { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
-    .timeframe-custom label { font-weight: 600; font-size: 0.9rem; }
-    .timeframe-custom .modal-input { width: auto; padding: 7px 10px; }
-    .timeframe-note { opacity: 0.75; font-size: 0.85rem; margin: 6px 0 10px; }
-    .loan-filters {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin: 14px 0;
-    }
-    .loan-filter.active { border-color: #B4BCC6; background: rgba(180, 188, 198,0.18); }
-    .loan-fields {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
-      gap: 6px 14px;
-      margin: 12px 0;
-    }
-    .loan-fields > p, .loan-fields > section { min-width: 0; overflow-wrap: anywhere; }
-    .loan-item, .loan-header { min-width: 0; }
-    .loan-item .loan-header strong { overflow-wrap: anywhere; }
-    #applicationsList .loan-item p { overflow-wrap: anywhere; }
-    #applicationsList .application-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 8px; margin: 10px 0; }
-    #applicationsList .application-facts > div { min-width: 0; border: 1px solid var(--bmf-border, rgba(255,255,255,.12)); border-radius: 8px; padding: 9px 10px; overflow-wrap: anywhere; }
-    #applicationsList .application-facts small { display: block; opacity: .72; margin-bottom: 4px; }
-    #applicationsList .application-facts strong { display:block; min-width:0; overflow-wrap:anywhere; word-break:break-word; }
-    #applicationsList .loan-header { min-width:0; padding:10px 12px; border:1px solid var(--bmf-border,#3A4452); border-radius:8px; background:var(--bmf-surface,#1A212B); }
-    #applicationsList .loan-header strong { min-width:0; flex:1 1 320px; margin:0 !important; overflow-wrap:anywhere; word-break:break-word; }
-    #applicationsList .application-review-note, #applicationsList .application-document-box, #applicationsList .application-review-actions { min-width:0; margin:10px 0; padding:12px; border:1px solid var(--bmf-border,#3A4452); border-radius:8px; background:var(--bmf-surface,#1A212B); overflow-wrap:anywhere; }
-    #applicationsList .application-document-box { display:flex; flex-wrap:wrap; gap:8px; }
-    #applicationsList .application-review-actions .button-row { margin:0 !important; }
-    .loan-directory-table { width:100%; min-width:1120px; table-layout:auto; }
-    .loan-directory-table th,.loan-directory-table td { white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
-    .loan-directory-table .loan-id-cell { min-width:150px; max-width:180px; white-space:normal; overflow-wrap:anywhere; word-break:break-all; }
-    .loan-directory-table td:nth-child(2) { min-width:190px; }
-    .loan-directory-table td:nth-child(2) strong,.loan-directory-table td:nth-child(2) small { display:block; min-width:0; overflow-wrap:anywhere; word-break:break-word; }
-    .loan-directory-table .money-cell { white-space:nowrap; }
-    .profile-wrap { display:grid; gap:14px; max-width:100%; min-width:0; color:var(--text,#E6EAF0); }
-    .profile-card { min-width:0; overflow:hidden; border:1px solid var(--border,#3A4452); border-radius:10px; background:var(--panel-bg,#1A212B); }
-    .profile-card-header { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; padding:12px 18px; border-bottom:1px solid var(--border,#3A4452); background:var(--app-bg,#222B38); color:var(--muted,#B4BCC6); font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; overflow-wrap:anywhere; }
-    .profile-card-body { min-width:0; padding:16px 18px; }
-    .profile-customer-heading { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
-    .profile-avatar { display:grid; place-items:center; flex:0 0 56px; width:56px; height:56px; border:2px solid var(--accent,#5B94D6); border-radius:50%; background:rgba(91, 148, 214,.12); color:var(--accent,#5B94D6); font-size:20px; font-weight:700; }
-    .profile-customer-name { min-width:0; flex:1 1 180px; }
-    .profile-customer-name h2 { margin:0 0 4px; overflow-wrap:anywhere; font-size:20px; }
-    .profile-customer-name p { margin:0; color:var(--muted,#B4BCC6); overflow-wrap:anywhere; }
-    .profile-role-chip { padding:4px 10px; border:1px solid var(--accent,#5B94D6); border-radius:20px; background:rgba(91, 148, 214,.1); color:var(--accent,#5B94D6); letter-spacing:0; text-transform:none; }
-    .profile-actions { display:flex; flex:1 1 260px; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
-    .profile-button { min-height:38px; padding:8px 13px; border:1px solid var(--border,#3A4452); border-radius:7px; background:transparent; color:var(--text,#E6EAF0); cursor:pointer; font:inherit; font-weight:600; }
-    .profile-button.profile-primary { border-color:var(--accent,#5B94D6); background:var(--accent,#5B94D6); color:#fff; }
-    .profile-info-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; min-width:0; }
-    .profile-info-field, .profile-summary-tile { min-width:0; padding:11px 12px; border:1px solid var(--border,#3A4452); border-radius:8px; background:var(--app-bg,#222B38); overflow-wrap:anywhere; }
-    .profile-info-field small, .profile-summary-tile small { display:block; margin-bottom:5px; color:var(--muted,#B4BCC6); font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
-    .profile-info-field strong { display:block; color:var(--text,#E6EAF0); overflow-wrap:anywhere; word-break:break-word; }
-    .profile-info-field .profile-mono { color:var(--accent,#5B94D6); font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
-    .profile-summary-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }
-    .profile-summary-tile strong { display:block; margin:3px 0; color:var(--text,#E6EAF0); font-size:20px; line-height:1.2; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
-    .profile-summary-tile span { color:var(--muted,#B4BCC6); font-size:11px; }
-    .tone-blue { color:var(--accent,#5B94D6) !important; }.tone-green { color:var(--success,#8FDCB0) !important; }.tone-amber { color:var(--warning,#F0C56A) !important; }.tone-red { color:var(--danger,#FFB4AB) !important; }
-    .profile-notice { padding:12px 14px; border:1px solid var(--warning,#F0C56A); border-radius:8px; background:rgba(240, 197, 106,.1); color:var(--warning,#F0C56A); }
-    .profile-application-card { min-width:0; margin:8px 0; padding:12px; border:1px solid var(--border,#3A4452); border-radius:8px; background:var(--app-bg,#222B38); }
-    .profile-application-card > header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px; }
-    .profile-application-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
-    .profile-application-note, .profile-document-box { margin-top:10px; padding:10px 12px; border:1px solid var(--border,#3A4452); border-radius:8px; overflow-wrap:anywhere; }
-    .profile-document-box { display:flex; flex-wrap:wrap; gap:8px; }
-    .profile-loan-history { min-width:0; }
-    .profile-filter-row { display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:10px 16px; border-bottom:1px solid var(--border,#3A4452); }
-    .profile-filter-row > strong { margin-right:4px; color:var(--muted,#B4BCC6); font-size:11px; letter-spacing:.05em; text-transform:uppercase; }
-    .profile-filter-chip { padding:6px 12px; border:1px solid var(--border,#3A4452); border-radius:20px; background:transparent; color:var(--muted,#B4BCC6); cursor:pointer; font:inherit; font-size:12px; }
-    .profile-filter-chip.active { border-color:var(--accent,#5B94D6); background:var(--accent,#5B94D6); color:#fff; }
-    .profile-result-note { padding:10px 16px; color:var(--muted,#B4BCC6); font-size:12px; }
-    .profile-loan-list { display:grid; gap:12px; }
-    .profile-empty { padding:16px; border:1px dashed var(--border,#3A4452); border-radius:8px; text-align:center; color:var(--muted,#B4BCC6); }
-    .tone-purple { color:#F0D0D4 !important; }
-    .security-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:12px 0 18px; }
-    .security-metrics article { min-width:0; min-height:94px; padding:16px 18px; border:1px solid var(--border,#3A4452); border-radius:10px; background:var(--panel-bg,#1A212B); }
-    .security-metrics small { display:block; color:var(--muted,#B4BCC6); font-size:12px; letter-spacing:.05em; text-transform:uppercase; }
-    .security-metrics strong { display:block; margin-top:7px; color:var(--accent,#5B94D6); font-size:26px; }
-    .security-role-list { display:grid; gap:12px; margin:14px 0; }
-    .security-role-group { min-width:0; overflow:hidden; border:1px solid var(--border,#3A4452); border-radius:10px; background:var(--panel-bg,#1A212B); }
-    .security-role-group > header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border,#3A4452); background:var(--app-bg,#222B38); }
-    .security-role-group > header strong { font-size:16px; }
-    .security-role-group > header span { color:var(--muted,#B4BCC6); font-size:13px; }
-    .security-role-members { display:grid; gap:0; }
-    .security-fixed-member { display:grid; gap:3px; padding:12px 16px; border-bottom:1px solid var(--border,#3A4452); }
-    .security-fixed-member:last-child { border-bottom:0; }
-    .security-fixed-member span,.security-fixed-member small { color:var(--muted,#B4BCC6); overflow-wrap:anywhere; }
-    .security-fixed-member small { color:var(--success,#8FDCB0); }
-    .security-employee-card { min-width:0; padding:14px 16px; border-bottom:1px solid var(--border,#3A4452); }
-    .security-employee-card:last-child { border-bottom:0; }
-    .security-employee-card > header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:12px; border-bottom:1px solid var(--border,#3A4452); }
-    .security-employee-card > header > div { min-width:0; display:grid; gap:3px; }
-    .security-employee-card > header strong { overflow-wrap:anywhere; }
-    .security-employee-card > header small { color:var(--muted,#B4BCC6); overflow-wrap:anywhere; }
-    .security-count { flex:none; color:var(--muted,#B4BCC6); font-size:12px; }
-    .security-permission-list { display:grid; }
-    .security-permission-row { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:48px; padding:8px 4px; border-bottom:1px solid var(--border,#3A4452); }
-    .security-switch-wrap { display:flex; align-items:center; gap:8px; color:var(--muted,#B4BCC6); }
-    .security-switch-wrap input { width:42px; height:24px; accent-color:var(--success,#8FDCB0); cursor:pointer; }
-    .security-switch-wrap small { width:24px; color:var(--muted,#B4BCC6); }
-    .security-employee-actions { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; padding-top:12px; }
-    .security-employee-actions label { display:grid; flex:1 1 220px; gap:5px; color:var(--muted,#B4BCC6); font-size:12px; }
-    .security-employee-actions .modal-input { margin:0; }
-    .security-group-card { min-width:0; margin:8px 0; padding:14px; border:1px solid var(--border,#3A4452); border-radius:10px; background:var(--panel-bg,#1A212B); }
-    .security-group-permissions { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
-    .security-permission-pill { padding:5px 8px; border:1px solid var(--border,#3A4452); border-radius:6px; font-size:12px; }
-    .security-permission-pill.is-on { color:var(--success,#8FDCB0); border-color:rgba(143, 220, 176,.35); background:rgba(143, 220, 176,.08); }
-    .security-permission-pill.is-off { color:var(--muted,#B4BCC6); }
-    .security-empty { margin:0; padding:14px 16px; color:var(--muted,#B4BCC6); }
-    #userModal .loan-item { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); min-width:0; margin:0; padding:0; overflow:hidden; border:1px solid var(--border,#3A4452); border-radius:8px; background:var(--panel-bg,#1A212B); }
-    #userModal .loan-header { grid-column:1/-1; min-width:0; margin:0; padding:12px 14px; border-bottom:1px solid var(--border,#3A4452); background:var(--app-bg,#222B38); }
-    #userModal .loan-header strong { min-width:0; overflow-wrap:anywhere; word-break:break-word; }
-    #userModal .loan-item > p { min-width:0; min-height:62px; margin:-1px 0 0 -1px; padding:10px 12px; border:1px solid var(--border,#3A4452); background:var(--panel-bg,#1A212B); overflow-wrap:anywhere; word-break:break-word; }
-    #userModal .loan-fields { grid-column:1/-1; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:0; margin:0; }
-    #userModal .loan-fields > p { min-width:0; margin:0 -1px -1px 0; padding:10px 12px; border:1px solid var(--border,#3A4452); background:var(--panel-bg,#1A212B); overflow-wrap:anywhere; word-break:break-word; }
-    #userModal .loan-fields > section { grid-column:1/-1; min-width:0; padding:12px; border:1px solid var(--border,#3A4452); background:var(--panel-bg,#1A212B); overflow-wrap:anywhere; }
-    #userModal .loan-item > div:has(> a.proof-link), #userModal .loan-item > form.payment-form, #userModal .loan-item > .payment-review-panel,
-    #userModal .loan-item > input.modal-input, #userModal .loan-item > .button-row, #userModal .loan-item > .admin-decision-box { grid-column:1/-1; }
-    #userModal .loan-item > div:has(> a.proof-link) { padding:8px 12px; border-top:1px solid var(--border,#3A4452); overflow-wrap:anywhere; }
-    #userModal .loan-item > form.payment-form { margin:0 !important; border:0; border-top:1px solid var(--border,#3A4452); border-radius:0; background:var(--panel-bg,#1A212B); }
-    #userModal .payment-review-panel { margin:0; padding:12px; border-top:1px solid var(--border,#3A4452); }
-    #userModal .payment-review-panel ul, #userModal .loan-fields ul { display:grid; gap:6px; padding:0; list-style:none; }
-    #userModal .payment-review-panel li, #userModal .loan-fields li { min-width:0; padding:9px 10px; border:1px solid var(--border,#3A4452); border-radius:6px; background:var(--app-bg,#222B38); overflow-wrap:anywhere; }
-    #userModal .profile-history-item { display:flex; gap:10px; align-items:flex-start; }
-    #userModal .profile-history-content { min-width:0; overflow-wrap:anywhere; }
-    #userModal .profile-history-content small { display:block; margin-top:3px; color:var(--muted,#B4BCC6); }
-    #userModal .loan-fields ul { margin:8px 0 0; }
-    #userModal .loan-fields ul li { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
-    #userModal .loan-fields ul li .pay-amount { margin-left:auto; color:var(--success,#8FDCB0); white-space:nowrap; }
-    #userModal .loan-fields ul li .proof-link { margin:0; }
-    #userModal .loan-fields ul li .pay-receipt { color:var(--accent,#5B94D6); font-family:ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
-    #userModal .history-item, #userModal .loan-fields li { min-width:0; }
-    #userModal .profile-empty { padding:16px; border:1px dashed var(--border,#3A4452); border-radius:8px; text-align:center; color:var(--muted,#B4BCC6); }
-    @media(max-width:900px) { .profile-summary-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } .profile-info-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } #userModal .loan-fields { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-    @media(max-width:600px) { .profile-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .profile-info-grid,.profile-application-grid { grid-template-columns:1fr; } #userModal .loan-item { grid-template-columns:repeat(2,minmax(0,1fr)); } #userModal .loan-fields { grid-template-columns:repeat(2,minmax(0,1fr)); } .profile-actions { justify-content:stretch; } .profile-button { flex:1 1 100%; } .security-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .security-role-group > header { align-items:flex-start; flex-direction:column; } }
-    @media (max-width: 600px) { #userModal { padding: 8px; } #userModal .modal-content { width: 100%; max-height: calc(100vh - 16px); margin: 0 auto; padding: 18px 14px; } }
-    .proof-link { display: inline-block; margin: 4px 8px 4px 0; }
-    .announcement-form { max-width: 720px; }
-    .announcement-form textarea { min-height: 180px; resize: vertical; }
-    .store-section { margin-top: 26px; padding: 20px; }
-    .report-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 12px; margin: 16px 0; }
-    .report-metric { padding: 12px; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; }
-    body.light .report-metric { border-color: rgba(0,0,0,0.12); }
-    .report-metric strong { display: block; margin-top: 5px; font-size: 1.2rem; }
-    .request-badge {
-      display: inline-block;
-      min-width: 30px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: rgba(180, 188, 198,0.22);
-      color: inherit;
-      font-size: 0.85rem;
-      font-weight: 800;
-      text-align: center;
-    }
-    body.light .request-badge { background: rgba(85, 97, 112,0.14); }
-    .request-row {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 14px;
-      flex-wrap: wrap;
-      padding: 16px 4px;
-      border-top: 1px solid rgba(255,255,255,0.12);
-    }
-    body.light .request-row { border-color: rgba(0,0,0,0.1); }
-    .request-seq {
-      display: inline-block;
-      min-width: 34px;
-      height: 34px;
-      line-height: 34px;
-      border-radius: 50%;
-      background: rgba(180, 188, 198,0.25);
-      text-align: center;
-      font-weight: 800;
-    }
-    .feedback-item { padding: 14px 0; border-top: 1px solid rgba(255,255,255,0.12); }
-    body.light .feedback-item { border-color: rgba(0,0,0,0.1); }
-    .feedback-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
-    .feedback-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
-    .detail-feedback { min-height: 24px; margin: 8px 0; }
-    .hidden { display: none !important; }
-    .message-text {
-      min-height: 24px;
-      margin-top: 8px;
-      text-align: center;
-      opacity: 0.9;
-    }
-    .status-tag {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-    .status-tag.pending,
-    .status-tag.grace { background: color-mix(in srgb, var(--warning) 14%, var(--surface)); color: var(--warning); }
-    .status-tag.active { background: color-mix(in srgb, var(--info) 14%, var(--surface)); color: var(--info); }
-    .status-tag.paid { background: color-mix(in srgb, var(--success) 14%, var(--surface)); color: var(--success); }
-    .status-tag.defaulted,
-    .status-tag.declined { background: color-mix(in srgb, var(--error) 14%, var(--surface)); color: var(--error); }
-    .status-tag.liquidated { background: color-mix(in srgb, var(--secondary) 14%, var(--surface)); color: var(--secondary); }
-    .loader {
-      display: none;
-      width: 100%;
-      justify-content: center;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .loader.active { display: flex; }
-    .loader span {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #5B94D6, #B4BCC6);
-      animation: bounce 0.9s infinite alternate;
-    }
-    .loader span:nth-child(2) { animation-delay: 0.15s; }
-    .loader span:nth-child(3) { animation-delay: 0.3s; }
-    @keyframes bounce {
-      0% { transform: translateY(0); opacity: 0.5; }
-      100% { transform: translateY(-6px); opacity: 1; }
-    }
-
-    /* ════════════════════════════════════════════════════════
-       PrymeBMF Admin — BMF Master Fidelity skin (GitHub dark)
-       ════════════════════════════════════════════════════════ */
-    :root {
-      --bmf-bg:#10141A; --bmf-card:#1A212B; --bmf-surface:#222B38; --bmf-border:#3A4452;
-      --bmf-text:#E6EAF0; --bmf-muted:#B4BCC6;
-      --bmf-blue:#5B94D6; --bmf-green:#8FDCB0; --bmf-amber:#F0C56A; --bmf-red:#FFB4AB; --bmf-purple:#F0D0D4;
-    }
-    *, *::before, *::after, html, body { font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif; }
-    body { background:var(--bmf-bg); color:var(--bmf-text); }
-    body.dark::before { display:none; }
-    .panel { background:var(--bmf-card); border:1px solid var(--bmf-border); border-radius:8px; box-shadow:none; backdrop-filter:none; }
-    .auth-input, .search-box, .modal-input { background:var(--bmf-bg); border:1px solid var(--bmf-border); border-radius:6px; }
-    .auth-input:focus, .search-box:focus, .modal-input:focus { outline:none; border-color:var(--bmf-blue); box-shadow:0 0 0 3px rgba(91, 148, 214,.35); }
-    .modal { background:rgba(1,4,9,.72); }
-    .modal-content { background:var(--bmf-surface); border:1px solid var(--bmf-border); border-radius:8px; }
-    .enter-btn { background:var(--bmf-blue); border:1px solid var(--bmf-blue); border-radius:6px; box-shadow:none; letter-spacing:.5px; color:var(--on-primary); }
-    .enter-btn:hover { background:#7EAEDE; box-shadow:0 4px 14px rgba(91, 148, 214,.35); opacity:1; }
-    .store-card:hover:not(:disabled) { border-color:var(--bmf-blue); }
-    .report-metric { background:var(--bmf-bg); border:1px solid var(--bmf-border); border-radius:8px; }
-    .loan-filter.active { border-color:var(--bmf-blue); background:rgba(91, 148, 214,.16); color:var(--bmf-text); }
-    .user-card { background:var(--bmf-bg); border:1px solid var(--bmf-border); border-radius:8px; }
-    .user-card:hover { border-color:var(--bmf-blue); }
-    .loan-item { background:var(--bmf-bg); border:1px solid var(--bmf-border); border-radius:8px; }
-    .request-row, .feedback-item { border-top-color:var(--bmf-border); }
-    .admin-topbar h1 { font-weight:700; }
-  </style>
+  <title>BMF Admin</title>
+  <link rel="stylesheet" href="style.css?v=20261116-bmf-redesign">
+  
 </head>
 <body>
   <script>document.body.classList.add(localStorage.getItem('adminTheme') === 'light' ? 'light' : 'dark');</script>
   <div id="bmfToast" class="bmf-toast" role="status" aria-live="polite"></div>
   <div class="admin-shell">
-    <header class="brand-header"><a class="brand-mark" href="index.html">PrymeBMF Admin</a><span class="store-context" id="storeContext"></span></header>
+    <header class="brand-header"><a class="brand-mark" href="/">Buraza Micro Finance</a><span class="store-context" id="storeContext"></span><button type="button" class="icon-btn theme-float" id="authThemeToggle" aria-label="Switch to light theme"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button></header>
 
-    <section id="storeSelect">
-      <h1 class="screen-title">Choose a store</h1>
-      <p>Select the business workspace you need to access.</p>
-      <div class="store-grid">
-        <button type="button" class="panel store-card" data-store="buraza">
-          <h2>Buraza Micro Finance</h2>
-          <p>Loans and customer accounts</p>
-          <span class="store-status">Active | BMF</span>
-        </button>
-        <button type="button" class="panel store-card" disabled>
-          <h2>Other stores</h2>
-          <p>Additional subsidiaries can be added here later.</p>
-          <span class="store-status">Not configured</span>
-        </button>
-      </div>
-    </section>
-
-    <section id="adminAuth" class="panel admin-auth hidden">
-      <p class="tagline" style="letter-spacing: 2px;">Admin Access</p>
+    <section id="adminAuth" class="admin-auth">
+      <div class="brand-lockup"><strong>Staff sign in</strong><span>Buraza Micro Finance</span></div>
 
       <form id="adminLoginForm" class="auth-form">
-        <input type="email" id="adminEmail" class="auth-input" placeholder="Admin email" required autocomplete="email">
+        <div class="method-toggle" role="radiogroup" aria-label="Sign in with">
+          <label><input type="radio" name="adminLoginMethod" value="username" checked> Username</label>
+          <label><input type="radio" name="adminLoginMethod" value="email"> Email</label>
+        </div>
+        <label class="field-label" id="adminIdentifierLabel" for="adminEmail">Username</label>
+        <input type="text" id="adminEmail" class="auth-input" placeholder="Username" required autocomplete="username">
+        <label class="field-label" for="adminPassword">Password</label>
         <input type="password" id="adminPassword" class="auth-input" placeholder="Password" required autocomplete="current-password">
-        <button type="submit" class="enter-btn">Login</button>
+        <label class="check-row"><input type="checkbox" id="adminRequireOtp"> <span>Email me a one-time code</span></label>
+        <button type="submit" class="enter-btn">Sign in</button>
         <button type="button" id="showPasswordReset" class="toggle-mode">Forgot password?</button>
-        <button type="button" id="backToStores" class="toggle-mode">Back to stores</button>
       </form>
 
       <form id="adminOtpForm" class="auth-form hidden">
@@ -653,40 +62,42 @@
     <section id="adminDashboard" class="hidden">
       <header class="admin-appbar">
         <span id="loggedInAdmin" hidden></span>
-        <div class="admin-brand"><strong>BMF</strong><span>· Admin</span><small>Buraza Micro Finance</small></div>
-        <label class="admin-search-wrap"><span aria-hidden="true">Find:</span><input id="adminDashboardSearch" type="search" placeholder="Loans, borrowers, receipts..." aria-label="Search dashboard"></label>
+        <button type="button" class="icon-btn" id="adminNavToggle" aria-label="Open menu" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <div class="admin-brand"><strong>BMF</strong><small>Buraza Micro Finance</small></div>
+        <label class="admin-search-wrap"><span class="visually-hidden">Search</span><input id="adminDashboardSearch" type="search" placeholder="Search loans, borrowers, receipts" aria-label="Search dashboard"></label>
         <div class="admin-user-controls">
-          <button id="adminThemeToggle" type="button" class="toggle-mode admin-mode-btn" aria-label="Switch to light theme">Use light theme</button>
-          <div class="notification-anchor"><button id="adminNotificationBtn" type="button" aria-label="Notifications" aria-expanded="false">&#128276;<span id="adminNotificationCount" class="notification-count hidden">0</span></button><section id="adminNotificationMenu" class="notification-menu hidden" aria-label="Notifications"><header><strong>Notifications</strong><button id="markAllNotificationsRead" type="button">Mark all read</button></header><div id="adminNotificationList"></div><footer><button id="viewAllNotifications" type="button">View all notifications</button></footer></section></div>
+          <button id="adminThemeToggle" type="button" class="icon-btn" aria-label="Switch to light theme"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+          <div class="notification-anchor"><button id="adminNotificationBtn" class="icon-btn" type="button" aria-label="Notifications" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 7 3 7 3 7H3s3 0 3-7"/><path d="M10 19a2 2 0 0 0 4 0"/></svg><span id="adminNotificationCount" class="notification-count hidden">0</span></button><section id="adminNotificationMenu" class="notification-menu hidden" aria-label="Notifications"><header><strong>Notifications</strong><button id="markAllNotificationsRead" type="button">Mark all read</button></header><div id="adminNotificationList"></div><footer><button id="viewAllNotifications" type="button">View all notifications</button></footer></section></div>
           <span id="adminAvatar" class="admin-avatar">BM</span><span id="adminDisplayName" class="admin-display-name">Admin</span>
         </div>
       </header>
+      <div class="nav-scrim" id="adminNavScrim"></div>
 
     <div class="admin-dashboard-layout">
       <aside id="adminSidebar" class="admin-sidebar" aria-label="Admin navigation">
         <nav>
           <span class="admin-sidebar-section">Main</span>
-          <button type="button" class="admin-nav-item active" data-admin-page="portfolioOverview" title="Dashboard" aria-current="page"><span class="admin-nav-icon icon-dashboard" aria-hidden="true">▦</span><span>Dashboard</span></button>
-          <button type="button" class="admin-nav-item" data-admin-page="requestQueue" title="Loan Requests"><span class="admin-nav-icon icon-applications" aria-hidden="true">▤</span><span>Loan Requests</span></button>
-          <button type="button" class="admin-nav-item" data-admin-page="allLoansView" title="All Loans"><span class="admin-nav-icon" aria-hidden="true">▥</span><span>All Loans</span></button>
-          <button type="button" class="admin-nav-item" data-admin-page="customersView" title="Customers"><span class="admin-nav-icon icon-customers" aria-hidden="true">♧</span><span>Customers</span></button>
-          <button type="button" class="admin-nav-item" data-admin-page="paymentsView" title="Payments"><span class="admin-nav-icon icon-payments" aria-hidden="true">¤</span><span>Payments</span></button>
-          <button type="button" class="admin-nav-item" data-admin-page="poolsView" title="Lending pools"><span class="admin-nav-icon" aria-hidden="true">◈</span><span>Pools</span></button>
-          <button type="button" class="admin-nav-item" data-admin-page="overdueView" title="Overdue"><span class="admin-nav-icon icon-overdue" aria-hidden="true">!</span><span>Overdue</span></button>
-          <button type="button" class="admin-nav-item" data-admin-page="defaultersView" title="Defaulters"><span class="admin-nav-icon icon-defaulters" aria-hidden="true">!</span><span>Defaulters</span></button>
+          <button type="button" class="admin-nav-item active" data-admin-page="portfolioOverview" title="Dashboard" aria-current="page"><span class="admin-nav-icon icon-dashboard" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span><span>Dashboard</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="requestQueue" title="Loan Requests"><span class="admin-nav-icon icon-applications" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 6h16v12H4z"/><path d="M4 10h16"/></svg></span><span>Loan Requests</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="allLoansView" title="All Loans"><span class="admin-nav-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5"/></svg></span><span>All Loans</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="customersView" title="Customers"><span class="admin-nav-icon icon-customers" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.6-3 2.7-4.5 5.5-4.5S14.4 16 15 19"/><circle cx="17" cy="9" r="2"/><path d="M17 14.5c1.8.3 3.2 1.4 3.8 3.5"/></svg></span><span>Customers</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="paymentsView" title="Payments"><span class="admin-nav-icon icon-payments" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg></span><span>Payments</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="poolsView" title="Lending pools"><span class="admin-nav-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 18V10M10 18V6M16 18v-5M22 18H2"/></svg></span><span>Pools</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="overdueView" title="Overdue"><span class="admin-nav-icon icon-overdue" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></svg></span><span>Overdue</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="defaultersView" title="Defaulters"><span class="admin-nav-icon icon-defaulters" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 4l8 14H4z"/><path d="M12 10v4M12 16.5v.5"/></svg></span><span>Defaulters</span></button>
           <span class="admin-sidebar-section">Management</span>
-          <button type="button" class="admin-nav-item" data-admin-page="announcementView" title="Announcements"><span class="admin-nav-icon" aria-hidden="true">◉</span><span>Announcements</span></button>
-          <button type="button" class="admin-nav-item" data-admin-page="inviteView" title="Invite Links"><span class="admin-nav-icon" aria-hidden="true">↗</span><span>Invite Links</span></button>
-          <button type="button" class="admin-nav-item" data-admin-page="createUserView" title="Create User"><span class="admin-nav-icon" aria-hidden="true">＋</span><span>Create User</span></button>
-          <button type="button" class="admin-nav-item" id="adminSidebarHr" data-admin-page="hrView" title="HR"><span class="admin-nav-icon icon-hr" aria-hidden="true">♙</span><span>HR</span></button>
-          <button type="button" class="admin-nav-item" id="adminSidebarApplications" data-admin-page="applicationsView" title="Quick Screen"><span class="admin-nav-icon icon-applications" aria-hidden="true">▦</span><span>Quick Screen</span></button>
-          <button type="button" class="admin-nav-item" id="adminSidebarSwitchStore" data-dashboard-action="switch-store" title="Switch Store" hidden><span class="admin-nav-icon icon-store" aria-hidden="true">▤</span><span>Switch Store</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="announcementView" title="Announcements"><span class="admin-nav-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 10v4h3l7 4V6L7 10H4z"/><path d="M18 9a4 4 0 0 1 0 6"/></svg></span><span>Announcements</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="inviteView" title="Invite Links"><span class="admin-nav-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg></span><span>Invite Links</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="createUserView" title="Create User"><span class="admin-nav-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="10" cy="8" r="3"/><path d="M4 19c.7-3 2.8-4.5 6-4.5M19 8v6M16 11h6"/></svg></span><span>Create User</span></button>
+          <button type="button" class="admin-nav-item" id="adminSidebarHr" data-admin-page="hrView" title="HR"><span class="admin-nav-icon icon-hr" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="4" y="7" width="16" height="12" rx="2"/><path d="M8 7V5h8v2"/></svg></span><span>HR</span></button>
+          <button type="button" class="admin-nav-item" id="adminSidebarApplications" data-admin-page="applicationsView" title="Quick Screen"><span class="admin-nav-icon icon-applications" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M8 3h8v4H8z"/><path d="M6 5H5a2 2 0 0 0-2 2v12h18V7a2 2 0 0 0-2-2h-1"/></svg></span><span>Quick Screen</span></button>
+          <button type="button" class="admin-nav-item" id="adminSidebarSwitchStore" data-dashboard-action="switch-store" title="Switch Store" hidden><span class="admin-nav-icon icon-store" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 10h16v9H4zM3 10l2-5h14l2 5"/></svg></span><span>Switch Store</span></button>
           <span class="admin-sidebar-section">Reports</span>
-          <button type="button" class="admin-nav-item" data-admin-page="portfolioReports" title="Reports Platform"><span class="admin-nav-icon icon-reports" aria-hidden="true">↗</span><span>Reports Platform</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="portfolioReports" title="Reports"><span class="admin-nav-icon icon-reports" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M5 19V9M12 19V5M19 19v-7"/></svg></span><span>Reports</span></button>
           <span class="admin-sidebar-section">Settings</span>
-          <button type="button" class="admin-nav-item" id="adminSidebarServerMode" data-admin-page="serverSettingsView" title="Server Mode"><span class="admin-nav-icon" aria-hidden="true">⚙</span><span>Server Mode</span></button>
-          <button type="button" class="admin-nav-item" id="adminSidebarLoanRates" data-admin-page="loanInterestRatesView" title="Loan Rates"><span class="admin-nav-icon" aria-hidden="true">％</span><span>Loan Rates</span></button>
-          <button type="button" id="logoutBtn" class="admin-nav-item" data-dashboard-action="logout" title="Logout"><span class="admin-nav-icon icon-logout" aria-hidden="true">⇥</span><span>Logout</span></button>
+          <button type="button" class="admin-nav-item" id="adminSidebarServerMode" data-admin-page="serverSettingsView" title="Settings"><span class="admin-nav-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M3 12h2M19 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span><span>Settings</span></button>
+          <button type="button" class="admin-nav-item" id="adminSidebarLoanRates" data-admin-page="loanInterestRatesView" title="Loan Rates"><span class="admin-nav-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M19 5L5 19"/><circle cx="7.5" cy="7.5" r="2"/><circle cx="16.5" cy="16.5" r="2"/></svg></span><span>Loan Rates</span></button>
+          <button type="button" id="logoutBtn" class="admin-nav-item" data-dashboard-action="logout" title="Logout"><span class="admin-nav-icon icon-logout" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M10 7V5H5v14h5v-2"/><path d="M10 12h9M16 8l4 4-4 4"/></svg></span><span>Logout</span></button>
         </nav>
       </aside>
       <main class="admin-main-content">
@@ -712,7 +123,7 @@
               <span id="collectionRangeError" class="collection-range-error" role="status" aria-live="polite"></span>
             </div>
             <div id="collectionsChart" aria-live="polite"></div>
-            <p class="chart-analysis-hint">Amounts are in Kwacha. Blue shows payments received; green shows newly approved loans. Point markers show exact totals for each date or period.</p>
+            <p class="chart-analysis-hint">Amounts are in Kwacha. Lime is payments received. Grey is newly approved loans.</p>
             <div class="chart-legend"><span><i class="legend-payments"></i>Payments Received</span><span><i class="legend-loans"></i>New Loans</span></div>
           </section>
           <section class="panel admin-activity-panel"><h2>Recent Activity</h2><ul id="recentActivity" class="activity-list"></ul><button type="button" class="link-button" data-admin-jump="requestQueue">View all activity →</button></section>
@@ -784,7 +195,7 @@
 
         <section id="requestQueue" class="panel store-section admin-utility-section admin-page hidden" aria-labelledby="newRequestsTitle"><div class="admin-topbar"><div><h1 id="newRequestsTitle">Loan Requests &amp; Payment Reviews <span id="newRequestsBadge" class="request-badge" aria-live="polite">0</span></h1><p>Review loan requests and submitted payment proofs.</p></div><div class="button-row"><button type="button" class="toggle-mode" id="refreshRequestsBtn">Refresh requests</button><button type="button" class="toggle-mode" data-export-table="requests">Export CSV</button><button type="button" class="toggle-mode" data-export-table="requests" data-export-format="pdf">Export PDF</button></div></div><div id="newRequestsList"><p>Loading requests...</p></div><p id="newRequestsNote" class="message-text"></p></section>
         <section id="portfolioReports" class="panel store-section admin-utility-section admin-page hidden" aria-labelledby="storeReportsTitle">
-          <div class="admin-page-header"><div><h1 id="storeReportsTitle">Reports Platform</h1><p>Manually generate and download the BMF Excel and PDF reports.</p></div></div>
+          <div class="admin-page-header"><div><h1 id="storeReportsTitle">Reports</h1><p>Choose a report, set the dates, and download Excel or PDF.</p></div></div>
           <div id="reportLibrary" class="report-library"></div>
         </section>
         <section id="feedbackDetails" class="panel store-section admin-utility-section admin-page hidden" aria-labelledby="feedbackDetailsTitle"><h1 id="feedbackDetailsTitle">Feedback Review</h1><div class="loan-filters" id="storeFeedbackFilters" role="group" aria-label="Filter customer feedback"><button class="toggle-mode loan-filter active" data-feedback-filter="all" type="button">All</button><button class="toggle-mode loan-filter" data-feedback-filter="complaint" type="button">Complaints</button><button class="toggle-mode loan-filter" data-feedback-filter="experience" type="button">Experiences</button><button class="toggle-mode loan-filter" data-feedback-filter="improvement" type="button">Improvements</button><button class="toggle-mode loan-filter" data-feedback-filter="inquiry" type="button">Inquiries</button></div><div id="storeFeedbackList"><p>Loading feedback...</p></div></section>
@@ -833,8 +244,8 @@
         </section>
 
         <section id="serverSettingsView" class="admin-page hidden panel" aria-labelledby="serverSettingsTitle">
-          <h1 id="serverSettingsTitle">Server Mode</h1>
-          <p>Control whether the server is reachable from outside the local network. Protected routes still require a valid device token.</p>
+          <h1 id="serverSettingsTitle">Settings</h1>
+          <p>Network access for this BMF server. Private keeps it on the local network. Public makes it reachable on the internet. Protected routes still require a signed-in device.</p>
           <p id="serverModeStatus" class="message-text" style="text-align:left;margin:12px 0" role="status"></p>
           <button id="serverModeBtn" class="toggle-mode admin-mode-btn" type="button">Switch Mode</button>
           <div id="serverModeConfirm" class="server-mode-confirm" hidden><span id="serverModeConfirmText"></span><button id="serverModeConfirmCancel" class="toggle-mode" type="button">Cancel</button><button id="serverModeConfirmSwitch" class="enter-btn" type="button">Switch</button></div>
@@ -1049,6 +460,13 @@
     </section>
       </main>
     </div>
+      <nav class="mobile-tabbar" aria-label="Primary">
+        <button type="button" data-mobile-page="portfolioOverview"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span>Dashboard</span></button>
+        <button type="button" data-mobile-page="allLoansView"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5"/></svg><span>Loans</span></button>
+        <button type="button" data-mobile-page="paymentsView"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg><span>Payments</span></button>
+        <button type="button" data-mobile-page="portfolioReports"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M5 19V9M12 19V5M19 19v-7"/></svg><span>Reports</span></button>
+        <button type="button" data-mobile-page="menu"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></button>
+      </nav>
     </section>
   </div>
 
@@ -1148,6 +566,6 @@
     </div>
   </div>
 
-  <script src="admin.js?v=20261108-custom-tenure-rates"></script>
+  <script src="admin.js?v=20261116-bmf-redesign"></script>
 </body>
 </html>

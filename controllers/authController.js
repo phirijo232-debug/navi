@@ -65,16 +65,16 @@ function buildSignupUrl(req, token) {
   let url = '';
   const override = String(process.env.PUBLIC_URL || process.env.APP_URL || config.PUBLIC_URL || '').trim().replace(/\/+$/, '');
   if (override) {
-    url = `${override}/signup.html?invite=${token}`;
+    url = `${override}/signup?invite=${token}`;
   } else {
     try {
       const base = getPublicBaseUrl(req);
       if (base) {
-        url = `${base}/signup.html?invite=${token}`;
+        url = `${base}/signup?invite=${token}`;
       }
     } catch { /* fall through to relative */ }
     if (!url) {
-      url = `/signup.html?invite=${token}`;
+      url = `/signup?invite=${token}`;
     }
   }
   try {
@@ -523,55 +523,153 @@ function classifyMailError(err, action = 'send the OTP') {
   return { status: 503, error: `Unable to ${action}. Please try again shortly.` };
 }
 
+const LOGIN_REJECTED = { error: 'Invalid username, email, or password.' };
+let loginTimingHash = null;
+
+function loginWantsOtp(body) {
+  if (!body || body.requireOtp === undefined || body.requireOtp === null || body.requireOtp === '') return true;
+  if (body.requireOtp === false || body.requireOtp === 0) return false;
+  return !['false', '0', 'no', 'off'].includes(String(body.requireOtp).trim().toLowerCase());
+}
+
+function findLoginUser(users, identifier) {
+  const needle = String(identifier || '').trim().toLowerCase();
+  if (!needle) return null;
+  const byEmail = users.filter(user => String(user.email || '').trim().toLowerCase() === needle);
+  if (byEmail.length === 1) return byEmail[0];
+  if (byEmail.length > 1) return null;
+  const byUsername = users.filter(user => String(user.username || '').trim().toLowerCase() === needle);
+  return byUsername.length === 1 ? byUsername[0] : null;
+}
+
+async function rejectLogin(req, res, identifier, password, user, reason) {
+  auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN_FAILED, actor: normalizeEmail(identifier), targetId: user?.id, ip: req.ip, detail: { reason } });
+  if (auditGuardian.trackFailedLogin(req.ip) >= auditGuardian.BRUTE_THRESHOLD) {
+    auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_BRUTE_FORCE, actor: normalizeEmail(identifier), targetId: user?.id, ip: req.ip, detail: { path: '/login', attempts: auditGuardian.BRUTE_THRESHOLD } });
+  }
+  if (!user) {
+    if (!loginTimingHash) loginTimingHash = await bcrypt.hash('bmf-login-timing-pad', 4);
+    await bcrypt.compare(String(password || ''), loginTimingHash);
+  }
+  return res.status(400).json(LOGIN_REJECTED);
+}
+
+function establishLoginSession(user, req, pending) {
+  const users = getUsers();
+  const userIndex = users.findIndex(entry => entry === user || String(entry.email || '').trim().toLowerCase() === String(user.email || '').trim().toLowerCase());
+  if (userIndex < 0) {
+    return { status: 400, body: { error: 'Unable to locate your account.' } };
+  }
+
+  const now = new Date().toISOString();
+  users[userIndex].trustedDevices = users[userIndex].trustedDevices || [];
+  const normalizedUser = normalizeTrustedDevices(users[userIndex]);
+  const existingDevice = normalizedUser.trustedDevices.find(device => device.ip === req.ip);
+  const issued = issueDeviceToken({ userId: normalizedUser.id, email: normalizedUser.email });
+  const deviceRecord = {
+    ...issued.record,
+    createdAt: existingDevice?.createdAt || now,
+    lastSeen: now,
+    ip: req.ip
+  };
+
+  if (existingDevice) {
+    Object.assign(existingDevice, deviceRecord);
+    delete existingDevice.token;
+  } else {
+    normalizedUser.trustedDevices.push(deviceRecord);
+  }
+
+  normalizedUser.trustedDevices = normalizeTrustedDevices({ ...normalizedUser }).trustedDevices;
+  users[userIndex] = normalizedUser;
+  saveUsers(users);
+  if (supabaseApi.enabled()) {
+    supabaseApi.saveSession({
+      token_hash: issued.record.tokenHash,
+      email: String(normalizedUser.email || '').toLowerCase(),
+      user_id: normalizedUser.id == null ? null : String(normalizedUser.id),
+      jti: issued.record.jti,
+      expires_at: issued.record.expiresAt,
+      revoked: false,
+      ip: req.ip || null,
+      last_seen: now
+    });
+  }
+
+  auditGuardian.clearFailedLogin(req.ip);
+  auditGuardian.writeAudit({
+    action: auditGuardian.ACTIONS.USER_LOGIN,
+    actor: normalizedUser.email,
+    targetId: users[userIndex].id,
+    ip: req.ip,
+    detail: { role: pending.role, storeId: pending.storeId, otp: Boolean(pending.otp) }
+  });
+
+  return {
+    status: 200,
+    body: {
+      message: 'Login successful.',
+      username: pending.username,
+      role: pending.role,
+      storeId: pending.storeId,
+      email: normalizedUser.email,
+      deviceToken: issued.token
+    }
+  };
+}
+
 async function requestLogin(req, res) {
   try {
-    const { email, password } = req.body;
+    const body = req.body || {};
+    const identifier = String(body.identifier || body.username || body.email || '').trim();
+    const password = body.password;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required.' });
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Username or email, and password, are required.' });
     }
 
     const users = getUsers();
-    const user = users.find(u => u.email === email);
+    const user = findLoginUser(users, identifier);
 
-    if (!user) {
-      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN_FAILED, actor: normalizeEmail(email), ip: req.ip, detail: { reason: 'Invalid credentials' } });
-      if (auditGuardian.trackFailedLogin(req.ip) >= auditGuardian.BRUTE_THRESHOLD) auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_BRUTE_FORCE, actor: normalizeEmail(email), ip: req.ip, detail: { path: '/login', attempts: auditGuardian.BRUTE_THRESHOLD } });
-      return res.status(400).json({ error: 'Invalid email or password.' });
-    }
-
-    if (!user.password) {
-      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN_FAILED, actor: normalizeEmail(email), targetId: user.id, ip: req.ip, detail: { reason: 'Password not set' } });
-      return res.status(400).json({ error: 'Invalid email or password.' });
+    if (!user || !user.password) {
+      return rejectLogin(req, res, identifier, password, user, user ? 'Password not set' : 'Invalid credentials');
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
-      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN_FAILED, actor: normalizeEmail(email), targetId: user.id, ip: req.ip, detail: { reason: 'Invalid credentials' } });
-      if (auditGuardian.trackFailedLogin(req.ip) >= auditGuardian.BRUTE_THRESHOLD) auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_BRUTE_FORCE, actor: normalizeEmail(email), targetId: user.id, ip: req.ip, detail: { path: '/login', attempts: auditGuardian.BRUTE_THRESHOLD } });
-      return res.status(400).json({ error: 'Invalid email or password.' });
+      return rejectLogin(req, res, identifier, password, user, 'Invalid credentials');
     }
     auditGuardian.clearFailedLogin(req.ip);
 
-    const otpEmail = String(user.email || '').trim();
-    if (!otpEmail) {
-      return res.status(503).json({ error: 'This account does not have a registered email address.' });
-    }
-
-    delete pendingLogins[email];
-    await otpService.sendOTP('Login Verification', email, false, otpEmail);
-    pendingLogins[email] = {
-      email,
-      otpEmail,
+    const accountEmail = String(user.email || '').trim();
+    const pending = {
+      email: accountEmail,
+      otpEmail: accountEmail,
       username: user.username,
       role: user.role,
       storeId: user.storeId || config.DEFAULT_STORE_ID,
       createdAt: Date.now()
     };
+
+    if (!loginWantsOtp(body)) {
+      const session = establishLoginSession(user, req, pending);
+      return res.status(session.status).json(session.body);
+    }
+
+    if (!accountEmail) {
+      return res.status(503).json({ error: 'This account does not have a registered email address.' });
+    }
+
+    delete pendingLogins[accountEmail];
+    delete pendingLogins[identifier];
+    await otpService.sendOTP('Login Verification', accountEmail, false, accountEmail);
+    pendingLogins[accountEmail] = pending;
+    if (identifier !== accountEmail) pendingLogins[identifier] = pending;
     res.json({
       message: 'OTP sent. Please verify to complete login.',
-      otpSentTo: otpEmail,
-      otpChannel: 'account'
+      otpSentTo: accountEmail,
+      otpChannel: 'account',
+      email: accountEmail
     });
 
   } catch (err) {
@@ -592,13 +690,14 @@ function getUserByDeviceToken(token) {
 // code row for this email means step one passed. The code is still verified below.
 function rebuildPendingLogin(email) {
   if (!supabaseApi.enabled() || typeof email !== 'string' || !email) return null;
-  const row = supabaseApi.getOtp(otpService.buildOtpKey(email, 'Login Verification'));
+  const user = findLoginUser(getUsers(), email);
+  const accountEmail = String(user?.email || email).trim();
+  const row = supabaseApi.getOtp(otpService.buildOtpKey(accountEmail, 'Login Verification'));
   if (!row || Date.parse(row.expires_at) <= Date.now()) return null;
-  const user = getUsers().find(u => u.email === email);
   if (!user) return null;
   return {
-    email,
-    otpEmail: String(user.email || '').trim(),
+    email: accountEmail,
+    otpEmail: accountEmail,
     username: user.username,
     role: user.role,
     storeId: user.storeId || config.DEFAULT_STORE_ID,
@@ -615,68 +714,23 @@ async function confirmLogin(req, res) {
       return res.status(400).json({ error: 'No pending login found.' });
     }
 
-    const result = otpService.verifyOTP(otp, email, 'Login Verification');
+    const result = otpService.verifyOTP(otp, pending.email || email, 'Login Verification');
     if (!result.valid) {
       const attempts = auditGuardian.trackFailedLogin(req.ip);
-      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN_FAILED, actor: normalizeEmail(email), ip: req.ip, detail: { reason: 'Invalid login verification code', attemptCount: attempts } });
-      if (attempts >= auditGuardian.BRUTE_THRESHOLD) auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_BRUTE_FORCE, actor: normalizeEmail(email), ip: req.ip, detail: { path: '/login/confirm', attempts } });
+      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN_FAILED, actor: normalizeEmail(pending.email || email), ip: req.ip, detail: { reason: 'Invalid login verification code', attemptCount: attempts } });
+      if (attempts >= auditGuardian.BRUTE_THRESHOLD) auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_BRUTE_FORCE, actor: normalizeEmail(pending.email || email), ip: req.ip, detail: { path: '/login/confirm', attempts } });
       return res.status(400).json({ error: result.message });
     }
 
-    const users = getUsers();
-    const userIndex = users.findIndex(u => u.email === email);
-    if (userIndex < 0) {
+    const user = getUsers().find(entry => String(entry.email || '').trim().toLowerCase() === String(pending.email || email).trim().toLowerCase());
+    if (!user) {
       return res.status(400).json({ error: 'Unable to locate your account.' });
     }
 
-    const now = new Date().toISOString();
-    users[userIndex].trustedDevices = users[userIndex].trustedDevices || [];
-
-    const normalizedUser = normalizeTrustedDevices(users[userIndex]);
-    const existingDevice = normalizedUser.trustedDevices.find(device => device.ip === req.ip);
-    const issued = issueDeviceToken({ userId: normalizedUser.id, email: normalizedUser.email });
-    const deviceToken = issued.token;
-    const deviceRecord = {
-      ...issued.record,
-      createdAt: existingDevice?.createdAt || now,
-      lastSeen: now,
-      ip: req.ip
-    };
-
-    if (existingDevice) {
-      Object.assign(existingDevice, deviceRecord);
-      delete existingDevice.token;
-    } else {
-      normalizedUser.trustedDevices.push(deviceRecord);
-    }
-
-    normalizedUser.trustedDevices = normalizeTrustedDevices({ ...normalizedUser }).trustedDevices;
-    users[userIndex] = normalizedUser;
-
-    saveUsers(users);
-    if (supabaseApi.enabled()) {
-      supabaseApi.saveSession({
-        token_hash: issued.record.tokenHash,
-        email: String(normalizedUser.email || '').toLowerCase(),
-        user_id: normalizedUser.id == null ? null : String(normalizedUser.id),
-        jti: issued.record.jti,
-        expires_at: issued.record.expiresAt,
-        revoked: false,
-        ip: req.ip || null,
-        last_seen: now
-      });
-    }
+    const session = establishLoginSession(user, req, { ...pending, otp: true });
     delete pendingLogins[email];
-    auditGuardian.clearFailedLogin(req.ip);
-    auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN, actor: email, targetId: users[userIndex].id, ip: req.ip, detail: { role: pending.role, storeId: pending.storeId } });
-
-    res.json({
-      message: 'Login successful.',
-      username: pending.username,
-      role: pending.role,
-      storeId: pending.storeId,
-      deviceToken
-    });
+    delete pendingLogins[pending.email];
+    res.status(session.status).json(session.body);
 
   } catch (err) {
     logBreakage('authController.js', 'confirmLogin', err, 'LOGIN CONFIRM CIRCUIT TRIPPED');
