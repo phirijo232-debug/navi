@@ -586,10 +586,30 @@ function getUserByDeviceToken(token) {
   return findUserByDeviceToken(token);
 }
 
+// On Vercel each request can land on a different instance, so the in-memory
+// pendingLogins entry may be missing. The login code itself lives in the shared
+// Supabase otps table and is only issued after the password check, so a live
+// code row for this email means step one passed. The code is still verified below.
+function rebuildPendingLogin(email) {
+  if (!supabaseApi.enabled() || typeof email !== 'string' || !email) return null;
+  const row = supabaseApi.getOtp(otpService.buildOtpKey(email, 'Login Verification'));
+  if (!row || Date.parse(row.expires_at) <= Date.now()) return null;
+  const user = getUsers().find(u => u.email === email);
+  if (!user) return null;
+  return {
+    email,
+    otpEmail: String(user.email || '').trim(),
+    username: user.username,
+    role: user.role,
+    storeId: user.storeId || config.DEFAULT_STORE_ID,
+    createdAt: Date.now()
+  };
+}
+
 async function confirmLogin(req, res) {
   try {
     const { email, otp } = req.body;
-    const pending = pendingLogins[email];
+    const pending = pendingLogins[email] || rebuildPendingLogin(email);
 
     if (!pending) {
       return res.status(400).json({ error: 'No pending login found.' });
