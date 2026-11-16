@@ -114,4 +114,3 @@ on conflict (id) do update
       allowed_mime_types = excluded.allowed_mime_types;
 
 -- storage.objects already has RLS in Supabase. Do not add a public policy.
-alter table storage.objects enable row level security;
