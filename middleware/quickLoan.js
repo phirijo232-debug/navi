@@ -1,5 +1,6 @@
 'use strict';
 
+const supabaseApi = require('./supabaseApi');
 const buckets = new Map();
 
 const PHONE_RE = /^(\+?260|0)(?:(?:9[5-7]|7[6-7]|57)\d{7}|26\d{7})$/;
@@ -15,6 +16,10 @@ function imageKind(buffer) {
 }
 
 function allow(key, limit, windowMs, now = Date.now()) {
+  if (supabaseApi.enabled()) {
+    const hits = supabaseApi.bumpRateLimit(`quick:${key}`, Math.max(1, Math.round(windowMs / 1000)));
+    return hits <= limit;
+  }
   const recent = (buckets.get(key) || []).filter(stamp => now - stamp < windowMs);
   if (recent.length >= limit) {
     buckets.set(key, recent);

@@ -6,7 +6,8 @@ const { logError } = require('./logger');
 const config = require('../config');
 const dataStore = require('./dataStore');
 const { isFranchiseAdmin } = require('./storeScope');
-const { readDeviceClaims, deviceRecordMatches } = require('./tokenAuth');
+const { readDeviceClaims, deviceRecordMatches, hashValue } = require('./tokenAuth');
+const supabaseApi = require('./supabaseApi');
 
 const USERS_FILE = dataStore.paths.users;
 
@@ -99,6 +100,14 @@ function findUserByDeviceToken(token) {
   const user = users.find(entry => String(entry.email || '').trim().toLowerCase() === claims.email);
   if (!user) return null;
   if (claims.uid != null && user.id != null && String(claims.uid) !== String(user.id)) return null;
+  if (supabaseApi.enabled()) {
+    const session = supabaseApi.getSession(hashValue(token));
+    if (!session || session.revoked) return null;
+    if (Date.parse(session.expires_at) <= Date.now()) return null;
+    if (String(session.email || '').toLowerCase() !== claims.email) return null;
+    if (session.jti !== claims.jti) return null;
+    return user;
+  }
   const match = (user.trustedDevices || []).some(device => deviceRecordMatches(device, token, claims));
   return match ? user : null;
 }
@@ -109,6 +118,13 @@ function updateDeviceActivity(token, ip) {
   const users = getUsers();
   const userIndex = users.findIndex(entry => String(entry.email || '').trim().toLowerCase() === claims.email);
   if (userIndex < 0) return null;
+  if (supabaseApi.enabled()) {
+    const session = supabaseApi.getSession(hashValue(token));
+    if (!session || session.revoked || session.jti !== claims.jti) return null;
+    if (Date.parse(session.expires_at) <= Date.now()) return null;
+    supabaseApi.touchSession(hashValue(token), ip);
+    return users[userIndex];
+  }
   const device = users[userIndex].trustedDevices.find(entry => deviceRecordMatches(entry, token, claims));
   if (!device) return null;
 
@@ -205,9 +221,23 @@ function deviceAuth(req, res, next) {
 }
 
 // ─── Rate limiter ──────────────────────
+function sharedRateStore(prefix, windowMs) {
+  return {
+    init() {},
+    async increment(key) {
+      const hits = supabaseApi.bumpRateLimit(`${prefix}:${key}`, Math.max(1, Math.round(windowMs / 1000)));
+      return { totalHits: hits, resetTime: new Date(Date.now() + windowMs) };
+    },
+    async decrement() {},
+    async resetKey() {}
+  };
+}
+
+const globalWindowMs = 15 * 60 * 1000;
 const rateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: globalWindowMs,
   max: 100,
+  ...(supabaseApi.enabled() ? { store: sharedRateStore('global', globalWindowMs) } : {}),
   message: 'Too many requests. Slow down.',
   handler: (req, res) => {
     logError(`RATE LIMIT HIT: ${req.ip}`);
@@ -219,9 +249,11 @@ const rateLimiter = rateLimit({
 // reset, vault OTP). Applied to EVERY source IP — including localhost — so a
 // local process cannot hammer these flows unchecked. Kept separate from the
 // global limiter so the dashboard's frequent status polling is never throttled.
+const authWindowMs = 15 * 60 * 1000;
 const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: authWindowMs,
   limit: 20,
+  ...(supabaseApi.enabled() ? { store: sharedRateStore('auth', authWindowMs) } : {}),
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
@@ -236,9 +268,11 @@ const authRateLimiter = rateLimit({
 // CPU. 60 requests per minute per IP is generous for an uptime monitor while
 // still bounding floods. Kept separate from the global limiter so the
 // dashboard's /status polling is unaffected.
+const healthWindowMs = 60 * 1000;
 const healthRateLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: healthWindowMs,
   limit: 60,
+  ...(supabaseApi.enabled() ? { store: sharedRateStore('health', healthWindowMs) } : {}),
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {

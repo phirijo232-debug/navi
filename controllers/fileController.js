@@ -5,6 +5,7 @@ const { findUserByDeviceToken } = require('../middleware/security');
 const { canAccessRecord, isAdminRole } = require('../middleware/storeScope');
 const { logError } = require('../middleware/logger');
 const { verifyUploadSig, signUploadQuery, TTL_SECONDS } = require('../middleware/signedUrl');
+const supabaseApi = require('../middleware/supabaseApi');
 const dataStore = require('../middleware/dataStore');
 
 const UPLOAD_DIR = path.join(__dirname, '../public/uploads');
@@ -74,7 +75,8 @@ function serveFile(req, res) {
       return res.status(400).send('Invalid file.');
     }
     const abs = path.join(UPLOAD_DIR, filename);
-    if (!abs.startsWith(UPLOAD_DIR + path.sep) || !fs.existsSync(abs)) {
+    const inBucket = supabaseApi.enabled();
+    if (!inBucket && (!abs.startsWith(UPLOAD_DIR + path.sep) || !fs.existsSync(abs))) {
       return res.status(404).send('Not found.');
     }
     // Raw ?token= device tokens are rejected — the session must never travel in
@@ -93,6 +95,7 @@ function serveFile(req, res) {
       }
       res.set('Cache-Control', 'private, no-store');
       res.set('Referrer-Policy', 'no-referrer');
+      if (inBucket) return res.redirect(supabaseApi.createSignedUrl(filename, 60));
       return res.sendFile(abs);
     }
     const user = resolveAuthUser(req);
@@ -102,6 +105,7 @@ function serveFile(req, res) {
     }
     res.set('Cache-Control', 'private, no-store');
     res.set('Referrer-Policy', 'no-referrer');
+    if (inBucket) return res.redirect(supabaseApi.createSignedUrl(filename, 60));
     return res.sendFile(abs);
   } catch (err) {
     logError(`FILE SERVE FAILED: ${err.message}`);

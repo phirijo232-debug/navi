@@ -213,6 +213,7 @@ app.use((req, res, next) => {
   });
   next();
 });
+app.use('/api/cron', require('./routes/cron'));
 app.use(deviceAuth);
 app.use(premiumPrivacy);
 app.use(logAccess);
@@ -246,26 +247,29 @@ app.use((req, res) => {
 // the same user-facing 500. Registered last so it only catches unhandled errors.
 app.use(errorAudit);
 
-const startupRepairs = ensureDataIntegrity();
-if (startupRepairs.length) {
-  console.warn(`Navi Server data repair: ${startupRepairs.join('; ')}`);
+const supabaseStorage = String(process.env.STORAGE || '').trim().toLowerCase() === 'supabase';
+if (!supabaseStorage) {
+  const startupRepairs = ensureDataIntegrity();
+  if (startupRepairs.length) {
+    console.warn(`Navi Server data repair: ${startupRepairs.join('; ')}`);
+  }
+
+  const startupProblems = validateStartup();
+  if (startupProblems.length) {
+    console.error(`Navi Server startup validation FAILED: ${startupProblems.length} problem(s) found.`);
+    startupProblems.forEach(p => console.error(`  - ${p}`));
+    console.error('Server will not start until data files are repaired.');
+    process.exit(1);
+  }
 }
 
-const startupProblems = validateStartup();
-if (startupProblems.length) {
-  console.error(`Navi Server startup validation FAILED: ${startupProblems.length} problem(s) found.`);
-  startupProblems.forEach(p => console.error(`  - ${p}`));
-  console.error('Server will not start until data files are repaired.');
-  process.exit(1);
-}
-
-app.listen(config.PORT, config.HOST, () => {
+if (require.main === module) app.listen(config.PORT, config.HOST, () => {
   console.log(`Navi Server running on port ${config.PORT}`);
   auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.SERVER_STARTED, actor: 'system', detail: { port: config.PORT } });
   const mode = typeof getServerMode === 'function' ? getServerMode() : 'private';
   console.log(`[server-mode] started in ${mode.toUpperCase()} mode`);
 
-  startScheduler();
+  if (!process.env.VERCEL) startScheduler();
 
   // Keep-alive self-ping every 10 minutes
   cron.schedule('*/10 * * * *', () => {
@@ -289,3 +293,5 @@ app.listen(config.PORT, config.HOST, () => {
   // Retry any alerts queued during a prior SMTP outage
   replayPendingAlerts().catch(() => {});
 });
+
+module.exports = app;
