@@ -30,6 +30,15 @@
   --danger: var(--error);
 }
 
+.qs-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.pool-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 800px) { .pool-grid { grid-template-columns: repeat(3, 1fr); } }
+.pool-card { border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 16px; }
+.pool-card h2 { font-size: 16px; margin: 0 0 8px; }
+.pool-value { font-size: 28px; font-weight: 700; }
+.pool-card input, .pool-card button { min-height: 44px; font-size: 16px; width: 100%; margin-top: 8px; }
+.pool-help { font-size: 13px; color: var(--muted); line-height: 1.45; }
+
 html, body {
   width: 100%;
   min-height: 100vh;

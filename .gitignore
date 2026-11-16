@@ -10,6 +10,8 @@ data/navi.db-shm
 data/navi.db-wal
 data/health.json
 node_modules
+*.bak
+*.tmp
 
 # ─── Runtime artifacts — never commit (customer data / PII) ───
 # Logs are written at runtime by middleware/logger.js
@@ -18,4 +20,9 @@ logs/
 data/*.json
 # Uploaded KYC / proof-of-payment / collateral images (customer PII)
 public/uploads/
+
+# Scratch dumps from debugging. Not part of the app.
+/*.txt
+/tmp/
+/tools/
 

@@ -18,6 +18,22 @@ const transporter = nodemailer.createTransport({
 // HEART: in-memory OTP store, scoped by email and purpose so different flows do not collide
 const OTP_NAMESPACE = '__global_otp__';
 const otpStore = {};
+// Plain codes live only long enough to email a resend. The store itself keeps a hash.
+const issuedPlain = new Map();
+
+function hashOtp(code) {
+  return crypto.createHash('sha256').update(String(code)).digest('hex');
+}
+
+function otpMatches(input, codeHash) {
+  const presented = Buffer.from(hashOtp(input));
+  const stored = Buffer.from(String(codeHash || ''));
+  if (presented.length !== stored.length) {
+    crypto.timingSafeEqual(presented, presented);
+    return false;
+  }
+  return crypto.timingSafeEqual(presented, stored);
+}
 
 function normalizeEmailAddress(targetEmail = null) {
   if (typeof targetEmail !== 'string') return null;
@@ -58,6 +74,7 @@ function cleanupExpiredOtps() {
   Object.keys(otpStore).forEach((key) => {
     if (otpStore[key].expiry <= now) {
       delete otpStore[key];
+      issuedPlain.delete(key);
     }
   });
 }
@@ -68,21 +85,22 @@ function generateOTP(key, forceNew = false) {
 
   const normalizedKey = buildOtpKey(key);
   const active = otpStore[normalizedKey];
-  if (!forceNew && active && active.expiry > Date.now()) {
-    return active.code;
+  if (!forceNew && active && active.expiry > Date.now() && issuedPlain.has(normalizedKey)) {
+    return issuedPlain.get(normalizedKey);
   }
 
   let otp;
-  const existingCodes = new Set(Object.values(otpStore).map(entry => entry.code));
+  const existingHashes = new Set(Object.values(otpStore).map(entry => entry.codeHash));
   do {
     otp = crypto.randomInt(100000, 1000000).toString();
-  } while (!forceNew && existingCodes.has(otp));
+  } while (!forceNew && existingHashes.has(hashOtp(otp)));
 
   otpStore[normalizedKey] = {
-    code: otp,
+    codeHash: hashOtp(otp),
     expiry: Date.now() + 300000,
     createdAt: new Date().toISOString()
   };
+  issuedPlain.set(normalizedKey, otp);
 
   return otp;
 }
@@ -108,6 +126,7 @@ async function sendOTP(purpose = 'Account Verification', targetEmail = null, for
     return otp;
   } catch (error) {
     delete otpStore[key];
+    issuedPlain.delete(key);
     throw error;
   }
 }
@@ -118,14 +137,16 @@ function verifyOTP(input, targetEmail = null, purpose = null) {
 
   if (!record || Date.now() > record.expiry) {
     delete otpStore[key];
+    issuedPlain.delete(key);
     return { valid: false, message: 'OTP expired or not generated.' };
   }
 
-  if (input !== record.code) {
+  if (!otpMatches(input, record.codeHash)) {
     return { valid: false, message: 'Incorrect OTP.' };
   }
 
   delete otpStore[key];
+  issuedPlain.delete(key);
   return { valid: true };
 }
 module.exports = { sendOTP, verifyOTP, generateOTP, buildOtpKey, cleanupExpiredOtps };

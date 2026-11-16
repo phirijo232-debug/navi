@@ -1,30 +1,27 @@
 'use strict';
 
 // SHAPE_POLICY defines validation bounds and fixed structural values only.
-// It is NEVER used as a fallback for missing rates — if no rates have been
-// saved by the admin, the system must surface an error, not silently serve
-// these numbers. All rate values must come from loanInterestPolicy.json.
+// Official BMF week rates are the checked default when loanInterestPolicy.json
+// has no saved rates for the store. A saved policy that fails the checks is
+// rejected by normalizePolicy — it is never quietly repaired into these numbers.
 const SHAPE_POLICY = Object.freeze({
   extensionBaselineOneWeekRatePercent: 10,
   minTermDays: 7,
   maxTermDays: 153
 });
 
-// Kept for external consumers that import DEFAULT_POLICY by name.
-// Contains only the structural (non-rate) fields — never use its rate values.
 const DEFAULT_POLICY = Object.freeze({
-  weeklyRates: Object.freeze({ 1: 0, 2: 0, 3: 0, 4: 0 }), // zeroed — never fall back to these
-  extensionDailyRatePercent: 0,
+  weeklyRates: Object.freeze({ 1: 10, 2: 16, 3: 24, 4: 32 }),
+  extensionDailyRatePercent: 0.1,
   extensionBaselineOneWeekRatePercent: SHAPE_POLICY.extensionBaselineOneWeekRatePercent,
   minTermDays: SHAPE_POLICY.minTermDays,
   maxTermDays: SHAPE_POLICY.maxTermDays
 });
 
 function getDefaultPolicy() {
-  // Returns structural shape only. Callers must not use this for loan calculations.
   return {
-    weeklyRates: { 1: null, 2: null, 3: null, 4: null },
-    extensionDailyRatePercent: null,
+    weeklyRates: { ...DEFAULT_POLICY.weeklyRates },
+    extensionDailyRatePercent: DEFAULT_POLICY.extensionDailyRatePercent,
     extensionBaselineOneWeekRatePercent: SHAPE_POLICY.extensionBaselineOneWeekRatePercent,
     minTermDays: SHAPE_POLICY.minTermDays,
     maxTermDays: SHAPE_POLICY.maxTermDays

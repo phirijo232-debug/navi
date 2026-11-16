@@ -1,6 +1,7 @@
 const { logError } = require('../middleware/logger');
 const { isAdminRole } = require('../middleware/storeScope');
-const { findUserByDeviceToken } = require('../middleware/security');
+const dataStore = require('../middleware/dataStore');
+const { hashValue, readDeviceClaims } = require('../middleware/tokenAuth');
 
 const activeSessions = {};
 const failureTracker = {};
@@ -40,14 +41,18 @@ function trackSession(req, res, next) {
   try {
     const token = req.headers['x-device-token'];
     const ip = req.ip;
-    if (token) {
+    const claims = token ? readDeviceClaims(token) : null;
+    if (claims) {
+      const sessionId = hashValue(token);
       const sameIpEntries = Object.entries(activeSessions)
-        .filter(([entryToken, session]) => entryToken !== token && session.ip === ip);
+        .filter(([entryId, session]) => entryId !== sessionId && session.ip === ip);
 
-      sameIpEntries.forEach(([entryToken]) => delete activeSessions[entryToken]);
+      sameIpEntries.forEach(([entryId]) => delete activeSessions[entryId]);
 
-      activeSessions[token] = {
+      activeSessions[sessionId] = {
         ip,
+        email: claims.email,
+        tail: String(token).slice(-4),
         lastSeen: new Date().toISOString()
       };
     }
@@ -79,8 +84,9 @@ const getActiveSessions = circuitBreaker('getActiveSessions', async (req, res) =
   const isFullAdmin = callerRole === 'admin' || callerRole === 'franchise_admin';
 
   const sessions = [];
-  for (const [token, session] of Object.entries(activeSessions)) {
-    const user = findUserByDeviceToken(token);
+  const users = dataStore.readJson(dataStore.paths.users, [], Array.isArray);
+  for (const [, session] of Object.entries(activeSessions)) {
+    const user = users.find(entry => String(entry.email || '').trim().toLowerCase() === String(session.email || '').toLowerCase()) || null;
     const userStore = user?.storeId || null;
     const userRole = user?.role || null;
 
@@ -93,7 +99,7 @@ const getActiveSessions = circuitBreaker('getActiveSessions', async (req, res) =
     sessions.push({
       // Opaque id — only the last 4 characters survive; the full token is
       // never echoed back to any caller.
-      id: `…${String(token).slice(-4)}`,
+      id: `…${String(session.tail || '').slice(-4)}`,
       email: user?.email || null,
       role: userRole,
       storeId: userStore,

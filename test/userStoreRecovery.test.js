@@ -116,6 +116,10 @@ test('requestSignup requires a valid NRC number', async () => {
 });
 
 test('admin can fetch the user directory with account summaries', async () => {
+  const fs = require('node:fs');
+  const usersFile = require('../middleware/dataStore').paths.users;
+  const original = fs.existsSync(usersFile) ? fs.readFileSync(usersFile, 'utf8') : null;
+  fs.writeFileSync(usersFile, JSON.stringify([{ id: 1, email: 'directory@example.test', role: 'user', password: 'hash', trustedDevices: [] }]));
   const req = {
     authUser: { role: 'admin' },
     headers: {},
@@ -141,4 +145,6 @@ test('admin can fetch the user directory with account summaries', async () => {
   assert.ok(Array.isArray(res.body), 'directory returns a plain user array');
   assert.ok(res.body.some(user => user.email));
   assert.ok(res.body.every(user => user.password === undefined), 'passwords must never be exposed');
+  if (original === null) fs.rmSync(usersFile, { force: true });
+  else fs.writeFileSync(usersFile, original);
 });

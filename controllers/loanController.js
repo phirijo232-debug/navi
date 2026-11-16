@@ -22,7 +22,12 @@ function readLoanInterestPolicies() {
 
 function getStoreLoanInterestPolicy(storeId) {
   const policies = readLoanInterestPolicies();
-  return loanTerms.normalizePolicy(policies[String(storeId || config.DEFAULT_STORE_ID).toLowerCase()]);
+  const key = String(storeId || config.DEFAULT_STORE_ID).toLowerCase();
+  const saved = policies[key];
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) {
+    return loanTerms.normalizePolicy(loanTerms.getDefaultPolicy());
+  }
+  return loanTerms.normalizePolicy(saved);
 }
 
 function resolvePolicyStore(req, res) {
@@ -65,10 +70,6 @@ function getLoanInterestPolicy(req, res) {
 function getPublicLoanRates(req, res) {
   try {
     const storeId = config.DEFAULT_STORE_ID || 'buraza';
-    const policies = readLoanInterestPolicies();
-    if (!policies[storeId]) {
-      return res.status(503).json({ error: 'Loan rates have not been configured yet. Please contact BMF.' });
-    }
     const policy = getStoreLoanInterestPolicy(storeId);
     return res.json({
       weeklyRates: policy.weeklyRates,
@@ -449,24 +450,28 @@ function deriveLoanStatus(loan, today = getZambiaDateKey()) {
   if (outstanding <= 0) return 'paid';
 
   // Manual "verify overdue" is a durable admin decision — the clock must not undo it.
-  if (stored === 'defaulted' && loan.verifiedOverdueAt) return 'defaulted';
+  const raw = String(loan.status || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (raw === 'defaulted' && loan.verifiedOverdueAt) return 'defaulted';
+
+  // An agreed grace window ends on graceUntil. The day after, the loan is defaulted.
+  const agreedGraceUntil = String(loan.graceUntil || '').slice(0, 10);
+  if (raw === 'grace' && /^\d{4}-\d{2}-\d{2}$/.test(agreedGraceUntil)) {
+    return today <= agreedGraceUntil ? 'grace' : 'defaulted';
+  }
+
+  // Admin-set grace or defaulted (the stored word, not the legacy alias "overdue").
+  if (raw === 'grace') return 'grace';
+  if (raw === 'defaulted') return 'defaulted';
 
   const dueDate = String(loan.dueDate || '').slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return stored === 'paid' ? 'paid' : 'active';
 
-  // If admin explicitly set grace or defaulted, honour that — it overrides the clock.
-  if (stored === 'grace' || stored === 'defaulted') return stored;
-
-  // An agreed manual grace window (admin set graceUntil) also wins over the clock.
-  const agreedGraceUntil = String(loan.graceUntil || '').slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(agreedGraceUntil)) {
-    return today <= agreedGraceUntil ? 'grace' : 'defaulted';
-  }
-
-  // Clock-based status: overdue only — never auto-promote to grace or defaulted.
-  // Admin must manually move a loan to grace before penalty accrual starts.
+  // Clock: grace within GRACE_PERIOD_DAYS of the due date, defaulted the day after.
+  // The stored word "overdue" is not rewritten here and is not treated as grace.
   const daysToDue = daysBetween(today, dueDate);
-  if (daysToDue < 0) return 'overdue';
+  const graceDays = Number(config.GRACE_PERIOD_DAYS) || 3;
+  if (daysToDue < 0) return 'defaulted';
+  if (daysToDue <= graceDays) return 'grace';
   return 'active';
 }
 
@@ -501,10 +506,11 @@ function applyGraceAccrual(loan, today = getZambiaDateKey()) {
     if (!loan || Number(loan.outstanding || 0) <= 0) return loan;
     if (normalizeStatus(loan.status) === 'liquidated') return loan;
 
-    // Only accrue on loans the admin has explicitly moved to grace or defaulted.
-    // Overdue loans do NOT auto-accrue — admin must manually set status to grace first.
-    const stored = normalizeStatus(loan.status);
-    if (stored !== 'grace' && stored !== 'defaulted') return loan;
+    // Accrue only when the loan is actually in grace or defaulted (including
+    // the clock and an agreed graceUntil). A stored status of "overdue" does
+    // not by itself start the penalty.
+    const live = deriveLoanStatus(loan, today);
+    if (live !== 'grace' && live !== 'defaulted') return loan;
 
     const rate = Number(loan.graceDailyRate) > 0 ? Number(loan.graceDailyRate) : GRACE_DAILY_RATE;
 
@@ -872,10 +878,11 @@ function formatCurrency(value) {
   return `K ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function calculateInterest(amount, tenureWeeks) {
+function calculateInterest(amount, tenureWeeks, storeId) {
   const weeks = Number.parseInt(tenureWeeks, 10);
   if (![1, 2, 3, 4].includes(weeks)) throw new RangeError('Tenure must be between 1 and 4 weeks.');
-  return loanTerms.calculateInterestForDays(amount, weeks * 7, loanTerms.getDefaultPolicy());
+  const policy = getStoreLoanInterestPolicy(storeId || config.DEFAULT_STORE_ID);
+  return loanTerms.calculateInterestForDays(amount, weeks * 7, policy);
 }
 
 function getApprovalDeadline(urgency) {
@@ -1218,6 +1225,11 @@ async function updateLoanStatus(req, res) {
     const previousStatus = loan.status;
 
     if (['approve', 'approved'].includes(normalizedAction) && isAdmin) {
+      const tenureWeeks = Number(req.body.tenureWeeks || loan.tenureWeeks);
+      const tenureDays = Number(req.body.tenureDays || loan.tenureDays) || tenureWeeks * 7;
+      if (!tenureWeeks || tenureWeeks < 1 || tenureWeeks > 4) {
+        return res.status(400).json({ error: 'Invalid tenure. Choose 1 to 4 weeks.' });
+      }
       // Canonical status is 'active' — 'approved' is a legacy value that only
       // exists in LEGACY_STATUS_MAP for old records (AGENTS.md canonical list).
       loan.status = 'active';
@@ -1226,13 +1238,6 @@ async function updateLoanStatus(req, res) {
       loan.approvedAt = approvedAt.toISOString();
       // Borrowed date IS the approval date (BMF loan contract rule).
       loan.borrowedDate = getZambiaDateKey(approvedAt);
-      // FIX: read tenure as Number, default to 1 week only if truly missing;
-      // never silently fall back to 1 when the body sent 0, null, or an invalid string.
-      const tenureWeeks = Number(req.body.tenureWeeks);
-      const tenureDays  = Number(req.body.tenureDays) || tenureWeeks * 7;
-      if (!tenureWeeks || tenureWeeks < 1 || tenureWeeks > 4) {
-        return res.status(400).json({ error: 'Invalid tenure. Choose 1 to 4 weeks.' });
-      }
       loan.dueDate = tenureDays
         ? calculateDueDateFromApprovalDays(approvedAt, tenureDays)
         : calculateDueDateFromApproval(approvedAt, tenureWeeks);

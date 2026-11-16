@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { issueDeviceToken, hashValue } = require('../middleware/tokenAuth');
 const bcrypt = require('bcryptjs');
 const { logError, logHr, logBreakage } = require('../middleware/logger');
 const dataStore = require('../middleware/dataStore');
@@ -238,7 +239,11 @@ function normalizeTrustedDevices(user) {
       return;
     }
 
-    const token = device.token;
+    if (device.token && !device.tokenHash) {
+      device.tokenHash = hashValue(device.token);
+      delete device.token;
+    }
+    const token = device.tokenHash || device.jti;
     const ip = device.ip || 'unknown';
 
     if (token && !uniqueByToken.has(token)) {
@@ -254,12 +259,14 @@ function normalizeTrustedDevices(user) {
   });
 
   const deduped = [...new Map(
-    [...uniqueByToken.values()].map((device) => [device.token || `${device.ip}-${device.createdAt || Date.now()}`, device])
+    [...uniqueByToken.values()].map((device) => [device.tokenHash || device.jti || `${device.ip}-${device.createdAt || Date.now()}`, device])
   ).values()];
 
   const preferredDevices = deduped.filter((device) => {
     const ip = device.ip || 'unknown';
-    return !uniqueByIp.has(ip) || uniqueByIp.get(ip).token === device.token;
+    const id = device.tokenHash || device.jti;
+    const kept = uniqueByIp.get(ip);
+    return !uniqueByIp.has(ip) || (kept.tokenHash || kept.jti) === id;
   });
 
   const normalized = preferredDevices
@@ -366,11 +373,15 @@ async function requestSignup(req, res) {
 
     const users = getUsers();
     const exists = users.find(u => u.email === email);
-    if (exists) {
+    if (exists && exists.password) {
       return res.status(400).json({ error: 'Email already registered.' });
     }
 
-    pendingSignups[email] = { username, email, password, phone: normalizedPhone, nrc: nrc ? String(nrc).trim() : null, inviteToken, createdAt: Date.now() };
+    pendingSignups[email] = {
+      username, email, password, phone: normalizedPhone, nrc: nrc ? String(nrc).trim() : null, inviteToken,
+      existingUserId: exists ? exists.id : null,
+      createdAt: Date.now()
+    };
     await otpService.sendOTP('Account Signup Verification', email, false);
     res.json({ message: 'OTP sent to your email. Please verify to complete signup.' });
 
@@ -402,23 +413,35 @@ async function confirmSignup(req, res) {
 
     const users = getUsers();
     const hashedPassword = await bcrypt.hash(pending.password, 10);
-    const userNumber = users.length + 1;
-    const tokens = generateUserTokens(userNumber);
-
-    const newUser = {
-      id: userNumber,
-      username: pending.username,
-      email: pending.email,
-      phone: pending.phone,
-      nrc: pending.nrc || null,
-      password: hashedPassword,
-      tokens,
-      role: 'user',
-      storeId: config.DEFAULT_STORE_ID,
-      createdAt: new Date().toISOString()
-    };
-
-    users.push(newUser);
+    let newUser;
+    if (pending.existingUserId != null) {
+      const index = users.findIndex(user => user.id === pending.existingUserId || user.email === pending.email);
+      if (index < 0) {
+        return res.status(400).json({ error: 'Unable to locate your account.' });
+      }
+      users[index].username = pending.username || users[index].username;
+      users[index].phone = pending.phone || users[index].phone;
+      users[index].nrc = pending.nrc || users[index].nrc || null;
+      users[index].password = hashedPassword;
+      users[index].passwordSetAt = new Date().toISOString();
+      newUser = users[index];
+    } else {
+      const userNumber = users.length + 1;
+      const tokens = generateUserTokens(userNumber);
+      newUser = {
+        id: userNumber,
+        username: pending.username,
+        email: pending.email,
+        phone: pending.phone,
+        nrc: pending.nrc || null,
+        password: hashedPassword,
+        tokens,
+        role: 'user',
+        storeId: config.DEFAULT_STORE_ID,
+        createdAt: new Date().toISOString()
+      };
+      users.push(newUser);
+    }
     saveUsers(users);
     delete pendingSignups[email];
 
@@ -493,6 +516,11 @@ async function requestLogin(req, res) {
       return res.status(400).json({ error: 'Invalid email or password.' });
     }
 
+    if (!user.password) {
+      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN_FAILED, actor: normalizeEmail(email), targetId: user.id, ip: req.ip, detail: { reason: 'Password not set' } });
+      return res.status(400).json({ error: 'Invalid email or password.' });
+    }
+
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
       auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN_FAILED, actor: normalizeEmail(email), targetId: user.id, ip: req.ip, detail: { reason: 'Invalid credentials' } });
@@ -530,9 +558,8 @@ async function requestLogin(req, res) {
 }
 
 function getUserByDeviceToken(token) {
-  if (!token) return null;
-  const users = getUsers();
-  return users.find(u => u.trustedDevices?.some(device => device.token === token));
+  const { findUserByDeviceToken } = require('../middleware/security');
+  return findUserByDeviceToken(token);
 }
 
 async function confirmLogin(req, res) {
@@ -563,19 +590,20 @@ async function confirmLogin(req, res) {
 
     const normalizedUser = normalizeTrustedDevices(users[userIndex]);
     const existingDevice = normalizedUser.trustedDevices.find(device => device.ip === req.ip);
-    const deviceToken = existingDevice?.token || generateDeviceToken();
+    const issued = issueDeviceToken({ userId: normalizedUser.id, email: normalizedUser.email });
+    const deviceToken = issued.token;
+    const deviceRecord = {
+      ...issued.record,
+      createdAt: existingDevice?.createdAt || now,
+      lastSeen: now,
+      ip: req.ip
+    };
 
     if (existingDevice) {
-      existingDevice.lastSeen = now;
-      existingDevice.ip = req.ip;
-      existingDevice.createdAt = existingDevice.createdAt || now;
+      Object.assign(existingDevice, deviceRecord);
+      delete existingDevice.token;
     } else {
-      normalizedUser.trustedDevices.push({
-        token: deviceToken,
-        createdAt: now,
-        lastSeen: now,
-        ip: req.ip
-      });
+      normalizedUser.trustedDevices.push(deviceRecord);
     }
 
     normalizedUser.trustedDevices = normalizeTrustedDevices({ ...normalizedUser }).trustedDevices;
@@ -1105,4 +1133,9 @@ function verifyStoreSwitch(req, res) {
   }
 }
 
-module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError, sweepExpiredAuth, cleanupExpiredInvites, buildPublicLink };
+function issueSignupInvite(email, req) {
+  const inviteToken = generateInviteToken(email);
+  return { inviteToken, signupUrl: buildSignupUrl(req || {}, inviteToken) };
+}
+
+module.exports = { requestSignup, confirmSignup, resendOTP, requestLogin, confirmLogin, requestPasswordReset, confirmPasswordReset, createInvite, createAdminUser, validateInvite, getAllUsers, sendAdminAnnouncement, listInvites, listEmployees, editEmployee, setEmployeeRestriction, requestStoreSwitch, verifyStoreSwitch, classifyMailError, sweepExpiredAuth, cleanupExpiredInvites, buildPublicLink, issueSignupInvite };

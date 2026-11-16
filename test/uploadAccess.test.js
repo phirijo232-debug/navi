@@ -97,18 +97,14 @@ function mockRes() {
 }
 
 test('signed upload URLs: valid verifies, expired/tampered/wrong-file fail', () => {
-  const good = signUploadQuery('a.jpg');
-  assert.equal(verifyUploadSig('a.jpg', good.exp, good.sig), true);
-  // Expired (negative TTL → exp in the past; signature itself is well-formed).
-  const expired = signUploadQuery('a.jpg', -60);
-  assert.equal(verifyUploadSig('a.jpg', expired.exp, expired.sig), false);
-  // Tampered signature.
+  const good = signUploadQuery('a.jpg', undefined, { email: 'borrower@example.test' });
+  assert.equal(verifyUploadSig('a.jpg', good.exp, good.sig, good.jti, good.email), true);
+  const expired = signUploadQuery('a.jpg', -60, { email: 'borrower@example.test' });
+  assert.equal(verifyUploadSig('a.jpg', expired.exp, expired.sig, expired.jti, expired.email), false);
   const tamperedSig = `${good.sig.slice(0, -1)}${good.sig.endsWith('0') ? '1' : '0'}`;
-  assert.equal(verifyUploadSig('a.jpg', good.exp, tamperedSig), false);
-  // Signature minted for one file cannot open another.
-  assert.equal(verifyUploadSig('b.jpg', good.exp, good.sig), false);
-  // Garbage / missing inputs are denied, never thrown.
-  assert.equal(verifyUploadSig('a.jpg', 'not-a-number', good.sig), false);
+  assert.equal(verifyUploadSig('a.jpg', good.exp, tamperedSig, good.jti, good.email), false);
+  assert.equal(verifyUploadSig('b.jpg', good.exp, good.sig, good.jti, good.email), false);
+  assert.equal(verifyUploadSig('a.jpg', 'not-a-number', good.sig, good.jti, good.email), false);
   assert.equal(verifyUploadSig('a.jpg', undefined, undefined), false);
 });
 
@@ -127,16 +123,16 @@ test('serveFile opens a file via signed query, and rejects expired/tampered/toke
 
   try {
     // Valid signed link → served (no header user, no token in URL).
-    const { exp, sig } = signUploadQuery(filename);
+    const { exp, sig, jti, email } = signUploadQuery(filename, undefined, { email: 'borrower@example.test' });
     const okRes = mockRes();
-    serveFile({ params: { filename }, query: { exp, sig }, headers: {}, ip: 'test' }, okRes);
+    serveFile({ params: { filename }, query: { exp, sig, jti, u: email }, headers: {}, ip: 'test' }, okRes);
     assert.equal(okRes.statusCode, 200);
     assert.equal(okRes.sentFile, abs);
 
     // Expired link → 403.
-    const expired = signUploadQuery(filename, -60);
+    const expired = signUploadQuery(filename, -60, { email: 'borrower@example.test' });
     const expiredRes = mockRes();
-    serveFile({ params: { filename }, query: { exp: expired.exp, sig: expired.sig }, headers: {}, ip: 'test' }, expiredRes);
+    serveFile({ params: { filename }, query: { exp: expired.exp, sig: expired.sig, jti: expired.jti, u: expired.email }, headers: {}, ip: 'test' }, expiredRes);
     assert.equal(expiredRes.statusCode, 403);
 
     // Tampered signature → 403.
@@ -182,7 +178,7 @@ test('signUpload issues a link only to the owner / in-scope admin, never cross-u
       ownerRes
     );
     assert.equal(ownerRes.statusCode, 200);
-    assert.match(ownerRes.body.url, new RegExp(`^/uploads/${filename}\\?exp=\\d+&sig=[0-9a-f]{64}$`));
+    assert.match(ownerRes.body.url, new RegExp(`^/uploads/${filename}\\?exp=\\d+&sig=[0-9a-f]{64}&jti=`));
     assert.equal(ownerRes.body.expiresIn, 600);
 
     // Cross-user (different borrower) is refused.

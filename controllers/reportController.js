@@ -422,7 +422,7 @@ function getProfitAnalytics(req, res) {
 function getDefaulterAnalytics(req, res) {
   const scope = analyticsScope(req);
   if (!isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required for this report scope.' });
-  const defaulted = getAnalyticsLoans(scope).filter(loan => loan.businessStatus === 'defaulted');
+  const defaulted = getAnalyticsLoans(scope).filter(loan => loan.businessStatus === 'defaulted' || loan.businessStatus === 'overdue');
 
   const byCustomer = new Map();
   defaulted.forEach(loan => {
@@ -452,7 +452,7 @@ function getOverdueAnalytics(req, res) {
   const scope = analyticsScope(req);
   if (!isAuthorized(req, scope)) return res.status(403).json({ error: 'Admin access required for this report scope.' });
   const overdue = getAnalyticsLoans(scope).filter(loan =>
-    ['grace', 'defaulted'].includes(loan.businessStatus) && Number(loan.outstanding || 0) > 0);
+    ['grace', 'defaulted', 'overdue'].includes(loan.businessStatus) && Number(loan.outstanding || 0) > 0);
 
   return res.json({
     scope,
@@ -1102,9 +1102,9 @@ function getAnalyticsReport(req, res) {
   if (!canAccessStore(req, scope)) return res.status(403).json({ error: 'Access to this store is not allowed.' });
 
   const enriched = getEnrichedLoans().filter(loan => scope === 'all' || getRecordStoreId(loan) === scope);
-  const isOverdue = loan => ['grace', 'defaulted'].includes(loan.businessStatus);
+  const isOverdue = loan => ['grace', 'defaulted', 'overdue'].includes(loan.businessStatus);
   const isPaid = loan => loan.businessStatus === 'paid';
-  const isDefaulted = loan => loan.businessStatus === 'defaulted';
+  const isDefaulted = loan => loan.businessStatus === 'defaulted' || loan.businessStatus === 'overdue';
   const isActive = loan => !['paid', 'declined'].includes(loan.businessStatus);
 
   const totalProfitEarned = Number(enriched.reduce((sum, loan) => sum + interestPaidOf(loan), 0).toFixed(2));

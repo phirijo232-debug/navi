@@ -283,8 +283,8 @@
   <div class="qs-wrap">
     <div class="qs-header">
       <div class="brand">PrymeBMF</div>
-      <h1>Quick Screen</h1>
-      <p>Start your loan application in minutes. Fill in your details and we'll get back to you within 48 hours.</p>
+      <h1>Student Quick Loan</h1>
+      <p>No account needed. Tell us who you are, your school, and what the money is for. A loan officer reviews it before any account or loan is created.</p>
     </div>
 
     <div class="qs-card">
@@ -320,9 +320,26 @@
 
         <div class="two-up">
           <div class="field">
-            <label for="qsPurpose">Loan purpose <span class="req">*</span></label>
-            <input type="text" id="qsPurpose" name="product" class="qs-input" placeholder="e.g. Business stock" required>
+            <label for="qsSchool">School <span class="req">*</span></label>
+            <input type="text" id="qsSchool" name="school" class="qs-input" placeholder="e.g. University of Zambia" required>
           </div>
+          <div class="field">
+            <label for="qsStudentId">Student ID number <span class="req">*</span></label>
+            <input type="text" id="qsStudentId" name="studentId" class="qs-input" placeholder="e.g. 202612345" required>
+          </div>
+        </div>
+
+        <div class="two-up">
+          <div class="field">
+            <label for="qsProduct">Loan product</label>
+            <input type="text" id="qsProduct" name="loanProduct" class="qs-input" value="Student Quick Loan" readonly>
+          </div>
+          <div class="field">
+            <label for="qsPurpose">What the money is for <span class="req">*</span></label>
+            <input type="text" id="qsPurpose" name="purpose" class="qs-input" placeholder="e.g. School fees" required>
+          </div>
+        </div>
+        <div class="two-up">
           <div class="field">
             <label for="qsAmount">Amount requested (K) <span class="req">*</span></label>
             <input type="number" id="qsAmount" name="amount" class="qs-input" placeholder="e.g. 5000" min="1" step="any" required>
@@ -388,7 +405,7 @@
 
         <!-- ── Documents ── -->
         <div class="section-divider">Documents</div>
-        <p style="font-size:13px; color:#8b949e; margin-bottom:14px; line-height:1.5">Upload clear images of your NRC (both sides) and collateral photos (both sides). All four images are required. JPG / PNG / WEBP, max 5 MB each.</p>
+        <p style="font-size:13px; color:#8b949e; margin-bottom:14px; line-height:1.5">NRC (both sides) and your student ID photo are required. Collateral photos are optional. JPEG, PNG, or WEBP, max 5 MB each.</p>
 
         <div class="upload-grid">
           <div class="upload-box" id="boxNrcFront">
@@ -405,18 +422,25 @@
             <div class="u-hint">Required</div>
             <div class="u-check">✓ Attached</div>
           </div>
-          <div class="upload-box" id="boxColFront">
-            <input type="file" id="qsColFront" name="collateralFront" accept="image/*" required>
-            <div class="u-icon">📦</div>
-            <div class="u-label">Collateral Front</div>
+          <div class="upload-box" id="boxStudentId">
+            <input type="file" id="qsStudentIdPhoto" name="studentIdPhoto" accept="image/jpeg,image/png,image/webp" required>
+            <div class="u-icon">🎓</div>
+            <div class="u-label">Student ID</div>
             <div class="u-hint">Required</div>
             <div class="u-check">✓ Attached</div>
           </div>
+          <div class="upload-box" id="boxColFront">
+            <input type="file" id="qsColFront" name="collateralFront" accept="image/jpeg,image/png,image/webp">
+            <div class="u-icon">📦</div>
+            <div class="u-label">Collateral Front</div>
+            <div class="u-hint">Optional</div>
+            <div class="u-check">✓ Attached</div>
+          </div>
           <div class="upload-box" id="boxColBack">
-            <input type="file" id="qsColBack" name="collateralBack" accept="image/*" required>
+            <input type="file" id="qsColBack" name="collateralBack" accept="image/jpeg,image/png,image/webp">
             <div class="u-icon">📦</div>
             <div class="u-label">Collateral Back</div>
-            <div class="u-hint">Required</div>
+            <div class="u-hint">Optional</div>
             <div class="u-check">✓ Attached</div>
           </div>
         </div>
@@ -439,6 +463,11 @@
           <span>I have read, understood, and agree to these terms and conditions.</span>
         </label>
 
+        <div id="turnstileSlot"></div>
+        <div class="qs-hp" aria-hidden="true">
+          <label for="qsCompany">Company</label>
+          <input type="text" id="qsCompany" name="company" tabindex="-1" autocomplete="off">
+        </div>
         <button type="submit" class="qs-submit" id="qsSubmitBtn">Submit Application</button>
         <p class="qs-error" id="qsError"></p>
       </form>
@@ -560,6 +589,14 @@
     });
 
     loadPublicRates(); // fetch live rates on page load
+    fetch('/api/apply/public-config').then(res => res.json()).then(cfg => {
+      if (!cfg || !cfg.turnstileSiteKey) return;
+      const script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      script.async = true;
+      script.onload = () => window.turnstile && window.turnstile.render('#turnstileSlot', { sitekey: cfg.turnstileSiteKey });
+      document.head.appendChild(script);
+    }).catch(() => {});
     updateEstimate();
 
     // ── Error helper ──────────────────────────────────────────────────────────
@@ -574,7 +611,9 @@
       const email     = document.getElementById('qsEmail').value.trim();
       const nrcNumber = document.getElementById('qsNrc').value.trim();
       const phone     = document.getElementById('qsPhone').value.trim();
-      const product   = document.getElementById('qsPurpose').value.trim();
+      const school    = document.getElementById('qsSchool').value.trim();
+      const studentId = document.getElementById('qsStudentId').value.trim();
+      const purpose   = document.getElementById('qsPurpose').value.trim();
       const amount    = document.getElementById('qsAmount').value.trim();
       const urgency   = document.getElementById('qsUrgency').value;
       const agreed    = document.getElementById('qsAgree').checked;
@@ -586,23 +625,22 @@
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showError('Please enter a valid email address.');
       if (!nrcNumber) return showError('Please enter your NRC number.');
       if (!phone)     return showError('Please enter your phone number.');
-      if (!product)   return showError('Please enter a loan purpose.');
+      if (!school)    return showError('Please enter your school.');
+      if (!studentId) return showError('Please enter your student ID number.');
+      if (!purpose)   return showError('Please say what the money is for.');
       if (!amount || Number(amount) <= 0) return showError('Please enter a valid amount.');
 
       // Fixed weeks only — no custom date on public applications.
 
+      const studentPhoto = document.getElementById('qsStudentIdPhoto').files[0];
       const colFront = document.getElementById('qsColFront').files[0];
       const colBack  = document.getElementById('qsColBack').files[0];
 
-      if (!nrcFront || !nrcBack) {
+      if (!nrcFront || !nrcBack || !studentPhoto) {
         if (!nrcFront) document.getElementById('boxNrcFront').classList.add('required-flash');
         if (!nrcBack)  document.getElementById('boxNrcBack').classList.add('required-flash');
-        return showError('Please attach both NRC front and back images.');
-      }
-      if (!colFront || !colBack) {
-        if (!colFront) document.getElementById('boxColFront').classList.add('required-flash');
-        if (!colBack)  document.getElementById('boxColBack').classList.add('required-flash');
-        return showError('Please attach both collateral front and back images.');
+        if (!studentPhoto) document.getElementById('boxStudentId').classList.add('required-flash');
+        return showError('Please attach both NRC images and your student ID photo.');
       }
       if (!agreed) return showError('Please agree to the terms and conditions before submitting.');
 
@@ -615,7 +653,10 @@
       formData.append('email',       email);
       formData.append('nrcNumber',   nrcNumber);
       formData.append('phone',       phone);
-      formData.append('product',     product);
+      formData.append('school',      school);
+      formData.append('studentId',   studentId);
+      formData.append('purpose',     purpose);
+      formData.append('loanProduct', 'Student Quick Loan');
       formData.append('amount',      amount);
       formData.append('urgency',     urgency);
       formData.append('tenureWeeks', String(weeks));
@@ -627,9 +668,11 @@
 
       formData.append('nrcFront', nrcFront);
       formData.append('nrcBack',  nrcBack);
-
-      formData.append('collateralFront', colFront);
-      formData.append('collateralBack',  colBack);
+      formData.append('studentIdPhoto', studentPhoto);
+      if (colFront) formData.append('collateralFront', colFront);
+      if (colBack) formData.append('collateralBack', colBack);
+      const turnstileToken = document.querySelector('[name="cf-turnstile-response"]')?.value;
+      if (turnstileToken) formData.append('turnstileToken', turnstileToken);
 
       const btn = document.getElementById('qsSubmitBtn');
       btn.disabled = true;

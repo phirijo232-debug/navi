@@ -20,7 +20,9 @@ const BACKUP_FILES = [
   'notifications.json',
   'dailyReportState.json',
   'invites.json',
-  'loanInterestPolicy.json'
+  'loanInterestPolicy.json',
+  'applications.json',
+  'lendingCapital.json'
 ];
 const BACKUP_ID_PATTERN = /^backup-\d{8}-\d{6}(-\d+)?$/;
 const BACKUP_NAME_PATTERN = /^backup-\d{8}-\d{6}(-\d+)?\.json$/;
