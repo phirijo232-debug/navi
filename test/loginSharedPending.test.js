@@ -69,3 +69,19 @@ test('login code from another instance completes login via the shared otps row',
     supabaseApi.setTransport(null);
   }
 });
+
+test('a code that could not be emailed is not left in the shared otps table', async () => {
+  const previous = { STORAGE: process.env.STORAGE, GMAIL_USER: process.env.GMAIL_USER, GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD };
+  process.env.STORAGE = 'supabase';
+  delete process.env.GMAIL_USER;
+  delete process.env.GMAIL_APP_PASSWORD;
+  supabaseApi.setTransport(memoryTransport());
+  try {
+    const email = 'nomail@example.test';
+    await assert.rejects(otp.sendOTP('Login Verification', email, false, email));
+    assert.equal(supabaseApi.getOtp(otp.buildOtpKey(email, 'Login Verification')), null);
+  } finally {
+    for (const [k, v] of Object.entries(previous)) { if (v == null) delete process.env[k]; else process.env[k] = v; }
+    supabaseApi.setTransport(null);
+  }
+});
