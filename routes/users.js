@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
 const path = require('path');
 const { logError } = require('../middleware/logger');
 const dataStore = require('../middleware/dataStore');
@@ -8,11 +7,10 @@ const dataStore = require('../middleware/dataStore');
 const USERS_FILE = dataStore.paths.users || path.join(dataStore.DATA_DIR, 'users.json');
 const LOANS_FILE = dataStore.paths.loans || path.join(dataStore.DATA_DIR, 'loans.json');
 
+// Read through dataStore so the Supabase copy is used on Vercel.
 function readUsers() {
   try {
-    const raw = fs.readFileSync(USERS_FILE, 'utf8');
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
+    return dataStore.readJson(USERS_FILE, [], Array.isArray);
   } catch (err) {
     logError(`READ USERS FAILED: ${err.message}`);
     return [];
@@ -25,9 +23,7 @@ function writeUsers(users) {
 
 function readLoans() {
   try {
-    const raw = fs.readFileSync(LOANS_FILE, 'utf8');
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
+    return dataStore.readJson(LOANS_FILE, [], Array.isArray);
   } catch (err) {
     logError(`READ LOANS FAILED: ${err.message}`);
     return [];
