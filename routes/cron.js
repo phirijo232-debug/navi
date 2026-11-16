@@ -2,6 +2,9 @@
 
 // Vercel calls these on a UTC clock. Lusaka is UTC+2 all year, so
 // 00:05 Lusaka = 22:05 UTC, 08:00 Lusaka = 06:00 UTC, 23:58 Lusaka = 21:58 UTC.
+// The Hobby plan only allows each cron once per day, so the cleanup runs at
+// 06:20 Lusaka instead of every hour. The same address can be called hourly
+// by an outside scheduler, or by Vercel after the project is on Pro.
 const crypto = require('crypto');
 const path = require('path');
 const dataStore = require('../middleware/dataStore');
