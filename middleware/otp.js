@@ -1,6 +1,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const crypto = require('crypto');
+const supabaseApi = require('./supabaseApi');
 const nodemailer = require('nodemailer');
 
 // HEAD: transporter configuration
@@ -70,6 +71,10 @@ function buildOtpKey(targetEmail = null, purpose = null) {
 
 // LEGS: cleanup expired entries so active codes stay unique and current
 function cleanupExpiredOtps() {
+  if (supabaseApi.enabled()) {
+    supabaseApi.deleteExpiredOtps();
+    return;
+  }
   const now = Date.now();
   Object.keys(otpStore).forEach((key) => {
     if (otpStore[key].expiry <= now) {
@@ -81,9 +86,20 @@ function cleanupExpiredOtps() {
 
 // ARMS: reuse the currently active OTP for a given email/purpose unless a fresh resend is explicitly requested
 function generateOTP(key, forceNew = false) {
+  const normalizedKey = buildOtpKey(key);
+  if (supabaseApi.enabled()) {
+    const existing = supabaseApi.getOtp(normalizedKey);
+    if (!forceNew && existing && Date.parse(existing.expires_at) > Date.now() && issuedPlain.has(normalizedKey)) {
+      return issuedPlain.get(normalizedKey);
+    }
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const expiry = Date.now() + 300000;
+    supabaseApi.saveOtp(normalizedKey, hashOtp(otp), expiry);
+    issuedPlain.set(normalizedKey, otp);
+    return otp;
+  }
   cleanupExpiredOtps();
 
-  const normalizedKey = buildOtpKey(key);
   const active = otpStore[normalizedKey];
   if (!forceNew && active && active.expiry > Date.now() && issuedPlain.has(normalizedKey)) {
     return issuedPlain.get(normalizedKey);
@@ -133,6 +149,20 @@ async function sendOTP(purpose = 'Account Verification', targetEmail = null, for
 
 function verifyOTP(input, targetEmail = null, purpose = null) {
   const key = buildOtpKey(targetEmail, purpose);
+  if (supabaseApi.enabled()) {
+    const row = supabaseApi.getOtp(key);
+    if (!row || Date.parse(row.expires_at) <= Date.now()) {
+      if (row) supabaseApi.deleteOtp(key);
+      issuedPlain.delete(key);
+      return { valid: false, message: 'OTP expired or not generated.' };
+    }
+    if (!otpMatches(input, row.code_hash)) {
+      return { valid: false, message: 'Incorrect OTP.' };
+    }
+    supabaseApi.deleteOtp(key);
+    issuedPlain.delete(key);
+    return { valid: true };
+  }
   const record = otpStore[key];
 
   if (!record || Date.now() > record.expiry) {

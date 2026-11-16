@@ -627,7 +627,7 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-const storage = multer.diskStorage({
+const diskUploadStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
     const safe = path.basename(String(file.originalname || 'upload'))
@@ -637,6 +637,30 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`);
   }
 });
+const supabaseUploadStorage = {
+  _handleFile(req, file, cb) {
+    const chunks = [];
+    file.stream.on('data', chunk => chunks.push(chunk));
+    file.stream.on('error', cb);
+    file.stream.on('end', () => {
+      try {
+        const supabaseApi = require('../middleware/supabaseApi');
+        const buffer = Buffer.concat(chunks);
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        const safeExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext) ? ext : '.jpg';
+        const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${safeExt}`;
+        supabaseApi.uploadObject(filename, buffer, file.mimetype || 'image/jpeg');
+        cb(null, { filename, path: filename, size: buffer.length });
+      } catch (err) {
+        cb(err);
+      }
+    });
+  },
+  _removeFile(req, file, cb) { cb(null); }
+};
+const storage = String(process.env.STORAGE || '').trim().toLowerCase() === 'supabase'
+  ? supabaseUploadStorage
+  : diskUploadStorage;
 const ALLOWED_UPLOAD_MIME = /^image\/(jpeg|jpg|png|webp|gif)$/i;
 const upload = multer({
   storage,

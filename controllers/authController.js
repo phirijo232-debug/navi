@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { issueDeviceToken, hashValue } = require('../middleware/tokenAuth');
+const supabaseApi = require('../middleware/supabaseApi');
 const bcrypt = require('bcryptjs');
 const { logError, logHr, logBreakage } = require('../middleware/logger');
 const dataStore = require('../middleware/dataStore');
@@ -117,6 +118,10 @@ function saveInvites(invites) {
 }
 
 function cleanupExpiredInvites() {
+  if (supabaseApi.enabled()) {
+    supabaseApi.deleteExpiredInvites();
+    return 0;
+  }
   const invites = loadInvites();
   const now = Date.now();
   let removed = 0;
@@ -181,6 +186,16 @@ function sweepExpiredAuth(now = Date.now()) {
 }
 
 function generateInviteToken(email) {
+  if (supabaseApi.enabled()) {
+    const token = crypto.randomBytes(16).toString('hex');
+    supabaseApi.saveInvite({
+      token_hash: hashValue(token),
+      email: String(email || '').trim().toLowerCase(),
+      expires_at: new Date(Date.now() + INVITE_EXPIRY_MS).toISOString(),
+      used: false
+    });
+    return token;
+  }
   const invites = loadInvites();
   const token = crypto.randomBytes(16).toString('hex');
   invites[token] = {
@@ -195,6 +210,11 @@ function generateInviteToken(email) {
 
 function getInviteByToken(token) {
   if (!token) return null;
+  if (supabaseApi.enabled()) {
+    const row = supabaseApi.getInvite(hashValue(String(token).trim()));
+    if (!row || row.used || Date.parse(row.expires_at) <= Date.now()) return null;
+    return { email: row.email, expiresAt: Date.parse(row.expires_at), used: false };
+  }
   const invites = loadInvites();
   const invite = invites[String(token).trim()];
   if (!invite || invite.used || invite.expiresAt <= Date.now()) {
@@ -204,6 +224,10 @@ function getInviteByToken(token) {
 }
 
 function markInviteUsed(token) {
+  if (supabaseApi.enabled()) {
+    supabaseApi.markInviteUsed(hashValue(String(token).trim()));
+    return;
+  }
   const invites = loadInvites();
   const key = String(token).trim();
   if (invites[key]) {
@@ -610,6 +634,18 @@ async function confirmLogin(req, res) {
     users[userIndex] = normalizedUser;
 
     saveUsers(users);
+    if (supabaseApi.enabled()) {
+      supabaseApi.saveSession({
+        token_hash: issued.record.tokenHash,
+        email: String(normalizedUser.email || '').toLowerCase(),
+        user_id: normalizedUser.id == null ? null : String(normalizedUser.id),
+        jti: issued.record.jti,
+        expires_at: issued.record.expiresAt,
+        revoked: false,
+        ip: req.ip || null,
+        last_seen: now
+      });
+    }
     delete pendingLogins[email];
     auditGuardian.clearFailedLogin(req.ip);
     auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN, actor: email, targetId: users[userIndex].id, ip: req.ip, detail: { role: pending.role, storeId: pending.storeId } });
@@ -700,6 +736,7 @@ async function confirmPasswordReset(req, res) {
     users[userIndex].password = hashedPassword;
     users[userIndex].trustedDevices = [];
     saveUsers(users);
+    if (supabaseApi.enabled()) supabaseApi.revokeSessions(email);
 
     delete pendingResets[email];
     res.json({ message: 'Password reset successfully. You can now login.' });
@@ -1022,6 +1059,7 @@ async function editEmployee(req, res) {
       if (!isStrongPassword(password)) return res.status(400).json({ error: passwordRequirementsText() });
       target.password = await bcrypt.hash(password, 10);
       target.trustedDevices = []; // force re-login on the changed account
+      if (supabaseApi.enabled()) supabaseApi.revokeSessions(target.email);
     }
 
     users[index] = target;

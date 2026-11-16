@@ -5,6 +5,7 @@ const { logError } = require('./logger');
 // HEART delegate: SQLite mirror behind DB_MODE (json|dual|sqlite). All logic
 // lives in db.js — this file keeps its exact API and JSON-first behaviour.
 const db = require('./db');
+const supabaseApi = require('./supabaseApi');
 
 // ─── Single source of truth for where the JSON data lives ───────────────────
 // Production: <repo>/data
@@ -65,6 +66,10 @@ let tmpCounter = 0;
 // ─── After every successful save a `.bak` copy is refreshed, giving us a       ───
 // ─── last-known-good snapshot for recovery.                                   ───
 function writeJson(file, data) {
+  if (supabaseApi.enabled()) {
+    supabaseApi.putDocument(path.basename(file), data);
+    return;
+  }
   const json = JSON.stringify(data, null, 2);
   const tmpFile = `${file}.${process.pid}.${tmpCounter++}.tmp`;
   try {
@@ -120,6 +125,11 @@ function recover(file, fallback, reason) {
 }
 
 function readJson(file, fallback, validate = () => true) {
+  if (supabaseApi.enabled()) {
+    const body = supabaseApi.getDocument(path.basename(file));
+    if (body == null || !validate(body)) return fallback;
+    return body;
+  }
   // HEART sqlite mode: read the mirrored document first; fall through to the
   // JSON path whenever the DB has no row, fails validation, or went unhealthy —
   // so JSON files remain a complete, always-usable fallback.
@@ -157,6 +167,7 @@ function readJson(file, fallback, validate = () => true) {
 // ─── Startup integrity pass: validates every known data file before the       ───
 // ─── server accepts traffic, repairing from backup where possible.            ───
 function ensureDataIntegrity() {
+  if (supabaseApi.enabled()) return [];
   const report = [];
   for (const name of CORE_DATA_FILES) {
     const file = path.join(DATA_DIR, name);

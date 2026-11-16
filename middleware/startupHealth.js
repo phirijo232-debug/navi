@@ -42,6 +42,7 @@ function validateJsonFile(filePath, label) {
  * Call this before app.listen() in server.js.
  */
 function validateStartup() {
+  if (String(process.env.STORAGE || '').trim().toLowerCase() === 'supabase') return [];
   const problems = [];
   console.log('Running startup data validation...');
   CRITICAL_FILES.forEach(({ file, label }) => {

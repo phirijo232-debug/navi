@@ -11,6 +11,7 @@
 // secret: links then die on restart, which is fine for dev/LAN because the
 // TTL is only 10 minutes anyway.
 const crypto = require('crypto');
+const supabaseApi = require('./supabaseApi');
 
 const TTL_SECONDS = 10 * 60;
 const SIGNED_SECRET = String(process.env.SIGNING_SECRET || '').trim().length >= 32
@@ -31,7 +32,18 @@ function signUploadQuery(filename, ttlSeconds = TTL_SECONDS, user = {}) {
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
   const jti = crypto.randomBytes(9).toString('hex');
   const email = String(user.email || '').trim().toLowerCase();
-  issuedLinks.set(jti, { exp, email, filename, revoked: false });
+  const record = { exp, email, filename, revoked: false };
+  if (supabaseApi.enabled()) {
+    supabaseApi.saveUploadLink({
+      jti,
+      filename,
+      email,
+      expires_at: new Date(exp * 1000).toISOString(),
+      revoked: false
+    });
+  } else {
+    issuedLinks.set(jti, record);
+  }
   return { exp, sig: hmac(payload(filename, exp, email, jti)), jti, email };
 }
 
@@ -53,8 +65,12 @@ function verifyUploadSig(filename, expRaw, sigRaw, jtiRaw, emailRaw) {
   const exp = Number(expRaw);
   if (!Number.isFinite(exp) || !Number.isInteger(exp)) return false;
   if (exp < Math.floor(Date.now() / 1000)) return false;
-  const record = issuedLinks.get(String(jtiRaw));
-  if (!record || record.revoked || record.filename !== filename || record.exp !== exp) return false;
+  const record = supabaseApi.enabled()
+    ? supabaseApi.getUploadLink(String(jtiRaw))
+    : issuedLinks.get(String(jtiRaw));
+  if (!record || record.revoked || record.filename !== filename) return false;
+  const recordExp = record.exp != null ? Number(record.exp) : Math.floor(Date.parse(record.expires_at) / 1000);
+  if (recordExp !== exp) return false;
   const email = String(emailRaw == null ? record.email : emailRaw).trim().toLowerCase();
   if (record.email !== email) return false;
   const expected = hmac(payload(filename, exp, email, jtiRaw));

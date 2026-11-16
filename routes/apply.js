@@ -12,6 +12,7 @@ const { getRecordStoreId, getRequestedStoreId, canAccessStore, canAccessRecord, 
 const { calculateInterest, getLoansData, saveLoansData, generateLoanReceiptId } = require('../controllers/loanController');
 const { issueSignupInvite } = require('../controllers/authController');
 const { imageKind, quickLoanLimits, PHONE_RE, NRC_RE, EMAIL_RE } = require('../middleware/quickLoan');
+const supabaseApi = require('../middleware/supabaseApi');
 
 const APPLICATIONS_FILE = dataStore.paths.applications || path.join(dataStore.DATA_DIR, 'applications.json');
 const NOTIFICATIONS_FILE = dataStore.paths.notifications;
@@ -87,8 +88,13 @@ function fileBuffer(files, name) {
 function saveVerifiedPhoto(file) {
   const kind = imageKind(file.buffer);
   if (!kind) return { error: 'Photos must be JPEG, PNG, or WEBP files.' };
-  if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
   const filename = `${Date.now()}-${crypto.randomBytes(3).toString('hex')}-${kind === 'jpg' ? 'photo.jpg' : `photo.${kind}`}`;
+  if (supabaseApi.enabled()) {
+    const type = kind === 'png' ? 'image/png' : (kind === 'webp' ? 'image/webp' : 'image/jpeg');
+    supabaseApi.uploadObject(filename, file.buffer, type);
+    return { filename };
+  }
+  if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
   fs.writeFileSync(path.join(UPLOAD_DIR, filename), file.buffer);
   return { filename };
 }
