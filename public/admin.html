@@ -671,6 +671,7 @@
           <button type="button" class="admin-nav-item" data-admin-page="allLoansView" title="All Loans"><span class="admin-nav-icon" aria-hidden="true">▥</span><span>All Loans</span></button>
           <button type="button" class="admin-nav-item" data-admin-page="customersView" title="Customers"><span class="admin-nav-icon icon-customers" aria-hidden="true">♧</span><span>Customers</span></button>
           <button type="button" class="admin-nav-item" data-admin-page="paymentsView" title="Payments"><span class="admin-nav-icon icon-payments" aria-hidden="true">¤</span><span>Payments</span></button>
+          <button type="button" class="admin-nav-item" data-admin-page="poolsView" title="Lending pools"><span class="admin-nav-icon" aria-hidden="true">◈</span><span>Pools</span></button>
           <button type="button" class="admin-nav-item" data-admin-page="overdueView" title="Overdue"><span class="admin-nav-icon icon-overdue" aria-hidden="true">!</span><span>Overdue</span></button>
           <button type="button" class="admin-nav-item" data-admin-page="defaultersView" title="Defaulters"><span class="admin-nav-icon icon-defaulters" aria-hidden="true">!</span><span>Defaulters</span></button>
           <span class="admin-sidebar-section">Management</span>
@@ -987,6 +988,36 @@
           </form>
         </div>
       </section>
+    </section>
+
+    <section id="poolsView" class="admin-page hidden" aria-labelledby="poolsTitle">
+      <div class="admin-topbar">
+        <div>
+          <h1 id="poolsTitle">Lending pools</h1>
+          <p class="pool-help">Available to lend starts from the capital you set. It goes down by the principal of each loan when that loan is disbursed, and it goes back up only by the principal part of repayments. Interest does not return to this pool. Expected income is the total still owed (principal plus interest). Expected interest is the interest portion of that balance.</p>
+        </div>
+      </div>
+      <div class="pool-grid">
+        <article class="pool-card">
+          <h2>1. Available to lend</h2>
+          <div class="pool-value" id="poolAvailable">K 0.00</div>
+          <p class="pool-help" id="poolCapitalNote"></p>
+          <label for="poolCapital">Lending capital (K)</label>
+          <input id="poolCapital" type="number" min="0" step="0.01" inputmode="decimal">
+          <button type="button" id="poolCapitalSave">Save capital</button>
+        </article>
+        <article class="pool-card">
+          <h2>2. Expected income</h2>
+          <div class="pool-value" id="poolExpected">K 0.00</div>
+          <p class="pool-help">Still owed on loans already given out. Collected so far: <strong id="poolCollected">K 0.00</strong></p>
+        </article>
+        <article class="pool-card">
+          <h2>3. Expected interest</h2>
+          <div class="pool-value" id="poolInterest">K 0.00</div>
+          <p class="pool-help">The interest still expected inside pool 2. Principal still out: <strong id="poolPrincipalOut">K 0.00</strong></p>
+        </article>
+      </div>
+      <p id="poolsMessage" class="message-text"></p>
     </section>
 
     <section id="applicationsView" class="admin-page hidden" aria-labelledby="applicationsTitle">

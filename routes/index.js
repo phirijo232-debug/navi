@@ -45,6 +45,7 @@ const {
 } = require('../controllers/securityController');
 const { getAuditEntries } = require('../controllers/auditController');
 const { requestApproval, listApprovals, decideApproval, checkApproval } = require('../controllers/accessApprovalController');
+const { getPools, setLendingCapital } = require('../controllers/poolsController');
 const { requireFeatures, requirePremiumReportVisibility } = require('../middleware/featurePermissions');
 
 const viewRevenueGate = requireFeatures('view_revenue');
@@ -73,6 +74,10 @@ function dispatchReportExport(req, res, next) {
 }
 
 router.get('/', (req, res) => res.send('Navi Server is running!'));
+router.get('/api/apply/public-config', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || '' });
+});
 
 router.get('/status', getStatus);
 // IMMUNE: public tier returns {status, uptime} only; the admin tier (memory, db,
@@ -169,6 +174,8 @@ router.post('/admin/loans', upload.fields([
   { name: 'collateralBack', maxCount: 1 }
 ]), createAdminLoan);
 router.post('/admin/announcements', bulkNotifyGate, sendAdminAnnouncement);
+router.get('/admin/pools', getPools);
+router.post('/admin/pools/capital', setLendingCapital);
 router.post('/admin/backup', createBackup);
 router.get('/admin/backups', listBackups);
 router.post('/admin/restore', restoreBackup);

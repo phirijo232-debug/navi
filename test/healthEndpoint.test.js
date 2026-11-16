@@ -3,6 +3,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const { getHealth, getStatus } = require('../controllers/statusController');
+const { issueDeviceToken } = require('../middleware/tokenAuth');
+
+function deviceFor(user) {
+  const issued = issueDeviceToken({ userId: user.id, email: user.email });
+  user.trustedDevices = [{ ...issued.record, lastSeen: new Date().toISOString() }];
+  return issued.token;
+}
 
 function recorder() {
   return {
@@ -31,23 +38,20 @@ test('GET /health public tier exposes only status + uptime (no internals)', asyn
 
 test('GET /health admin tier adds detail only for a valid admin token', async () => {
   const original = fs.readFileSync(require('../middleware/dataStore').paths.users, 'utf8');
-  const users = [
-    { id: 1, email: 'h.admin@example.test', role: 'store_admin', storeId: 'buraza',
-      trustedDevices: [{ token: 'health-admin-token', lastSeen: new Date().toISOString() }] },
-    { id: 2, email: 'h.user@example.test', role: 'user', storeId: 'buraza',
-      trustedDevices: [{ token: 'health-customer-token', lastSeen: new Date().toISOString() }] }
-  ];
-  fs.writeFileSync(require('../middleware/dataStore').paths.users, JSON.stringify(users, null, 2));
+  const admin = { id: 1, email: 'h.admin@example.test', role: 'store_admin', storeId: 'buraza' };
+  const customer = { id: 2, email: 'h.user@example.test', role: 'user', storeId: 'buraza' };
+  const adminToken = deviceFor(admin);
+  const customerToken = deviceFor(customer);
+  fs.writeFileSync(require('../middleware/dataStore').paths.users, JSON.stringify([admin, customer], null, 2));
 
   try {
-    // Customer token → public tier only, even WITH a token.
     const customerRes = recorder();
-    await getHealth({ headers: { 'x-device-token': 'health-customer-token' } }, customerRes);
+    await getHealth({ headers: { 'x-device-token': customerToken } }, customerRes);
     assert.deepEqual(Object.keys(customerRes.body).sort(), ['status', 'uptime']);
 
     // Admin token → detail tier.
     const adminRes = recorder();
-    await getHealth({ headers: { 'x-device-token': 'health-admin-token' } }, adminRes);
+    await getHealth({ headers: { 'x-device-token': adminToken } }, adminRes);
     assert.ok(adminRes.body.memory, 'admin sees memory');
     assert.ok(adminRes.body.db, 'admin sees db');
     assert.ok(adminRes.body.heartbeat, 'admin sees heartbeat');
@@ -83,13 +87,12 @@ test('GET /status public tier exposes liveness only', async () => {
 test('GET /status admin tier retains operational dashboard metrics', async () => {
   const usersFile = require('../middleware/dataStore').paths.users;
   const original = fs.readFileSync(usersFile, 'utf8');
-  fs.writeFileSync(usersFile, JSON.stringify([
-    { email: 'status.admin@example.test', role: 'store_admin', storeId: 'buraza',
-      trustedDevices: [{ token: 'status-admin-token' }] }
-  ]));
+  const statusAdmin = { id: 3, email: 'status.admin@example.test', role: 'store_admin', storeId: 'buraza' };
+  const statusToken = deviceFor(statusAdmin);
+  fs.writeFileSync(usersFile, JSON.stringify([statusAdmin]));
   try {
     const res = recorder();
-    await getStatus({ headers: { 'x-device-token': 'status-admin-token' } }, res);
+    await getStatus({ headers: { 'x-device-token': statusToken } }, res);
     assert.ok(res.body.ram.used);
     assert.ok(res.body.cpu.cores);
     assert.ok(['public', 'private'].includes(res.body.serverMode));

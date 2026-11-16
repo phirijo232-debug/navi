@@ -40,7 +40,7 @@ Immune system (security gates) + Skin (client links/errors) + Lungs (exposure).
   requests. Real per-user tokens (`…01`, `…02`) live in users.json and are
   unaffected, so nobody gets logged out. cli.js guards the now-empty default.
 - PUBLIC_DEPLOY gate upgraded: refuses boot unless SIGNING_SECRET set AND
-  MASTER_KEY/SHUTDOWN_KEY set to a non-default value (kills the `'phirii26'`
+  MASTER_KEY/SHUTDOWN_KEY set to a non-default value (kills the old built-in default
   fallback for /internal-shutdown, /vault/*, /admin/restore).
 - `/status` exempted from the general rate limiter (dashboard polls every 5s =
   120 req/15 min vs 100/min cap → second PC would 429 after ~8 min).

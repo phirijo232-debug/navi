@@ -1,518 +1,291 @@
-// ─── BMF scheduler (daily report job + hygiene jobs, all Africa/Lusaka) ─────
-//   08:00 — Daily Business Report (Excel + PDF) to jophiri223@gmail.com.
-//   This is the ONLY daily report: it replaced the old 23:58 notification pass
-//   and the 23:59 report slot entirely.
-// On startup: if a scheduled day was missed while the server was down, the
-// report is sent once as a catch-up before normal scheduling resumes.
-
 require('dotenv').config();
+const express = require('express');
 const path = require('path');
+const https = require('https');
 const cron = require('node-cron');
-const PDFDocument = require('pdfkit');
-const ExcelJS = require('exceljs');
-const emailService = require('./middleware/email');
-const dataStore = require('./middleware/dataStore');
-const { logError, logBreakage } = require('./middleware/logger');
-const { runDueDatePass } = require('./middleware/loanNotifications');
-const { getEnrichedLoans, deriveLoanStatus, accrueAllGrace } = require('./controllers/loanController');
-const { runKidneySweep } = require('./middleware/kidneys');
-const { buildPaymentsReportData, buildPaymentsExcelReport, buildPaymentsPdfReport } = require('./controllers/reportController');
-const R = require('./services/bmfReports');
-const X = require('./services/bmfExcel');
-const P = require('./services/bmfPdf');
+const config = require('./config');
+const { logError, logAccess, replayPendingAlerts } = require('./middleware/logger');
+const { helmet, deviceAuth, rateLimiter, authRateLimiter, getServerMode, healthRateLimiter } = require('./middleware/security');
+const { verifyOTP, sendOTP } = require('./middleware/otp');
+const { trackSession } = require('./controllers/sessionController');
+const { serveFile } = require('./controllers/fileController');
+const routes = require('./routes');
+const applyRouter = require('./routes/apply');
+const usersRouter = require('./routes/users');
+const { startScheduler } = require('./scheduler');
+const { ensureDataIntegrity } = require('./middleware/dataStore');
+const { startHealthWatch } = require('./middleware/healthWatch');
+const { errorAudit, captureOrigin, appendAudit } = require('./middleware/errorAudit');
+const { isPrivateControlClient } = require('./middleware/localControl');
+const { shareKeyGate } = require('./middleware/shareLinks');
+const { validateStartup } = require('./middleware/startupHealth');
+const auditGuardian = require('./middleware/auditLog');
+const { premiumPrivacy } = require('./middleware/premiumPrivacy');
 
-const TIMEZONE = process.env.DAILY_REPORT_TIMEZONE || 'Africa/Lusaka';
-// Rule 8: report recipient. Env wins; default is the admin mailbox.
-// Daily Business Report runs at DAILY_SEND_TIME (default 08:00) Lusaka.
-// Due-date notifications run separately at 23:58 (loanNotifications middleware).
-const REPORT_RECIPIENT = process.env.DAILY_REPORT_EMAIL || 'jophiri223@gmail.com';
-const DAILY_SEND_TIME = process.env.DAILY_REPORT_TIME || '08:00';
-const [DAILY_REPORT_HOUR, DAILY_REPORT_MINUTE] = DAILY_SEND_TIME.split(':').map(Number);
-const STATE_FILE = dataStore.paths.dailyReportState;
-// Flexible payment tracking sheet time frame - adjust anytime via .env without code changes.
-// Example: PAYMENTS_SHEET_FROM=2026-10-01, PAYMENTS_SHEET_TO=2026-10-31 (empty = all time).
-const TRACKING_FROM = process.env.PAYMENTS_SHEET_FROM || '';
-const TRACKING_TO = process.env.PAYMENTS_SHEET_TO || '';
-const TRACKING_STATE_FILE = path.join(dataStore.DATA_DIR, 'paymentsReportState.json');
-// Flexible portfolio report frame - empty = daily (today) behaviour, as spec'd.
-// Example: PORTFOLIO_SHEET_FROM=2026-10-01, PORTFOLIO_SHEET_TO=2026-10-31
-const PORTFOLIO_FROM = process.env.PORTFOLIO_SHEET_FROM || '';
-const PORTFOLIO_TO = process.env.PORTFOLIO_SHEET_TO || '';
+const ADMIN_KEY = process.env.MASTER_KEY || config.SHUTDOWN_KEY || null;
+const ADMIN_EMAIL = process.env.ADMIN_EMAILS || process.env.GMAIL_USER;
 
-function lusakaDate(date = new Date()) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE }).format(date);
-}
-
-function shiftDays(dateString, days) {
-  const [y, m, d] = dateString.split('-').map(Number);
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC' })
-    .format(new Date(Date.UTC(y, m - 1, d + days)));
-}
-
-/** Flip every active loan whose dueDate is in the past to 'overdue' and persist. */
-function runOverdueSweep() {
-  const todayStr = lusakaDate();
-  const loans = dataStore.readJson(dataStore.paths.loans, []);
-  let changed = 0;
-  for (const loan of loans) {
-    if (loan.status !== 'active') continue;
-    if (!loan.dueDate) continue;
-    if (String(loan.dueDate).slice(0, 10) >= todayStr) continue;
-    loan.status = 'overdue';
-    if (!loan.statusHistory) loan.statusHistory = [];
-    loan.statusHistory.push({
-      status: 'overdue',
-      reason: 'Loan past due date — auto-updated by system.',
-      actor: 'system',
-      source: 'cron',
-      updatedAt: new Date().toISOString()
-    });
-    changed++;
+// DEPLOYMENT GATE (blocking): public deployment requires (a) signed-URL image
+// serving — already implemented in middleware/signedUrl.js + fileController —
+// and (b) hardened secrets: MASTER_KEY (vault/shutdown key, must no longer fall
+// back to the hardcoded default) and SIGNING_SECRET (image-link signing; without
+// it links die on every restart). Refuse to boot so a weak config can't go live.
+if (String(process.env.PUBLIC_DEPLOY).toLowerCase() === 'true') {
+  const missing = [];
+  if (!process.env.MASTER_KEY || process.env.MASTER_KEY === 'phirii26') missing.push('MASTER_KEY');
+  if (!process.env.SIGNING_SECRET) missing.push('SIGNING_SECRET');
+  if (missing.length) {
+    console.error(`Refusing to start: PUBLIC_DEPLOY=true needs ${missing.join(' and ')} set in .env (long random values).`);
+    process.exit(1);
   }
-  if (changed) {
-    dataStore.writeJson(dataStore.paths.loans, loans);
-    console.log(`[scheduler] overdue sweep: ${changed} loan(s) marked overdue.`);
-  } else {
-    console.log('[scheduler] overdue sweep: no changes.');
-  }
-  return changed;
 }
 
-function readState() {
-  return dataStore.readJson(STATE_FILE, {}, obj => typeof obj === 'object' && obj !== null);
+// Public mode (and PUBLIC_DEPLOY) will not boot on a missing or short signing
+// secret. Private mode is unchanged. The master-key check above is unchanged.
+function signingSecretIsWeak() {
+  return String(process.env.SIGNING_SECRET || '').trim().length < 32;
+}
+if ((getServerMode() === 'public' || String(process.env.PUBLIC_DEPLOY).toLowerCase() === 'true') && signingSecretIsWeak()) {
+  console.error('Refusing to start: public mode needs SIGNING_SECRET set to a long random value (at least 32 characters).');
+  process.exit(1);
 }
 
-function writeState(lastSentDate) {
-  dataStore.writeJson(STATE_FILE, { lastSentDate });
-}
+const app = express();
+app.disable('x-powered-by');
+// PUBLIC: sit behind one reverse proxy (nginx/Caddy/cloudflare). Trust exactly
+// one hop so req.ip / X-Forwarded-For resolve to the REAL client IP — rate
+// limiting and audit logs are useless if everyone looks like the proxy. Never
+// set `true` (trusts any spoofed X-Forwarded-For from the open internet).
+app.set('trust proxy', 1);
 
-function readTrackingState() {
-  return dataStore.readJson(TRACKING_STATE_FILE, {}, obj => typeof obj === 'object' && obj !== null);
-}
-
-function writeTrackingState(lastSentDate, frame) {
-  dataStore.writeJson(TRACKING_STATE_FILE, { lastSentDate, frame });
-}
-
-/** Tracking sheet data for the currently configured (env-adjustable) time frame. */
-function buildPaymentsLeadersData() {
-  return buildPaymentsReportData(TRACKING_FROM || null, TRACKING_TO || null);
-}
-
-/** Plain-text body for the payment tracking sheet email. */
-function buildPaymentsReportBody(data) {
-  const range = `${data.from || 'All time'}${data.to ? ` to ${data.to}` : ''}`;
-  const lines = [
-    'Pryme Buraza Micro Finance (BMF) - Payment Tracking Sheet',
-    `Time frame: ${range}`,
-    `Generated: ${data.generatedAt}`,
-    '',
-    `Total payments: ${data.totalPayments}`,
-    `Total amount collected: K${data.totalAmount.toFixed(2)}`,
-    `Total interest collected: K${data.totalInterest.toFixed(2)}`,
-    `Total principal collected: K${data.totalPrincipal.toFixed(2)}`,
-    `Payment modes: ${data.modes.join(', ') || 'n/a'}`,
-    `Recorded by: ${data.recordedBy.join(', ') || 'n/a'}`,
-    '',
-    'Most recent payments:'
-  ];
-  const recent = data.payments.slice(-10).reverse();
-  if (!recent.length) lines.push('- No payments in this time frame.');
-  recent.forEach(p => {
-    lines.push(
-      `- ${p.paymentReceiptId || 'n/a'} | loan ${p.loanReceiptId || 'n/a'} | ${p.email || 'n/a'} | ` +
-      `K${Number(p.amount || 0).toFixed(2)} | ${p.mode || 'Cash'} | ${String(p.paymentDate || p.date || '').slice(0, 10)} | by ${p.recordedBy || 'admin'}`
-    );
-  });
-  return lines.join('\n');
-}
-
-/** Everything the daily report email shows — single source for body/PDF/XLSX. */
-function buildDailyReportData(reportDate = lusakaDate()) {
-  const loans = getEnrichedLoans();
-  const today = lusakaDate();
-  const usePeriod = Boolean(PORTFOLIO_FROM || PORTFOLIO_TO);
-
-  // Counts a date value against the active frame: the configured period when
-  // PORTFOLIO_SHEET_FROM/TO are set, otherwise the single report day.
-  const inFrame = (value) => {
-    if (!value) return false;
-    if (!usePeriod) return String(value).slice(0, 10) === reportDate;
-    const ts = new Date(value).getTime();
-    if (Number.isNaN(ts)) return false;
-    if (PORTFOLIO_FROM && ts < new Date(`${PORTFOLIO_FROM}T00:00:00Z`).getTime()) return false;
-    if (PORTFOLIO_TO && ts > new Date(`${PORTFOLIO_TO}T23:59:59Z`).getTime()) return false;
-    return true;
-  };
-
-  const active = loans.filter(loan =>
-    ['active', 'grace', 'defaulted'].includes(loan.businessStatus));
-  const overdue = loans.filter(loan =>
-    ['grace', 'defaulted'].includes(loan.businessStatus) && Number(loan.outstanding || 0) > 0);
-  const defaulted = loans.filter(loan => loan.businessStatus === 'defaulted');
-
-  const approvedToday = loans.filter(loan => inFrame(loan.approvedAt || loan.borrowedDate));
-
-  let paymentsTodayAmount = 0;
-  let interestToday = 0;
-  let paymentsTodayCount = 0;
-  loans.forEach(loan => {
-    (Array.isArray(loan.payments) ? loan.payments : []).forEach(payment => {
-      if (inFrame(payment.paymentDate || payment.date)) {
-        paymentsTodayAmount += Number(payment.amount || 0);
-        interestToday += Number(payment.interestPortion || 0);
-        paymentsTodayCount += 1;
-      }
-    });
-  });
-
-  return {
-    reportDate,
-    generatedAt: new Date().toISOString(),
-    period: usePeriod ? { from: PORTFOLIO_FROM || null, to: PORTFOLIO_TO || null } : null,
-    activeLoans: active.length,
-    activeOutstanding: Number(active.reduce((sum, l) => sum + Number(l.outstanding || 0), 0).toFixed(2)),
-    approvedToday: approvedToday.map(l => ({ receipt: l.receiptNumber, email: l.email, amount: l.amount })),
-    approvedTodayCount: approvedToday.length,
-    paymentsTodayCount,
-    paymentsTodayAmount: Number(paymentsTodayAmount.toFixed(2)),
-    overdueCount: overdue.length,
-    overdueTotal: Number(overdue.reduce((sum, l) => sum + Number(l.outstanding || 0), 0).toFixed(2)),
-    overdueLoans: overdue.map(l => ({
-      receipt: l.receiptNumber, email: l.email, dueDate: l.dueDate, outstanding: l.outstanding
-    })),
-    defaultersCount: defaulted.length,
-    interestToday: Number(interestToday.toFixed(2)),
-    today
-  };
-}
-
-function buildReportBody(data) {
-  const approved = data.approvedToday.length
-    ? ` (${data.approvedToday.map(l => `${l.receipt} ${l.email} K${Number(l.amount || 0).toFixed(2)}`).join('; ')})`
-    : '';
-  const frame = data.period ? ` (${data.period.from || 'start'} to ${data.period.to || 'today'})` : '';
-  const label = data.period ? 'in period' : 'today';
-  return [
-    `Daily Loan Report — ${data.reportDate}${frame}`,
-    '',
-    `Total active loans: ${data.activeLoans}`,
-    `Outstanding on active loans: K${data.activeOutstanding.toFixed(2)}`,
-    `New loans approved ${label}: ${data.approvedTodayCount}${approved}`,
-    `Payments received ${label}: ${data.paymentsTodayCount} totaling K${data.paymentsTodayAmount.toFixed(2)}`,
-    `Overdue loans: ${data.overdueCount} totaling K${data.overdueTotal.toFixed(2)}`,
-    `Defaulters: ${data.defaultersCount}`,
-    `Total interest earned ${label}: K${data.interestToday.toFixed(2)}`
-  ].join('\n');
-}
-
-/** Plain-text PDF of the same report (first attachment). */
-function buildReportPdf(data) {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
-    const chunks = [];
-    doc.on('data', chunk => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-
-    doc.fontSize(16).text('Pryme Buraza Micro Finance — Daily Loan Report', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.fontSize(11).text(`Date: ${data.reportDate}${data.period ? ` (${data.period.from || 'start'} to ${data.period.to || 'today'})` : ''}`, { align: 'center' });
-    doc.moveDown(1.5);
-    const label = data.period ? 'in period' : 'today';
-
-    doc.fontSize(12).text('Portfolio Summary');
-    doc.moveDown(0.5);
-    doc.fontSize(10).text(`Total active loans: ${data.activeLoans}`);
-    doc.text(`Outstanding on active loans: K${data.activeOutstanding.toFixed(2)}`);
-    doc.text(`New loans approved ${label}: ${data.approvedTodayCount}`);
-    doc.text(`Payments received ${label}: ${data.paymentsTodayCount} (K${data.paymentsTodayAmount.toFixed(2)})`);
-    doc.text(`Overdue loans: ${data.overdueCount} (K${data.overdueTotal.toFixed(2)})`);
-    doc.text(`Defaulters: ${data.defaultersCount}`);
-    doc.text(`Total interest earned ${label}: K${data.interestToday.toFixed(2)}`);
-
-    if (data.overdueLoans.length) {
-      doc.moveDown(1);
-      doc.fontSize(12).text('Overdue Loans');
-      doc.moveDown(0.5);
-      doc.fontSize(9);
-      data.overdueLoans.forEach(loan => {
-        doc.text(`${loan.receipt || 'n/a'} | ${loan.email} | due ${loan.dueDate || 'n/a'} | outstanding K${Number(loan.outstanding || 0).toFixed(2)}`);
-      });
+app.use(helmet({
+  hsts: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      connectSrc: ["'self'"],
     }
-    // Close the stream so the 'end' event fires and the Buffer resolves.
-    doc.end();
-  });
-}
-
-/** Excel version of the same report (second attachment). */
-async function buildReportXlsx(data) {
-  const workbook = new ExcelJS.Workbook();
-  const summary = workbook.addWorksheet('Daily Report');
-  summary.columns = [
-    { header: 'Metric', key: 'metric', width: 45 },
-    { header: 'Value', key: 'value', width: 30 }
-  ];
-  summary.addRows([
-    { metric: 'Report date', value: data.reportDate },
-    { metric: 'Total active loans', value: data.activeLoans },
-    { metric: 'Outstanding on active loans (K)', value: data.activeOutstanding },
-    { metric: `New loans approved ${data.period ? 'in period' : 'today'}`, value: data.approvedTodayCount },
-    { metric: `Payments received ${data.period ? 'in period' : 'today'} (count)`, value: data.paymentsTodayCount },
-    { metric: `Payments received ${data.period ? 'in period' : 'today'} (K)`, value: data.paymentsTodayAmount },
-    { metric: 'Overdue loans (count)', value: data.overdueCount },
-    { metric: 'Overdue total (K)', value: data.overdueTotal },
-    { metric: 'Defaulters', value: data.defaultersCount },
-    { metric: `Interest earned ${data.period ? 'in period' : 'today'} (K)`, value: data.interestToday }
-  ]);
-  summary.getRow(1).font = { bold: true };
-
-  const overdue = workbook.addWorksheet('Overdue');
-  overdue.columns = [
-    { header: 'Receipt', key: 'receipt', width: 22 },
-    { header: 'Email', key: 'email', width: 35 },
-    { header: 'Due date', key: 'dueDate', width: 15 },
-    { header: 'Outstanding (K)', key: 'outstanding', width: 18 }
-  ];
-  data.overdueLoans.forEach(loan => overdue.addRow(loan));
-  overdue.getRow(1).font = { bold: true };
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  return Buffer.from(buffer);
-}
-
-async function sendDailyLoanReport() {
-  const data = buildDailyReportData();
-  const subject = `Pryme Buraza Micro Finance — Daily Loan Report ${data.reportDate}` + (data.period ? ` (${data.period.from || 'start'} to ${data.period.to || 'today'})` : '');
-
-  const loans = getEnrichedLoans();
-  const users = dataStore.readJson(dataStore.paths.users, [], Array.isArray);
-
-  const [pdf, xlsx] = await Promise.all([
-    P.businessPdf([{ title: 'DAILY SUMMARY', headers: ['Metric', 'Value'], rows: R.dailySummaryRows(loans, users, data.reportDate).rows }], { title: 'BMF DAILY REPORT', date: data.reportDate }),
-    (async () => {
-      const wb = await X.buildDailyWorkbook(loans, users, data.reportDate);
-      return X.workbookToBuffer(wb);
-    })()
-  ]);
-
-  const result = await emailService.sendCustomerEmail({
-    to: REPORT_RECIPIENT,
-    subject,
-    text: buildReportBody(data),
-    attachments: [
-      { filename: `BMF-Daily-Report-${data.reportDate}.pdf`, content: pdf },
-      { filename: `BMF-Daily-Report-${data.reportDate}.xlsx`, content: xlsx }
-    ]
-  });
-
-  if (!result?.ok) {
-    logBreakage('scheduler.js', 'sendDailyLoanReport', result?.reason || 'email delivery failed', 'DAILY LOAN REPORT FAILED');
-    return { ok: false, data };
   }
-  writeState(data.reportDate);
-  console.log(`[scheduler] daily report sent to ${REPORT_RECIPIENT} for ${data.reportDate}`);
-  return { ok: true, data };
+}));
+
+app.use(express.json());
+
+// Brute-force-sensitive endpoints (auth + vault OTP) get a strict limiter for
+// EVERY source IP — including localhost — so a local process can't hammer them.
+const AUTH_SENSITIVE_PATHS = new Set([
+  '/login', '/login/confirm', '/signup', '/signup/confirm', '/signup/resend',
+  '/password-reset', '/password-reset/confirm', '/vault/request', '/vault/authorize'
+]);
+
+app.use((req, res, next) => {
+  if (AUTH_SENSITIVE_PATHS.has(req.path)) {
+    return authRateLimiter(req, res, next);
+  }
+  next();
+});
+
+// General limiter skips localhost AND /status: the dashboard polls status every
+// 5s (per tab, forever) — on a public IP that would 429 itself away. /status is
+// a tiny read-only public payload (PUBLIC_PATHS), so exempt it explicitly;
+// auth-sensitive endpoints keep their stricter limits above.
+app.use((req, res, next) => {
+  const isLocalhost = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip);
+  if (isLocalhost || req.path === '/status') return next();
+  rateLimiter(req, res, next);
+});
+
+// Uploaded KYC / proof-of-payment images: served ONLY through the authenticated,
+// ownership-checked handler below — NOT via the public static mount. Registered
+// before express.static so a raw /uploads/<file> request never bypasses auth.
+// Accepts either an x-device-token header user or a short-lived ?exp=&sig=
+// signed link (public PCs open images via <a>, which cannot send headers).
+// Raw ?token= is rejected inside serveFile.
+app.get('/uploads/:filename', serveFile);
+
+// Option A public share links: key gate MUST run before express.static —
+// static answers publicly, so a gate after it would never fire. Only HTML
+// page loads are checked; APIs, assets, /status, /health and invite
+// validation pass through. /signin.html is an alias of login.html (no
+// duplicate file). Both mount before deviceAuth so public visitors can
+// reach the login page with a valid ?key=.
+app.use(shareKeyGate);
+app.get('/signin.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+app.use(express.static(path.join(__dirname, 'public')));
+
+function hasValidAdminKey(req) {
+  const headerKey = req.headers['x-admin-key'] || req.headers['x-shutdown-key'];
+  const bodyKey = req.body && (req.body.password || req.body.masterKey);
+  return Boolean(headerKey && headerKey === ADMIN_KEY) || Boolean(bodyKey && bodyKey === ADMIN_KEY);
 }
 
-/** Collect a readable stream (pdfkit doc) into a Buffer for email attachments. */
-function streamToBuffer(stream) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    stream.on('data', chunk => chunks.push(chunk));
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-    stream.on('error', reject);
-  });
-}
-
-/** Daily payment tracking sheet email - time frame adjustable via PAYMENTS_SHEET_FROM / PAYMENTS_SHEET_TO. */
-async function sendPaymentsTrackingEmail() {
-  const data = buildPaymentsLeadersData();
-  const range = `${data.from || 'AllTime'}${data.to ? `-${data.to}` : ''}`;
-  const subject = `Pryme Buraza Micro Finance — Daily Payment Tracking Sheet ${lusakaDate()}`;
-  const pdf = await streamToBuffer(buildPaymentsPdfReport(data));
-  const xlsx = await buildPaymentsExcelReport(data);
-
-  const result = await emailService.sendCustomerEmail({
-    to: REPORT_RECIPIENT,
-    subject,
-    text: buildPaymentsReportBody(data),
-    attachments: [
-      { filename: `BMF-Payments-${range}.pdf`, content: pdf },
-      { filename: `BMF-Payments-${range}.xlsx`, content: xlsx }
-    ]
-  });
-
-  if (!result?.ok) {
-    logBreakage('scheduler.js', 'sendPaymentsTrackingEmail', result?.reason || 'email delivery failed', 'PAYMENTS TRACKING REPORT FAILED');
-    return { ok: false, data };
-  }
-  writeTrackingState(lusakaDate(), `${data.from || 'all'}:${data.to || 'all'}`);
-  console.log(`[scheduler] payments tracking report sent to ${REPORT_RECIPIENT}`);
-  return { ok: true, data };
-}
-
-/** Startup catch-up for the tracking sheet: send once if a scheduled day was missed (or the frame changed). */
-async function catchUpPaymentsTracking() {
-  const state = readTrackingState();
-  const today = lusakaDate();
-  const frame = `${TRACKING_FROM || 'all'}:${TRACKING_TO || 'all'}`;
-  if (!state.lastSentDate) {
-    writeTrackingState(today, frame);
-    return { ok: true, skipped: true, reason: 'first run - tracking state initialised' };
-  }
-  if (state.lastSentDate >= today && state.frame === frame) {
-    return { ok: true, skipped: true, reason: 'already sent for today' };
-  }
-  console.log(`[scheduler] tracking report ${state.lastSentDate} - catching up...`);
-  return sendPaymentsTrackingEmail();
-}
-
-/** Startup catch-up: send once if a scheduled day was missed while offline. */
-async function catchUpMissedReports() {
-  const state = readState();
-  const today = lusakaDate();
-  if (!state.lastSentDate) {
-    writeState(today);
-    return { ok: true, skipped: true, reason: 'first run — state initialised' };
-  }
-  if (state.lastSentDate >= today) {
-    return { ok: true, skipped: true, reason: 'already sent for today' };
-  }
-  console.log(`[scheduler] last report ${state.lastSentDate} — catching up missed day(s)...`);
-  return sendDailyLoanReport();
-}
-
-function startScheduler() {
-  // KIDNEYS — hourly hygiene sweep (expired OTPs, dead pending-auth entries,
-  // stale device tokens, idle sessions). Counts-only logging, never an alert.
-  cron.schedule('20 * * * *', () => {
-    setImmediate(async () => {
-      try {
-        runKidneySweep();
-      } catch (err) {
-        console.error('[CRON]', err.message);
-      }
-    });
-  }, { timezone: TIMEZONE });
-  // One sweep shortly after boot clears anything that accrued while the
-  // server was down (delayed so startup data repair finishes first).
-  setTimeout(() => runKidneySweep(), 60 * 1000).unref?.();
-
-  // Grace penalty — 1.8%/day accrual on grace/defaulted loans, once per day.
-  // Idempotent (loanController accrues by graceLastAccrual), so a restart or a
-  // missed day never double-charges; it simply catches up on the next run.
-  cron.schedule('5 0 * * *', () => {
-    setImmediate(async () => {
-      try {
-        try {
-          const result = accrueAllGrace(lusakaDate());
-          if (result.changed) {
-            console.log(`[scheduler] grace accrual applied to ${result.changed} loan(s)`);
-          }
-        } catch (err) {
-          logBreakage('scheduler.js', 'grace-accrual', err, 'GRACE ACCRUAL ERROR');
-        }
-      } catch (err) {
-        console.error('[CRON]', err.message);
-      }
-    });
-  }, { timezone: TIMEZONE });
-
-  // Overdue sweep — runs at 23:55 daily, 3 minutes before notifications.
-  // Ensures any loan that passed its due date today is flipped to 'overdue'
-  // before runDueDatePass fires and sends the overdue email at 23:58.
-  cron.schedule('55 23 * * *', () => {
-    setImmediate(() => {
-      try {
-        runOverdueSweep();
-      } catch (err) {
-        logBreakage('scheduler.js', 'cron:overdueSweep', err, 'OVERDUE SWEEP FAILED');
-      }
-    });
-  }, { timezone: TIMEZONE });
-
-  // Task 7 — notifications first, one minute before the report.
-  cron.schedule('58 23 * * *', () => {
-    setImmediate(async () => {
-      try {
-        await runDueDatePass()
-          .then(summary => console.log(`[scheduler] notifications: ${JSON.stringify(summary)}`))
-          .catch(err => logBreakage('scheduler.js', 'cron:notifications', err, 'SCHEDULER NOTIFICATIONS FAILED'));
-      } catch (err) {
-        console.error('[CRON]', err.message);
-      }
-    });
-  }, { timezone: TIMEZONE });
-
-  // Task 5 — daily report at DAILY_SEND_TIME (default 08:00 Lusaka). Guarded so
-  // a morning catch-up + scheduled cron never double-sends the same day's report.
-  cron.schedule(`${DAILY_REPORT_MINUTE} ${DAILY_REPORT_HOUR} * * *`, () => {
-    setImmediate(async () => {
-      try {
-        const today = lusakaDate();
-        if (readState().lastSentDate >= today) {
-          console.log(`[scheduler] daily report for ${today} already sent — skipping duplicate run`);
-          return;
-        }
-        await sendDailyLoanReport().catch(err => logBreakage('scheduler.js', 'cron:dailyReport', err, 'SCHEDULER REPORT FAILED'));
-      } catch (err) {
-        console.error('[CRON]', err.message);
-      }
-    });
-  }, { timezone: TIMEZONE });
-
-  // Flexible payment tracking sheet - same 23:59 slot, time frame set via env.
-  // Same once-per-day guard as the daily report above.
-  cron.schedule('59 23 * * *', () => {
-    setImmediate(async () => {
-      try {
-        const today = lusakaDate();
-        const frame = `${TRACKING_FROM || 'all'}:${TRACKING_TO || 'all'}`;
-        const state = readTrackingState();
-        if (state.lastSentDate >= today && state.frame === frame) {
-          console.log(`[scheduler] payments tracking sheet for ${today} already sent — skipping duplicate run`);
-          return;
-        }
-        await sendPaymentsTrackingEmail().catch(err => logBreakage('scheduler.js', 'cron:paymentsTracking', err, 'SCHEDULER TRACKING FAILED'));
-      } catch (err) {
-        console.error('[CRON]', err.message);
-      }
-    });
-  }, { timezone: TIMEZONE });
-
-  // Startup overdue sweep — catches loans that went past due while the server
-  // was offline (complements the setImmediate sweep in server.js).
-  setTimeout(() => {
-    try { runOverdueSweep(); } catch (err) {
-      logBreakage('scheduler.js', 'startup:overdueSweep', err, 'STARTUP OVERDUE SWEEP FAILED');
+app.post('/vault/request', async (req, res) => {
+  try {
+    if (!isPrivateControlClient(req.ip)) {
+      logError(`VAULT REQUEST BLOCKED — public-network request from ${req.ip}`);
+      return res.status(403).json({ error: 'Vault access is available only from the private network.' });
     }
-  }, 5000).unref?.();
+    const { password } = req.body || {};
+    const submittedKey = password || req.headers['x-admin-key'] || req.headers['x-shutdown-key'];
+    if (!ADMIN_KEY || !submittedKey || submittedKey !== ADMIN_KEY) {
+      logError(`VAULT REQUEST BLOCKED — invalid master key from ${req.ip}`);
+      return res.status(403).json({ error: 'Invalid master key.' });
+    }
+    await sendOTP('Vault Access', ADMIN_EMAIL);
+    return res.json({ message: 'Vault OTP sent to the configured admin email.' });
+  } catch (err) {
+    logError(`VAULT REQUEST FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Vault request failed.' });
+  }
+});
 
-  catchUpMissedReports().catch(err => logBreakage('scheduler.js', 'catchUpMissedReports', err, 'SCHEDULER CATCH-UP FAILED'));
-  catchUpPaymentsTracking().catch(err => logBreakage('scheduler.js', 'catchUpPaymentsTracking', err, 'SCHEDULER TRACKING CATCH-UP FAILED'));
-  console.log(`[scheduler] started (tz ${TIMEZONE}) — notifications 23:58, daily report ${DAILY_SEND_TIME} → ${REPORT_RECIPIENT}`);
+app.post('/vault/authorize', (req, res) => {
+  try {
+    if (!isPrivateControlClient(req.ip)) {
+      logError(`VAULT AUTH BLOCKED — public-network request from ${req.ip}`);
+      return res.status(403).json({ error: 'Vault access is available only from the private network.' });
+    }
+    const { password, otp } = req.body || {};
+    const submittedKey = password || req.headers['x-admin-key'] || req.headers['x-shutdown-key'];
+    if (!ADMIN_KEY || !submittedKey || submittedKey !== ADMIN_KEY) {
+      return res.status(403).json({ error: 'Invalid master key.' });
+    }
+    const result = verifyOTP(otp, ADMIN_EMAIL, 'Vault Access');
+    if (!result.valid) {
+      return res.status(400).json({ error: result.message });
+    }
+    return res.json({ authorized: true, message: 'Vault access approved.' });
+  } catch (err) {
+    logError(`VAULT AUTH FAILED: ${err.message}`);
+    return res.status(503).json({ error: 'Vault authorization failed.' });
+  }
+});
+
+app.post('/internal-shutdown', (req, res) => {
+  if (!isPrivateControlClient(req.ip)) {
+    logError(`UNAUTHORIZED SHUTDOWN ATTEMPT from public IP ${req.ip}`);
+    return res.status(403).send('Denied');
+  }
+  const key = req.headers['x-admin-key'] || req.headers['x-shutdown-key'];
+  if (!ADMIN_KEY || key !== ADMIN_KEY) {
+    logError(`UNAUTHORIZED SHUTDOWN ATTEMPT from ${req.ip}`);
+    return res.status(403).send('Denied');
+  }
+  res.send('Navi Server shutting down...');
+  logError('SERVER SHUTDOWN VIA CMD');
+  setTimeout(() => process.exit(0), 500);
+});
+
+// Share-key gate: protects the public signup entry page (?key= required when SHARE_PUBLIC_KEY is set).
+app.use(shareKeyGate);
+
+// Public quick-screen loan application (no auth required).
+app.get('/quick-screen', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'quick-screen.html'));
+});
+
+// Public loan application submissions do not require a device token. Mount the
+// router under its prefix so its POST / handler sees the trimmed path; an
+// app.post('/api/apply', router) route leaves /api/apply visible to the router,
+// which falls through to deviceAuth.
+app.get('/api/apply/public-config', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || '' });
+});
+app.use('/api/apply', (req, res, next) => {
+  if (req.method !== 'POST') return next();
+  return applyRouter(req, res, next);
+});
+
+// Public loan rates — no auth required. Quick-screen page fetches this without
+// a device token. Must be mounted BEFORE deviceAuth. Rate-limited the same way
+// as /health so it cannot be hammered even from localhost.
+app.get('/loans/public-rates', healthRateLimiter, require('./controllers/loanController').getPublicLoanRates);
+
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    if (/^\/(?:admin|hr)(?:\/|$)/.test(req.path) && [401, 403].includes(res.statusCode)) {
+      auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_UNAUTHORISED_ADMIN, actor: req.authUser?.email || 'unauthenticated', ip: req.ip, detail: { path: req.path, method: req.method, status: res.statusCode, role: req.authUser?.role || null, storeId: req.authUser?.storeId || null } });
+    }
+  });
+  next();
+});
+app.use(deviceAuth);
+app.use(premiumPrivacy);
+app.use(logAccess);
+app.use(trackSession);
+// Application reads and reviews are admin-only and need req.authUser from
+// deviceAuth; keep them mounted after that middleware.
+app.use('/api/apply', applyRouter);
+app.use('/', usersRouter);
+app.use('/', routes);
+
+process.on('uncaughtException', (err) => {
+  const origin = captureOrigin(err);
+  logError(`[${origin}] UNCAUGHT ERROR: ${err.stack || err.message}`, true);
+  appendAudit(origin, err?.message || String(err), { source: 'uncaughtException' });
+});
+
+app.use((req, res) => {
+  if (req.url === '/favicon.ico' || req.url.startsWith('/.well-known')) {
+    return res.status(204).end();
+  }
+  const msg = `UNKNOWN ROUTE: ${req.method} ${req.url} from ${req.ip}`;
+  logError(msg);
+  if (req.path.startsWith('/api/') || req.path.startsWith('/admin/')) {
+    auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.THREAT_UNKNOWN_ROUTE, actor: req.authUser?.email || 'unauthenticated', ip: req.ip, detail: { path: req.path, method: req.method, storeId: req.authUser?.storeId || null } });
+  }
+  res.status(404).send('Route not found');
+});
+
+// IMMUNE + provenance: every failure that reaches the error pipeline is logged
+// with its origin (file:line handler) and a dedicated audit line, then returns
+// the same user-facing 500. Registered last so it only catches unhandled errors.
+app.use(errorAudit);
+
+const startupRepairs = ensureDataIntegrity();
+if (startupRepairs.length) {
+  console.warn(`Navi Server data repair: ${startupRepairs.join('; ')}`);
 }
 
-module.exports = {
-  lusakaDate,
-  runOverdueSweep,
-  buildDailyReportData,
-  buildPaymentsLeadersData,
-  buildPaymentsReportBody,
-  buildReportBody,
-  buildReportPdf,
-  buildReportXlsx,
-  sendDailyLoanReport,
-  sendPaymentsTrackingEmail,
-  catchUpMissedReports,
-  catchUpPaymentsTracking,
-  startScheduler,
-  REPORT_RECIPIENT,
-  TRACKING_FROM,
-  TRACKING_TO,
-  PORTFOLIO_FROM,
-  PORTFOLIO_TO
-};
+const startupProblems = validateStartup();
+if (startupProblems.length) {
+  console.error(`Navi Server startup validation FAILED: ${startupProblems.length} problem(s) found.`);
+  startupProblems.forEach(p => console.error(`  - ${p}`));
+  console.error('Server will not start until data files are repaired.');
+  process.exit(1);
+}
 
-if (require.main === module) startScheduler();
+app.listen(config.PORT, config.HOST, () => {
+  console.log(`Navi Server running on port ${config.PORT}`);
+  auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.SERVER_STARTED, actor: 'system', detail: { port: config.PORT } });
+  const mode = typeof getServerMode === 'function' ? getServerMode() : 'private';
+  console.log(`[server-mode] started in ${mode.toUpperCase()} mode`);
+
+  startScheduler();
+
+  // Keep-alive self-ping every 10 minutes
+  cron.schedule('*/10 * * * *', () => {
+    setImmediate(async () => {
+      try {
+        if (!process.env.APP_BASE_URL) return;
+        https.get(process.env.APP_BASE_URL, response => response.resume()).on('error', () => {});
+      } catch (err) {
+        console.error('[CRON]', err.message);
+      }
+    });
+  });
+
+  // Start heartbeat + outage detection
+  try {
+    startHealthWatch();
+  } catch (err) {
+    console.error(`Health watch failed to start: ${err.message}`);
+  }
+
+  // Retry any alerts queued during a prior SMTP outage
+  replayPendingAlerts().catch(() => {});
+});

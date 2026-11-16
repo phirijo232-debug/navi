@@ -19,9 +19,9 @@ test('sweepExpiredAuth drops dead pending entries and stale device tokens, keeps
       // Distinct IPs: getUsers()' normalizeTrustedDevices dedupes per-IP, so a
       // shared IP would hide these entries from the sweep before it runs.
       trustedDevices: [
-        { token: 'old-stale-token', lastSeen: stale, ip: '10.0.0.1' },
-        { token: 'fresh-token', lastSeen: fresh, ip: '10.0.0.2' },
-        { token: 'no-timestamp-token', ip: '10.0.0.3' } // defensive: kept
+        { tokenHash: 'old-stale-token', jti: 'old-stale-token', lastSeen: stale, ip: '10.0.0.1' },
+        { tokenHash: 'fresh-token', jti: 'fresh-token', lastSeen: fresh, ip: '10.0.0.2' },
+        { tokenHash: 'no-timestamp-token', jti: 'no-timestamp-token', ip: '10.0.0.3' }
       ]
     }
   ], null, 2));
@@ -32,7 +32,7 @@ test('sweepExpiredAuth drops dead pending entries and stale device tokens, keeps
     // Device pruning: only the clearly-stale one goes.
     assert.equal(result.staleDevices, 1);
     const users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-    const tokens = users[0].trustedDevices.map(d => d.token);
+    const tokens = users[0].trustedDevices.map(d => d.jti);
     assert.ok(tokens.includes('fresh-token'), 'fresh device must survive');
     assert.ok(tokens.includes('no-timestamp-token'), 'defensive keep when no timestamp');
     assert.ok(!tokens.includes('old-stale-token'), 'stale device must be pruned');
@@ -46,16 +46,19 @@ test('sweepExpiredAuth drops dead pending entries and stale device tokens, keeps
 });
 
 test('pruneSessions drops idle sessions and keeps active ones', () => {
-  // Distinct IPs — trackSession evicts other tokens sharing the same IP.
-  trackSession({ headers: { 'x-device-token': 'active-session-token' }, ip: '10.1.0.1' }, {}, () => {});
-  trackSession({ headers: { 'x-device-token': 'idle-session-token' }, ip: '10.1.0.2' }, {}, () => {});
+  const { issueDeviceToken } = require('../middleware/tokenAuth');
+  const active = issueDeviceToken({ userId: 1, email: 'active@example.test' });
+  const idle = issueDeviceToken({ userId: 2, email: 'idle@example.test' });
+  trackSession({ headers: { 'x-device-token': active.token }, ip: '10.1.0.1' }, {}, () => {});
+  trackSession({ headers: { 'x-device-token': idle.token }, ip: '10.1.0.2' }, {}, () => {});
 
   // Age the idle one beyond 24h by pruning with a future "now".
   const pruned = pruneSessions(24 * 60 * 60 * 1000, Date.now() + 25 * 60 * 60 * 1000);
   assert.ok(pruned >= 2, 'both sessions age out with a 25h-forward clock');
 
   // With the real clock, freshly-tracked sessions survive.
-  trackSession({ headers: { 'x-device-token': 'live-token' }, ip: '127.0.0.1' }, {}, () => {});
+  const live = issueDeviceToken({ userId: 3, email: 'live@example.test' });
+  trackSession({ headers: { 'x-device-token': live.token }, ip: '127.0.0.1' }, {}, () => {});
   const kept = pruneSessions();
   assert.equal(kept, 0, 'live session must not be pruned');
 });

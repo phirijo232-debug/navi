@@ -352,6 +352,7 @@ function showAdminPage(pageId, { recordHistory = true } = {}) {
   else if (pageId === 'feedbackDetails') fetchStoreFeedback();
   else if (pageId === 'serverSettingsView') initServerMode();
   else if (pageId === 'loanInterestRatesView') loadLoanInterestPolicy(true);
+  else if (pageId === 'poolsView') loadPools();
   else if (['allLoansView', 'overdueView', 'defaultersView'].includes(pageId)) {
     renderLoanDirectory(pageId);
     if (!portfolioLoaded) fetchNewRequests();
@@ -4103,6 +4104,53 @@ window.onload = () => {
   applyTheme(localStorage.getItem('adminTheme') === 'light' ? 'light' : 'dark');
   restoreSession();
 };
+
+async function loadPools() {
+  const message = document.getElementById('poolsMessage');
+  if (message) message.textContent = '';
+  try {
+    const res = await fetch('/admin/pools', { headers: getStoreHeaders() });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (message) message.textContent = data.error || 'Could not load pools.';
+      return;
+    }
+    document.getElementById('poolAvailable').textContent = formatCurrency(data.availableToLend);
+    document.getElementById('poolExpected').textContent = formatCurrency(data.expectedIncome);
+    document.getElementById('poolInterest').textContent = formatCurrency(data.expectedInterest);
+    document.getElementById('poolCollected').textContent = formatCurrency(data.collected);
+    document.getElementById('poolPrincipalOut').textContent = formatCurrency(data.principalStillOut);
+    document.getElementById('poolCapital').value = Number(data.capital || 0).toFixed(2);
+    document.getElementById('poolCapitalNote').textContent = data.assumption || '';
+    const role = localStorage.getItem('userRole');
+    const canEdit = role === 'admin' || role === 'franchise_admin';
+    document.getElementById('poolCapital').disabled = !canEdit;
+    document.getElementById('poolCapitalSave').hidden = !canEdit;
+  } catch {
+    if (message) message.textContent = 'Could not load pools.';
+  }
+}
+
+document.getElementById('poolCapitalSave')?.addEventListener('click', async () => {
+  const message = document.getElementById('poolsMessage');
+  const capital = document.getElementById('poolCapital').value;
+  try {
+    const res = await fetch('/admin/pools/capital', {
+      method: 'POST',
+      headers: getStoreHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ capital })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (message) message.textContent = data.error || 'Could not save the capital.';
+      return;
+    }
+    if (message) message.textContent = 'Lending capital saved.';
+    await loadPools();
+  } catch {
+    if (message) message.textContent = 'Could not save the capital.';
+  }
+});
 
 window.closeModal = closeModal;
 window.closeCreateUserModal = closeCreateUserModal;

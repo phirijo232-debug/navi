@@ -45,6 +45,7 @@ function canViewFile(user, filename) {
       || loan.collateralBack === filename
       || loan.nrcFront === filename
       || loan.nrcBack === filename
+      || loan.studentIdPhoto === filename
       || (Array.isArray(loan.paymentSubmissions) && loan.paymentSubmissions.some(s => s.screenshot === filename))
       || (Array.isArray(loan.payments) && loan.payments.some(p => p.screenshot === filename));
     if (!referenced) return false;
@@ -58,7 +59,8 @@ function canViewFile(user, filename) {
     const referenced = application.nrcFront === filename
       || application.nrcBack === filename
       || application.collateralFront === filename
-      || application.collateralBack === filename;
+      || application.collateralBack === filename
+      || application.studentIdPhoto === filename;
     if (!referenced) return false;
     if (admin) return canAccessRecord({ authUser: user, headers: {} }, application);
     return String(application.email || '').trim().toLowerCase() === requester;
@@ -83,9 +85,9 @@ function serveFile(req, res) {
     }
     // Signed-link opening (no header user): possession of a fresh, valid
     // signature for THIS file authorizes this one open (S3 presigned model).
-    const { exp, sig } = req.query || {};
-    if (exp !== undefined || sig !== undefined) {
-      if (!verifyUploadSig(filename, exp, sig)) {
+    const { exp, sig, jti, u } = req.query || {};
+    if (exp !== undefined || sig !== undefined || jti !== undefined) {
+      if (!verifyUploadSig(filename, exp, sig, jti, u)) {
         logError(`FILE ACCESS DENIED (bad/expired signature): ${filename} from ${req.ip}`);
         return res.status(403).send('Access denied. The link is invalid or expired.');
       }
@@ -121,9 +123,9 @@ async function signUpload(req, res) {
       logError(`SIGNED LINK DENIED: ${filename} for ${user?.email || 'unknown'} from ${req.ip}`);
       return res.status(403).json({ error: 'Access denied.' });
     }
-    const { exp, sig } = signUploadQuery(filename);
+    const { exp, sig, jti, email } = signUploadQuery(filename, TTL_SECONDS, user);
     return res.json({
-      url: `/uploads/${encodeURIComponent(filename)}?exp=${exp}&sig=${sig}`,
+      url: `/uploads/${encodeURIComponent(filename)}?exp=${exp}&sig=${sig}&jti=${encodeURIComponent(jti)}&u=${encodeURIComponent(email)}`,
       expiresIn: TTL_SECONDS
     });
   } catch (err) {

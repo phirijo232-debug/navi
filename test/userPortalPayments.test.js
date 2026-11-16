@@ -45,7 +45,7 @@ test('loan details modal has reliable accessible close controls', () => {
   assert.match(userPage, /document\.addEventListener\('keydown', event =>[\s\S]*event\.key === 'Escape' && modal\?\.classList\.contains\('active'\)[\s\S]*closeLoanModal\(\)/);
   assert.match(userPage, /m\.setAttribute\('aria-hidden', 'true'\)/);
   assert.match(userPage, /modal\.setAttribute\('aria-hidden', 'false'\)/);
-  assert.match(userPage, /\.customer-portal \.modal-content \{[^}]*max-height:calc\(100vh - 24px\)[^}]*background:#161b22[^}]*opacity:1/s);
+  assert.match(userPage, /\.customer-portal \.modal-content \{[^}]*max-height:calc\(100vh - 24px\)[^}]*background:#1A212B[^}]*opacity:1/s);
 });
 
 test('payment selection shows the selected loan balance read-only and submits only the proof', () => {

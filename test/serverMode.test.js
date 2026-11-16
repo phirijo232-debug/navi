@@ -103,13 +103,24 @@ test('GET /admin/server-mode blocks non-managers', () => {
 });
 
 test('GET /status reports the current serverMode to authenticated admins', async () => {
+  const fs = require('node:fs');
+  const { issueDeviceToken } = require('../middleware/tokenAuth');
+  const usersFile = require('../middleware/dataStore').paths.users;
+  const original = fs.readFileSync(usersFile, 'utf8');
+  const admin = { id: 1, email: 'mode.admin@example.test', role: 'admin', storeId: 'buraza' };
+  const issued = issueDeviceToken({ userId: admin.id, email: admin.email });
+  admin.trustedDevices = [issued.record];
+  fs.writeFileSync(usersFile, JSON.stringify([admin]));
   const { getStatus } = require('../controllers/statusController');
   const res = responseRecorder();
-  // jophiri223 admin device token
-  await getStatus({ headers: { 'x-device-token': '7fbd91684e4ce5c948e81248ed40c582749b11dcd9038db07c814ba95cb98b3e' } }, res);
+  try {
+  await getStatus({ headers: { 'x-device-token': issued.token } }, res);
   assert.equal(res.statusCode, 200);
   assert.equal(typeof res.body.serverMode, 'string');
   assert.ok(['public', 'private'].includes(res.body.serverMode));
+  } finally {
+    fs.writeFileSync(usersFile, original);
+  }
 });
 
 test('deviceAuth allows invite validation routes without a device token', (t, done) => {

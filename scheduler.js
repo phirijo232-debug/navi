@@ -119,7 +119,7 @@ function buildDailyReportData(reportDate = lusakaDate()) {
   const active = loans.filter(loan =>
     ['active', 'grace', 'defaulted'].includes(loan.businessStatus));
   const overdue = loans.filter(loan =>
-    ['grace', 'defaulted'].includes(loan.businessStatus) && Number(loan.outstanding || 0) > 0);
+    ['grace', 'defaulted', 'overdue'].includes(loan.businessStatus) && Number(loan.outstanding || 0) > 0);
   const defaulted = loans.filter(loan => loan.businessStatus === 'defaulted');
 
   const approvedToday = loans.filter(loan => inFrame(loan.approvedAt || loan.borrowedDate));
@@ -389,6 +389,10 @@ function startScheduler() {
       }
     });
   }, { timezone: TIMEZONE });
+
+  // Late loans are counted from the due date in reports. This job does not
+  // rewrite a loan's stored status to "overdue" — that word is treated as grace
+  // by older records and would start the daily penalty by accident.
 
   // Task 7 — notifications first, one minute before the report.
   cron.schedule('58 23 * * *', () => {

@@ -26,7 +26,7 @@ const RETIRED_TOKENS = [
   'd6e7ff'
 ];
 
-const SLATE_TOKENS = ['#06141b', '#9ba8ab', '#ccd0cf'];
+const SLATE_TOKENS = ['#10141a', '#e6eaf0', '#5b94d6'];
 
 function read(rel) {
   return fs.readFileSync(path.join(__dirname, '..', rel), 'utf8').toLowerCase();
@@ -54,14 +54,8 @@ test('slate retheme: new palette is present in the master stylesheet', () => {
 test('slate retheme: status pills keep their semantic colors', () => {
   const css = read('public/style.css');
   // pill tints use no-space rgba in style.css — assert exact in-file forms
-  assert.ok(css.includes('rgba(255,193,7'), 'grace pill amber tint missing');
-  assert.ok(css.includes('rgba(0,183,255'), 'active/direct-pay pill blue tint missing');
-  assert.ok(css.includes('rgba(76,175,80'), 'approved/paid pill green tint missing');
-  assert.ok(css.includes('rgba(244,67,54'), 'defaulted/declined pill red tint missing');
-  assert.ok(css.includes('rgba(111,76,255'), 'liquidated pill violet tint missing');
-  assert.ok(css.includes('#ffd54f'), 'grace pill text color missing');
-  assert.ok(css.includes('#8bc34a'), 'paid pill text color missing');
-  assert.ok(css.includes('#ff7a6c'), 'declined pill text color missing');
-  assert.ok(css.includes('#c9beff'), 'liquidated pill text color missing');
-  assert.ok(css.includes('#e65100'), 'overdue text color missing');
+  assert.ok(css.includes('#f0c56a'), 'grace/warning colour missing');
+  assert.ok(css.includes('#8fdcb0'), 'paid/success colour missing');
+  assert.ok(css.includes('#ffb4ab'), 'declined/error colour missing');
+  assert.ok(css.includes('#5b94d6'), 'active/primary colour missing');
 });

@@ -13,41 +13,57 @@
 const crypto = require('crypto');
 
 const TTL_SECONDS = 10 * 60;
-const SIGNED_SECRET = process.env.SIGNING_SECRET
-  || crypto.randomBytes(32).toString('hex');
-const SIGNED_SECRET_IS_EPHEMERAL = !process.env.SIGNING_SECRET;
+const SIGNED_SECRET = String(process.env.SIGNING_SECRET || '').trim().length >= 32
+  ? String(process.env.SIGNING_SECRET).trim()
+  : crypto.randomBytes(32).toString('hex');
+const SIGNED_SECRET_IS_EPHEMERAL = String(process.env.SIGNING_SECRET || '').trim().length < 32;
+const issuedLinks = new Map();
 
-function payload(filename, exp) {
-  return `bmf-upload|${filename}|${exp}`;
+function payload(filename, exp, email, jti) {
+  return `bmf-upload|${filename}|${exp}|${email}|${jti}`;
 }
 
 function hmac(value) {
   return crypto.createHmac('sha256', SIGNED_SECRET).update(value).digest('hex');
 }
 
-// Returns a query string fragment: `exp=<unix-seconds>&sig=<hex>`.
-function signUploadQuery(filename, ttlSeconds = TTL_SECONDS) {
+function signUploadQuery(filename, ttlSeconds = TTL_SECONDS, user = {}) {
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
-  return { exp, sig: hmac(payload(filename, exp)) };
+  const jti = crypto.randomBytes(9).toString('hex');
+  const email = String(user.email || '').trim().toLowerCase();
+  issuedLinks.set(jti, { exp, email, filename, revoked: false });
+  return { exp, sig: hmac(payload(filename, exp, email, jti)), jti, email };
 }
 
-// Build the link the client opens: /uploads/<file>?exp=..&sig=..
-function signedUploadPath(filename) {
-  const { exp, sig } = signUploadQuery(filename);
-  return `/uploads/${encodeURIComponent(filename)}?exp=${exp}&sig=${sig}`;
+function signedUploadPath(filename, user) {
+  const { exp, sig, jti, email } = signUploadQuery(filename, TTL_SECONDS, user);
+  return `/uploads/${encodeURIComponent(filename)}?exp=${exp}&sig=${sig}&jti=${jti}&u=${encodeURIComponent(email)}`;
 }
 
-// Strict verification: correct signature AND not expired. Constant-time
-// comparison so a wrong guess cannot be measured byte-by-byte.
-function verifyUploadSig(filename, expRaw, sigRaw) {
-  if (!filename || !expRaw || !sigRaw || typeof sigRaw !== 'string') return false;
+function revokeUploadLinksForEmail(email) {
+  const target = String(email || '').trim().toLowerCase();
+  for (const record of issuedLinks.values()) {
+    if (record.email === target) record.revoked = true;
+  }
+}
+
+// Signature, expiry, server-issued id, and the user the link was bound to.
+function verifyUploadSig(filename, expRaw, sigRaw, jtiRaw, emailRaw) {
+  if (!filename || !expRaw || !sigRaw || !jtiRaw || typeof sigRaw !== 'string') return false;
   const exp = Number(expRaw);
   if (!Number.isFinite(exp) || !Number.isInteger(exp)) return false;
-  if (exp < Math.floor(Date.now() / 1000)) return false; // expired
-  const expected = hmac(payload(filename, exp));
+  if (exp < Math.floor(Date.now() / 1000)) return false;
+  const record = issuedLinks.get(String(jtiRaw));
+  if (!record || record.revoked || record.filename !== filename || record.exp !== exp) return false;
+  const email = String(emailRaw == null ? record.email : emailRaw).trim().toLowerCase();
+  if (record.email !== email) return false;
+  const expected = hmac(payload(filename, exp, email, jtiRaw));
   const a = Buffer.from(expected, 'utf8');
   const b = Buffer.from(sigRaw, 'utf8');
-  if (a.length !== b.length) return false;
+  if (a.length !== b.length) {
+    crypto.timingSafeEqual(a, a);
+    return false;
+  }
   return crypto.timingSafeEqual(a, b);
 }
 
@@ -56,5 +72,6 @@ module.exports = {
   SIGNED_SECRET_IS_EPHEMERAL,
   signUploadQuery,
   signedUploadPath,
-  verifyUploadSig
+  verifyUploadSig,
+  revokeUploadLinksForEmail
 };

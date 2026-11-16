@@ -68,7 +68,9 @@ test('admin login sends OTP to the registered account mailbox and reuses the sam
 
     const updatedUsers = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
     assert.equal(updatedUsers[0].trustedDevices.length, 1);
-    assert.equal(updatedUsers[0].trustedDevices[0].token, 'existing-device-token');
+    assert.ok(updatedUsers[0].trustedDevices[0].tokenHash);
+    assert.equal(updatedUsers[0].trustedDevices[0].token, undefined);
+    assert.match(confirmRes.body.deviceToken, /^v1\./);
     assert.match(confirmRes.body.message, /Login successful/i);
   } finally {
     fs.writeFileSync(USERS_FILE, original);

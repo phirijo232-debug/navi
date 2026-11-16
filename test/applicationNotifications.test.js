@@ -76,9 +76,17 @@ test('Quick Screen applications appear in admin notifications and send an admin 
   form.set('phone', '0977123456');
   form.set('nrcNumber', '123456/78/1');
   form.set('product', 'Business equipment');
+  form.set('purpose', 'School fees');
+  form.set('school', 'UNZA');
+  form.set('studentId', 'S-100');
   form.set('amount', '100');
   form.set('tenureWeeks', '1');
   form.set('agreedToTerms', 'true');
+  const jpeg = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xFF, 0xD9]);
+  const photo = name => new File([jpeg], name, { type: 'image/jpeg' });
+  form.set('nrcFront', photo('nrc-front.jpg'));
+  form.set('nrcBack', photo('nrc-back.jpg'));
+  form.set('studentIdPhoto', photo('student.jpg'));
   const response = await fetch(`http://127.0.0.1:${server.address().port}/api/apply`, {
     method: 'POST',
     body: form

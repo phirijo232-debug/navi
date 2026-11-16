@@ -6,6 +6,7 @@ const { logError } = require('./logger');
 const config = require('../config');
 const dataStore = require('./dataStore');
 const { isFranchiseAdmin } = require('./storeScope');
+const { readDeviceClaims, deviceRecordMatches } = require('./tokenAuth');
 
 const USERS_FILE = dataStore.paths.users;
 
@@ -92,15 +93,23 @@ function isPrivateIp(ip) {
 
 function findUserByDeviceToken(token) {
   if (!token) return null;
+  const claims = readDeviceClaims(token);
+  if (!claims) return null;
   const users = getUsers();
-  return users.find(user => user.trustedDevices?.some(device => device.token === token));
+  const user = users.find(entry => String(entry.email || '').trim().toLowerCase() === claims.email);
+  if (!user) return null;
+  if (claims.uid != null && user.id != null && String(claims.uid) !== String(user.id)) return null;
+  const match = (user.trustedDevices || []).some(device => deviceRecordMatches(device, token, claims));
+  return match ? user : null;
 }
 
 function updateDeviceActivity(token, ip) {
+  const claims = readDeviceClaims(token);
+  if (!claims) return null;
   const users = getUsers();
-  const userIndex = users.findIndex(user => user.trustedDevices?.some(device => device.token === token));
+  const userIndex = users.findIndex(entry => String(entry.email || '').trim().toLowerCase() === claims.email);
   if (userIndex < 0) return null;
-  const device = users[userIndex].trustedDevices.find(device => device.token === token);
+  const device = users[userIndex].trustedDevices.find(entry => deviceRecordMatches(entry, token, claims));
   if (!device) return null;
 
   device.lastSeen = new Date().toISOString();
