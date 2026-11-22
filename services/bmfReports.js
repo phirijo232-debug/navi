@@ -87,7 +87,7 @@ function filenameFor(type, opts = {}) {
     }
     case 'all-loans': return `bmf_all_loans_${d}.xlsx`;
     case 'payments-today': return `bmf_daily_cashbook_${d}.xlsx`;
-    case 'overdue': return `bmf_how_risky_${d}.xlsx`;
+    case 'overdue': return `bmf_loan_risk_${d}.xlsx`;
     case 'defaulters': return `bmf_problem_loans_${d}.xlsx`;
     case 'borrower-statements': return `bmf_full_history_${d}.xlsx`;
     case 'approval-log': return `bmf_daily_cashbook_${d}.xlsx`;

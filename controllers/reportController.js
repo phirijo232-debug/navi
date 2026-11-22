@@ -1095,13 +1095,125 @@ function getAllUsersReport(req, res) {
   }
 }
 
+function loanOfficerName(loan) {
+  return String(loan.officer || loan.assignedOfficer || loan.createdBy || loan.approvedBy || '').trim();
+}
+
+function isoDay(value) {
+  const text = String(value || '').slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+}
+
+function buildPortfolioAnalytics(loans, from, to) {
+  const openStatuses = ['active', 'grace', 'defaulted', 'liquidated'];
+  const overdueStatuses = ['grace', 'defaulted', 'overdue'];
+  const inPeriod = day => {
+    if (!from && !to) return Boolean(day);
+    if (!day) return false;
+    if (from && day < from) return false;
+    if (to && day > to) return false;
+    return true;
+  };
+  let disbursed = 0;
+  let collected = 0;
+  let outstanding = 0;
+  let overdueAmount = 0;
+  let overdueCount = 0;
+  let profit = 0;
+  const seriesMap = new Map();
+  const addSeries = (day, field, amount) => {
+    if (!inPeriod(day)) return;
+    const row = seriesMap.get(day) || { date: day, collected: 0, disbursed: 0 };
+    row[field] = Number((row[field] + amount).toFixed(2));
+    seriesMap.set(day, row);
+  };
+  const buckets = [
+    { label: 'Current', min: 0, max: 0, count: 0, amount: 0 },
+    { label: '1-30 days', min: 1, max: 30, count: 0, amount: 0 },
+    { label: '31-60 days', min: 31, max: 60, count: 0, amount: 0 },
+    { label: '61-90 days', min: 61, max: 90, count: 0, amount: 0 },
+    { label: 'Over 90 days', min: 91, max: Infinity, count: 0, amount: 0 }
+  ];
+  const statusMap = new Map();
+  loans.forEach(loan => {
+    const status = String(loan.businessStatus || loan.status || 'pending').toLowerCase();
+    const principal = Number(loan.amount || 0);
+    const balance = Math.max(0, Number(loan.outstanding || 0));
+    const approved = isoDay(loan.approvedAt || loan.borrowedDate);
+    const due = isoDay(loan.dueDate);
+    if (!['pending', 'declined'].includes(status) && inPeriod(approved)) {
+      disbursed += principal;
+      addSeries(approved, 'disbursed', principal);
+    }
+    (Array.isArray(loan.payments) ? loan.payments : []).forEach(payment => {
+      const day = isoDay(payment.paymentDate || payment.date);
+      const paid = Number(payment.amount || 0);
+      if (!inPeriod(day)) return;
+      collected += paid;
+      profit += Number(payment.interestPortion || 0);
+      addSeries(day, 'collected', paid);
+    });
+    const inBook = !['pending', 'declined'].includes(status) && (!to || !approved || approved <= to);
+    if (inBook && balance > 0 && openStatuses.includes(status)) outstanding += balance;
+    const daysLate = due
+      ? Math.max(0, Math.round((Date.now() - new Date(`${due}T00:00:00Z`).getTime()) / 86400000))
+      : 0;
+    if (overdueStatuses.includes(status) && balance > 0 && daysLate > 0 && (!to || !due || due <= to)) {
+      overdueAmount += balance;
+      overdueCount += 1;
+      const bucket = buckets.find(item => daysLate >= item.min && daysLate <= item.max) || buckets[buckets.length - 1];
+      bucket.count += 1;
+      bucket.amount += balance;
+    } else if (inBook && balance > 0 && status === 'active') {
+      buckets[0].count += 1;
+      buckets[0].amount += balance;
+    }
+    if (!from && !to || inPeriod(approved)) {
+      const row = statusMap.get(status) || { status, count: 0, amount: 0 };
+      row.count += 1;
+      row.amount += principal;
+      statusMap.set(status, row);
+    }
+  });
+  return {
+    summary: {
+      disbursed: Number(disbursed.toFixed(2)),
+      collected: Number(collected.toFixed(2)),
+      outstanding: Number(outstanding.toFixed(2)),
+      overdueAmount: Number(overdueAmount.toFixed(2)),
+      overdueCount,
+      profit: Number(profit.toFixed(2)),
+      parPercent: outstanding > 0 ? Number(((overdueAmount / outstanding) * 100).toFixed(1)) : 0
+    },
+    series: [...seriesMap.values()].sort((a, b) => a.date.localeCompare(b.date)),
+    arrearsBuckets: buckets.map(bucket => ({
+      label: bucket.label,
+      count: bucket.count,
+      amount: Number(bucket.amount.toFixed(2))
+    })),
+    statusBreakdown: [...statusMap.values()].map(row => ({
+      status: row.status,
+      count: row.count,
+      amount: Number(row.amount.toFixed(2))
+    }))
+  };
+}
+
 function getAnalyticsReport(req, res) {
   try {
   if (!requireAdmin(req, res)) return;
   const scope = getRequestedStoreId(req);
   if (!canAccessStore(req, scope)) return res.status(403).json({ error: 'Access to this store is not allowed.' });
+  const { from, to, invalid } = readPeriod(req);
+  if (invalid) return res.status(400).json({ error: 'from/to must be YYYY-MM-DD dates.' });
 
-  const enriched = getEnrichedLoans().filter(loan => scope === 'all' || getRecordStoreId(loan) === scope);
+  const officerFilter = String(req.query.officer || '').trim().toLowerCase();
+  let enriched = getEnrichedLoans().filter(loan => scope === 'all' || getRecordStoreId(loan) === scope);
+  const officers = [...new Set(enriched.map(loanOfficerName).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  if (officerFilter) {
+    enriched = enriched.filter(loan => loanOfficerName(loan).toLowerCase() === officerFilter);
+  }
+  const portfolio = buildPortfolioAnalytics(enriched, from, to);
   const isOverdue = loan => ['grace', 'defaulted', 'overdue'].includes(loan.businessStatus);
   const isPaid = loan => loan.businessStatus === 'paid';
   const isDefaulted = loan => loan.businessStatus === 'defaulted' || loan.businessStatus === 'overdue';
@@ -1158,6 +1270,13 @@ function getAnalyticsReport(req, res) {
 
   return res.json({
     generatedAt: new Date().toISOString(),
+    period: { from: from || null, to: to || null },
+    officer: officerFilter || null,
+    officers,
+    summary: portfolio.summary,
+    series: portfolio.series,
+    arrearsBuckets: portfolio.arrearsBuckets,
+    statusBreakdown: portfolio.statusBreakdown,
     totalProfitEarned,
     projectedProfit,
     possibleLoss,
@@ -1209,6 +1328,7 @@ function isPromptReportType(type) {
 
 function promptReportRows(type, report) {
   switch (type) {
+    case 'loan-risk':
     case 'how-risky': return { rows: report.parRows };
     case 'who-owes': return { rows: report.agingRows };
     case 'full-history': return { statement: report.statement };
@@ -1228,9 +1348,10 @@ function buildPromptPdfSections(type, report) {
     : `K ${Number(value).toLocaleString('en-ZM', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const percent = value => value == null ? 'Not available' : `${(Number(value) * 100).toFixed(1)}%`;
   switch (type) {
+    case 'loan-risk':
     case 'how-risky':
       return [{
-        title: 'PORTFOLIO AT RISK',
+        title: 'LOAN RISK / ARREARS',
         headers: ['Loan ID', 'Borrower', 'Officer', 'Principal', 'Outstanding', 'Days Late', 'Risk Bucket', 'Reserve'],
         rows: report.parRows.map(row => [
           row.loanId, row.borrower, row.officer, money(row.principal), money(row.outstanding),

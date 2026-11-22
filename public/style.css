@@ -43,6 +43,10 @@
   --muted: #C6C7C2;
   --line: #2E3036;
   --accent: #C6F432;
+  --chart-payments: #C6F432;
+  --chart-loans: #C6C7C2;
+  --chart-collected: #C6F432;
+  --chart-disbursed: #F2F2F0;
   --on-accent: #0F1014;
   --danger: #FFB4AB;
   --warning: #F0C56A;
@@ -71,6 +75,10 @@ html.light, body.light {
   --muted: #3E423C;
   --line: #D5D5D0;
   --accent: #C6F432;
+  --chart-payments: #4F6B0E;
+  --chart-loans: #3E423C;
+  --chart-collected: #4F6B0E;
+  --chart-disbursed: #0F1014;
   --on-accent: #0F1014;
   --danger: #8C1D18;
   --warning: #6B4E00;
@@ -453,8 +461,9 @@ body:has(#adminDashboard:not(.hidden)) .brand-header { display: none; }
 
 .button-row, .report-actions, .feedback-export-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
-.panel, .admin-data-section, .report-card, .user-card, .pool-card, .board-card {
+.panel, .admin-data-section, .report-card, .report-row, .user-card, .pool-card, .board-card {
   background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: var(--space-4);
 }
@@ -544,7 +553,8 @@ body.light .admin-kpi-card strong::before {
 .chart-point-loans { fill: var(--muted); }
 .chart-legend { display: flex; gap: var(--space-4); margin-top: var(--space-3); color: var(--muted); font-size: 0.82rem; }
 .chart-legend i { display: inline-block; width: 12px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--muted); }
-.legend-payments { background: var(--accent); }
+.legend-payments, .legend-collected { background: var(--chart-collected); }
+.legend-disbursed { background: var(--chart-disbursed); }
 
 .admin-chart-panel, .admin-activity-panel, .admin-feedback-panel { margin-bottom: var(--space-4); }
 
@@ -706,6 +716,7 @@ body.light .pool-value { color: var(--text); }
 
 @media (min-width: 960px) {
   .admin-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #analyticsFigures.admin-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .pool-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
@@ -855,6 +866,35 @@ body.light .est-total .est-val { color: var(--text); }
 .dropdown-menu button { border: 0; background: transparent; color: var(--text); text-align: left; min-height: 40px; cursor: pointer; }
 .request-row, .feedback-item { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
 .security-switch-wrap { display: flex; align-items: center; gap: var(--space-2); }
+.admin-quick-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); margin-top: var(--space-3); }
+.admin-quick-grid button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+.admin-quick-grid .quick-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.analytics-toolbar { display: grid; grid-template-columns: 1fr 180px 180px 220px auto; gap: var(--space-3); align-items: end; margin-bottom: var(--space-4); }
+.analytics-toolbar .chart-range-pills { grid-column: 1 / -1; }
+.analytics-toolbar label { display: flex; flex-direction: column; gap: var(--space-1); color: var(--muted); font-size: 0.82rem; }
+.analytics-charts { display: grid; grid-template-columns: 1fr; gap: var(--space-4); margin: var(--space-4) 0; }
+.analytics-charts .panel h2, .downloads-heading { margin-bottom: var(--space-3); }
+.report-library { display: flex; flex-direction: column; gap: var(--space-3); }
+.report-row { display: flex; justify-content: space-between; gap: var(--space-4); align-items: center; }
+.report-row h3 { margin-bottom: 4px; }
+.report-row p { color: var(--muted); }
+.report-actions { display: flex; gap: var(--space-2); flex: 0 0 auto; }
+.report-actions .enter-btn, .report-actions .toggle-mode { min-width: 96px; }
+.bar-chart { display: flex; flex-direction: column; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; align-items: center; font-size: 0.88rem; }
+.bar-track { height: 10px; background: var(--bg); border-radius: 99px; overflow: hidden; }
+.bar-fill { display: block; height: 100%; background: var(--chart-collected); }
+.chart-line-payments, .chart-line-collected { stroke: var(--chart-collected); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.chart-line-loans, .chart-line-disbursed { stroke: var(--chart-disbursed); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.analytics-trend text { fill: var(--muted); font-size: 11px; font-family: var(--font); }
+.chart-area-payments { fill: var(--chart-payments); opacity: 0.12; }
+.chart-area-loans { fill: var(--chart-loans); opacity: 0.1; }
+.chart-point-payments { fill: var(--chart-payments); }
+.chart-point-loans { fill: var(--chart-loans); }
+@media (max-width: 1100px) {
+  .analytics-toolbar, .report-fields { grid-template-columns: 1fr; }
+  .report-row { flex-direction: column; align-items: stretch; }
+}
 
 :root { --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23F2F2F0' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
 html.light, body.light { --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%230F1014' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
@@ -913,6 +953,9 @@ body.light .qs-page select {
 .admin-shell input[type="search"]::-webkit-search-decoration,
 .admin-shell input[type="search"]::-webkit-search-cancel-button,
 .admin-shell input[type="search"]::-webkit-search-results-button { appearance: none; display: none; }
+.admin-shell input[type="date"],
+.qs-page input[type="date"],
+.auth-page input[type="date"] { padding-right: 40px; }
 .admin-shell input[type="date"]::-webkit-datetime-edit,
 .qs-page input[type="date"]::-webkit-datetime-edit,
 .admin-shell input[type="date"]::-webkit-datetime-edit-fields-wrapper { padding: 0; color: inherit; }

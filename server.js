@@ -136,7 +136,12 @@ app.use((req, res, next) => {
   return res.redirect(302, `${destination}${query}`);
 });
 
-app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
+function sendHtml(res, file) {
+  res.set('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(file);
+}
+app.get('/', (req, res) => sendHtml(res, path.join(PUBLIC_DIR, 'index.html')));
+app.get('/admin', (req, res) => sendHtml(res, path.join(PUBLIC_DIR, 'admin.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'login.html')));
 app.get('/account', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'user.html')));
 app.get('/signup', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'signup.html')));

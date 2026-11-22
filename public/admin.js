@@ -15,7 +15,7 @@ let customTimeframeFrom = '';
 let customTimeframeTo = '';
 
 const REPORT_LIBRARY = [
-  { type: 'how-risky', title: 'Loan risk / arrears report', description: 'Overdue loans, how late they are, and the loss reserve', source: 'par', filenamePrefix: 'bmf_how_risky' },
+  { type: 'loan-risk', title: 'Loan risk / arrears report', description: 'Overdue loans, how late they are, and the loss reserve', source: 'par', filenamePrefix: 'bmf_loan_risk' },
   { type: 'who-owes', title: 'Borrower arrears by age', description: 'Each borrower grouped by how many days they are late', source: 'aging', filenamePrefix: 'bmf_who_owes' },
   { type: 'full-history', title: 'Borrower statement', description: 'Every payment made and still owed for one loan', source: 'statement', filenamePrefix: 'bmf_full_history', borrowerSearch: true, periodFilter: false },
   { type: 'all-loans', title: 'Loans issued', description: 'Every loan issued in the selected dates', source: 'disbursements', filenamePrefix: 'bmf_all_loans' },
@@ -124,50 +124,28 @@ function renderReportLibrary() {
   const list = document.getElementById('reportLibrary');
   if (!list) return;
 
-  const officerOptions = (portfolioLoans || []).map(loan => loan.officer || loan.assignedOfficer || loan.createdBy)
-    .filter(Boolean)
-    .map(String)
-    .filter((value, index, arr) => arr.indexOf(value) === index)
-    .sort();
-
   list.innerHTML = REPORT_LIBRARY.map((report) => `
-    <article class="report-card" data-report-card="${report.type}">
-      <h3>${escapeHtml(report.title)}</h3>
-      <p>${escapeHtml(report.description)}</p>
-      <div class="report-fields">
+    <article class="report-row" data-report-card="${report.type}">
+      <div>
+        <h3>${escapeHtml(report.title)}</h3>
+        <p>${escapeHtml(report.description)}</p>
         ${report.periodFilter === false
           ? `<p class="report-period-note">${report.type === 'schedule'
             ? 'Includes all scheduled installments for the selected loan; date filters do not apply.'
             : 'Includes the selected loan\'s complete payment history; date filters do not apply.'}</p>`
-          : `
-            <label>
-              <span>From</span>
-              <input type="date" data-report-from>
-            </label>
-            <label>
-              <span>To</span>
-              <input type="date" data-report-to>
-            </label>
-            <label class="wide">
-              <span>Officer</span>
-              <select data-report-officer>
-                <option value="">All officers</option>
-                ${officerOptions.map(option => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join('')}
-              </select>
-            </label>
-          `}
+          : '<p class="report-period-note">Uses the period and officer selected above.</p>'}
         ${report.borrowerSearch ? `
           <label class="wide">
             <span>Borrower search</span>
             <input type="search" data-report-borrower placeholder="Search by name, email, or loan ID">
           </label>
         ` : ''}
+        <div class="last-generated">Not generated yet</div>
       </div>
       <div class="report-actions">
-        <button type="button" class="toggle-mode" data-report-action data-report-type="${report.type}" data-report-format="xlsx">Download Excel</button>
-        <button type="button" class="toggle-mode" data-report-action data-report-type="${report.type}" data-report-format="pdf">Download PDF</button>
+        <button type="button" class="enter-btn" data-report-action data-report-type="${report.type}" data-report-format="xlsx">Excel</button>
+        <button type="button" class="toggle-mode" data-report-action data-report-type="${report.type}" data-report-format="pdf">PDF</button>
       </div>
-      <div class="last-generated">Not generated yet</div>
     </article>
   `).join('');
 
@@ -176,9 +154,9 @@ function renderReportLibrary() {
       const { reportType, reportFormat: format } = button.dataset;
       const card = button.closest('[data-report-card]');
       if (!card) return;
-      const from = card.querySelector('[data-report-from]')?.value || '';
-      const to = card.querySelector('[data-report-to]')?.value || '';
-      const officer = card.querySelector('[data-report-officer]')?.value || '';
+      const from = card.querySelector('[data-report-from]')?.value || document.getElementById('analyticsFrom')?.value || '';
+      const to = card.querySelector('[data-report-to]')?.value || document.getElementById('analyticsTo')?.value || '';
+      const officer = card.querySelector('[data-report-officer]')?.value || document.getElementById('analyticsOfficer')?.value || '';
       const borrower = card.querySelector('[data-report-borrower]')?.value || '';
       await pullReport(reportType, format, { from, to, officer, borrower, card });
     });
@@ -262,6 +240,136 @@ async function pullReport(reportType, format, params = {}) {
     showBmfToast('Report downloaded successfully.');
   } catch (err) {
     showBmfToast(err.message || 'Could not generate report. Please try again.', 'error');
+  }
+}
+
+function analyticsIso(date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function ensureAnalyticsDefaults() {
+  const from = document.getElementById('analyticsFrom');
+  const to = document.getElementById('analyticsTo');
+  if (!from || !to) return;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (!to.value) to.value = analyticsIso(today);
+  if (!from.value) from.value = analyticsIso(new Date(today.getFullYear(), today.getMonth(), 1));
+  if (from.max !== to.value) from.max = analyticsIso(today);
+  if (to.max !== analyticsIso(today)) to.max = analyticsIso(today);
+}
+
+function applyAnalyticsPreset(preset) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const from = document.getElementById('analyticsFrom');
+  const to = document.getElementById('analyticsTo');
+  if (!from || !to) return;
+  to.value = analyticsIso(today);
+  if (preset === 'month') from.value = analyticsIso(new Date(today.getFullYear(), today.getMonth(), 1));
+  else if (preset === '30') from.value = analyticsIso(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29));
+  else if (preset === '90') from.value = analyticsIso(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 89));
+  else if (preset === 'year') from.value = analyticsIso(new Date(today.getFullYear(), 0, 1));
+  document.querySelectorAll('[data-analytics-preset]').forEach(button => {
+    const selected = button.dataset.analyticsPreset === preset;
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+  if (preset !== 'custom') loadAnalytics();
+}
+
+function analyticsBarChart(rows, valueKey, labelKey, emptyText) {
+  const data = rows.filter(row => Number(row[valueKey]) > 0);
+  if (!data.length) return `<p class="chart-empty">${escapeHtml(emptyText)}</p>`;
+  const max = Math.max(...data.map(row => Number(row[valueKey]) || 0), 1);
+  return `<div class="bar-chart">${data.map(row => {
+    const width = Math.max(4, Math.round((Number(row[valueKey]) / max) * 100));
+    const rawLabel = row[labelKey] || row.status || '';
+    const label = labelKey === 'status' ? formatStatus(rawLabel) : rawLabel;
+    const display = valueKey === 'count' ? String(row.count) : formatCurrency(row[valueKey]);
+    return `<div class="bar-row"><span>${escapeHtml(label)}</span><span class="bar-track"><span class="bar-fill" style="width:${width}%"></span></span><b>${escapeHtml(display)}</b></div>`;
+  }).join('')}</div>`;
+}
+
+function analyticsTrendChart(series) {
+  const points = Array.isArray(series) ? series : [];
+  const hasData = points.some(point => Number(point.collected) > 0 || Number(point.disbursed) > 0);
+  if (!hasData) return '<p class="chart-empty">No collections or disbursements in this period.</p>';
+  const width = 720;
+  const height = 240;
+  const left = 78;
+  const right = 12;
+  const top = 12;
+  const bottom = 32;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const max = Math.max(1, ...points.map(point => Math.max(Number(point.collected) || 0, Number(point.disbursed) || 0)));
+  const x = index => left + (points.length <= 1 ? plotWidth / 2 : index * plotWidth / (points.length - 1));
+  const y = value => top + plotHeight - (value / max) * plotHeight;
+  const line = field => points.map((point, index) => `${index ? 'L' : 'M'} ${x(index)},${y(Number(point[field]) || 0)}`).join(' ');
+  const yLabels = [max, max / 2, 0].map((value, index) => {
+    const yPos = top + plotHeight * index / 2;
+    return `<text x="${left - 8}" y="${yPos + 4}" text-anchor="end">${escapeHtml(formatCurrency(value))}</text><line class="chart-grid-line" x1="${left}" y1="${yPos}" x2="${width - right}" y2="${yPos}"/>`;
+  }).join('');
+  const tickIndexes = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])];
+  const xLabels = tickIndexes.map(index => {
+    const day = String(points[index].date || '');
+    const label = /^\d{4}-\d{2}-\d{2}$/.test(day) ? `${day.slice(8, 10)}/${day.slice(5, 7)}` : day;
+    return `<text x="${x(index)}" y="${height - 8}" text-anchor="middle">${escapeHtml(label)}</text>`;
+  }).join('');
+  return `<svg class="collections-svg analytics-trend" viewBox="0 0 ${width} ${height}" role="img" aria-label="Collections and disbursements">${yLabels}${xLabels}<path class="chart-line-disbursed" d="${line('disbursed')}" fill="none"></path><path class="chart-line-collected" d="${line('collected')}" fill="none"></path></svg><div class="chart-legend"><span><i class="legend-collected"></i>Collections</span><span><i class="legend-disbursed"></i>Disbursements</span></div>`;
+}
+
+async function loadAnalytics() {
+  const status = document.getElementById('analyticsStatus');
+  const figures = document.getElementById('analyticsFigures');
+  if (!figures) return;
+  ensureAnalyticsDefaults();
+  const from = document.getElementById('analyticsFrom')?.value || '';
+  const to = document.getElementById('analyticsTo')?.value || '';
+  const officer = document.getElementById('analyticsOfficer')?.value || '';
+  if (from && to && from > to) {
+    if (status) status.textContent = 'The start date must be on or before the end date.';
+    return;
+  }
+  if (status) status.textContent = 'Loading figures…';
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  if (officer) params.set('officer', officer);
+  try {
+    const response = await fetch(`/reports/analytics?${params.toString()}`, { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Could not load analytics.');
+    const summary = data.summary || {};
+    const overdueCount = Number(summary.overdueCount) || 0;
+    const cards = [
+      ['Disbursed', formatCurrency(summary.disbursed), 'Loans issued'],
+      ['Collected', formatCurrency(summary.collected), 'Payments received'],
+      ['Outstanding', formatCurrency(summary.outstanding), 'Still owed'],
+      ['Overdue', formatCurrency(summary.overdueAmount), `${overdueCount} loan${overdueCount === 1 ? '' : 's'}`],
+      ['Profit', formatCurrency(summary.profit), 'Interest collected'],
+      ['Arrears', `${Number(summary.parPercent || 0).toFixed(1)}%`, 'Of outstanding']
+    ];
+    const empty = !summary.disbursed && !summary.collected && !summary.outstanding && !overdueCount;
+    figures.innerHTML = cards.map(([label, value, caption]) => `<article class="admin-kpi-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(caption)}</small></article>`).join('');
+    if (status) status.textContent = empty ? 'No loans in this period.' : `Figures for ${from || 'the start'} to ${to || 'today'}.`;
+    const officerSelect = document.getElementById('analyticsOfficer');
+    if (officerSelect && Array.isArray(data.officers)) {
+      const current = officerSelect.value;
+      officerSelect.innerHTML = `<option value="">All officers</option>${data.officers.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}`;
+      if ([...officerSelect.options].some(option => option.value === current)) officerSelect.value = current;
+    }
+    const trend = document.getElementById('analyticsTrend');
+    const arrears = document.getElementById('analyticsArrears');
+    const statuses = document.getElementById('analyticsStatusChart');
+    if (trend) trend.innerHTML = analyticsTrendChart(data.series);
+    if (arrears) arrears.innerHTML = analyticsBarChart(data.arrearsBuckets || [], 'amount', 'label', 'No arrears in this period.');
+    if (statuses) statuses.innerHTML = analyticsBarChart(data.statusBreakdown || [], 'count', 'status', 'No loans in this period.');
+  } catch (err) {
+    if (status) status.textContent = err.message || 'Could not load analytics.';
   }
 }
 
@@ -356,7 +464,11 @@ function showAdminPage(pageId, { recordHistory = true } = {}) {
   else if (pageId === 'hrView') { fetchHrEmployees(); fetchSecurityGroups(); fetchAuditLog(); fetchAccessApprovals(); }
   else if (pageId === 'applicationsView') fetchApplications();
   else if (pageId === 'requestQueue') fetchNewRequests();
-  else if (pageId === 'portfolioReports') renderReportLibrary();
+  else if (pageId === 'portfolioReports') {
+    renderReportLibrary();
+    ensureAnalyticsDefaults();
+    loadAnalytics();
+  }
   else if (pageId === 'feedbackDetails') fetchStoreFeedback();
   else if (pageId === 'serverSettingsView') initServerMode();
   else if (pageId === 'loanInterestRatesView') loadLoanInterestPolicy(true);
@@ -1463,10 +1575,10 @@ function renderPortfolioOverview() {
   const intervalLabel = bucketDays === 1 ? 'Daily' : bucketDays <= 7 ? 'Weekly' : 'Monthly';
   const chartSvg = `<svg class="collections-svg admin-month-chart" viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="${intervalLabel} payments received and newly approved loan amounts from ${formatDate(firstDay)} to ${formatDate(lastDay)}">
     ${grid}${xLabels}
-    <path d="${makeArea(paymentPoints)}" fill="#C6F432" opacity=".12"></path>
-    <path d="${makeArea(loanPoints)}" fill="#8A8D86" opacity=".08"></path>
-    <path d="${makeLine(paymentPoints)}" fill="none" stroke="#C6F432" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
-    <path d="${makeLine(loanPoints)}" fill="none" stroke="#8A8D86" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path class="chart-area-payments" d="${makeArea(paymentPoints)}"></path>
+    <path class="chart-area-loans" d="${makeArea(loanPoints)}"></path>
+    <path class="chart-line-payments" d="${makeLine(paymentPoints)}" fill="none"></path>
+    <path class="chart-line-loans" d="${makeLine(loanPoints)}" fill="none"></path>
     ${tooltips}
   </svg>`;
   const hasChartData = series.some(point => point.payments > 0 || point.loans > 0);
@@ -3860,7 +3972,12 @@ document.getElementById('applyCollectionRange')?.addEventListener('click', () =>
   renderPortfolioOverview();
 });
 document.getElementById('dailyReportQuickBtn')?.addEventListener('click', () => {
-  pullReport('daily-cashbook', 'xlsx');
+  showReportsView();
+});
+document.getElementById('analyticsApply')?.addEventListener('click', () => loadAnalytics());
+document.getElementById('analyticsOfficer')?.addEventListener('change', () => loadAnalytics());
+document.querySelectorAll('[data-analytics-preset]').forEach(button => {
+  button.addEventListener('click', () => applyAnalyticsPreset(button.dataset.analyticsPreset));
 });
 document.getElementById('adminLoanTable')?.addEventListener('click', event => {
   const notifyButton = event.target.closest('[data-notify-loan]');
