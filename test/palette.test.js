@@ -26,7 +26,7 @@ const RETIRED_TOKENS = [
   'd6e7ff'
 ];
 
-const SLATE_TOKENS = ['#10141a', '#e6eaf0', '#5b94d6'];
+const SLATE_TOKENS = ['#0f1014', '#f2f2f0', '#c6f432'];
 
 function read(rel) {
   return fs.readFileSync(path.join(__dirname, '..', rel), 'utf8').toLowerCase();
@@ -57,5 +57,5 @@ test('slate retheme: status pills keep their semantic colors', () => {
   assert.ok(css.includes('#f0c56a'), 'grace/warning colour missing');
   assert.ok(css.includes('#8fdcb0'), 'paid/success colour missing');
   assert.ok(css.includes('#ffb4ab'), 'declined/error colour missing');
-  assert.ok(css.includes('#5b94d6'), 'active/primary colour missing');
+  assert.ok(css.includes('#c6f432'), 'accent colour missing');
 });

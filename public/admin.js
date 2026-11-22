@@ -15,15 +15,15 @@ let customTimeframeFrom = '';
 let customTimeframeTo = '';
 
 const REPORT_LIBRARY = [
-  { type: 'how-risky', title: 'How Risky Are Our Loans?', description: 'Shows which loans are overdue and by how long', source: 'par', filenamePrefix: 'bmf_how_risky' },
-  { type: 'who-owes', title: 'Who Owes What and How Late?', description: 'Lists every borrower\'s arrears in time buckets', source: 'aging', filenamePrefix: 'bmf_who_owes' },
-  { type: 'full-history', title: 'One Borrower\'s Full History', description: 'Every payment made and still owed for one loan', source: 'statement', filenamePrefix: 'bmf_full_history', borrowerSearch: true, periodFilter: false },
-  { type: 'all-loans', title: 'All Loans We Gave Out This Period', description: 'Every loan issued in a date range', source: 'disbursements', filenamePrefix: 'bmf_all_loans' },
-  { type: 'schedule', title: 'Payment Schedule Per Loan', description: 'Instalment-by-instalment plan for one loan', source: 'schedule', filenamePrefix: 'bmf_schedule', borrowerSearch: true, periodFilter: false },
-  { type: 'collection', title: 'How Well Is Money Being Collected?', description: 'Officer performance vs CGAP target', source: 'collection', filenamePrefix: 'bmf_collection' },
-  { type: 'problem-loans', title: 'Problem Loans & Write-Offs', description: 'Every defaulted loan and net loss', source: 'defaults', filenamePrefix: 'bmf_problem_loans' },
-  { type: 'daily-cashbook', title: 'Daily Money In and Out', description: 'Cashbook — every receipt and disbursement', source: 'cashbook', filenamePrefix: 'bmf_daily_cashbook' },
-  { type: 'officer-scorecard', title: 'Officer Scorecard', description: 'KPIs for each loan officer vs MIX Market targets', source: 'officers', filenamePrefix: 'bmf_officer_scorecard' }
+  { type: 'how-risky', title: 'Loan risk / arrears report', description: 'Overdue loans, how late they are, and the loss reserve', source: 'par', filenamePrefix: 'bmf_how_risky' },
+  { type: 'who-owes', title: 'Borrower arrears by age', description: 'Each borrower grouped by how many days they are late', source: 'aging', filenamePrefix: 'bmf_who_owes' },
+  { type: 'full-history', title: 'Borrower statement', description: 'Every payment made and still owed for one loan', source: 'statement', filenamePrefix: 'bmf_full_history', borrowerSearch: true, periodFilter: false },
+  { type: 'all-loans', title: 'Loans issued', description: 'Every loan issued in the selected dates', source: 'disbursements', filenamePrefix: 'bmf_all_loans' },
+  { type: 'schedule', title: 'Payment schedule', description: 'Instalment plan for one loan', source: 'schedule', filenamePrefix: 'bmf_schedule', borrowerSearch: true, periodFilter: false },
+  { type: 'collection', title: 'Collections performance', description: 'How much of the amount due was collected', source: 'collection', filenamePrefix: 'bmf_collection' },
+  { type: 'problem-loans', title: 'Problem loans and write-offs', description: 'Defaulted loans and recorded recoveries', source: 'defaults', filenamePrefix: 'bmf_problem_loans' },
+  { type: 'daily-cashbook', title: 'Daily cashbook', description: 'Receipts and disbursements', source: 'cashbook', filenamePrefix: 'bmf_daily_cashbook' },
+  { type: 'officer-scorecard', title: 'Officer scorecard', description: 'Lending and collection figures for each officer', source: 'officers', filenamePrefix: 'bmf_officer_scorecard' }
 ];
 let storeFeedback = [];
 let activeFeedbackFilter = 'all';
@@ -70,7 +70,7 @@ function openCreateUserModal(mode = 'customer') {
   const roleSelect = document.getElementById('newUserRole');
   const customerRole = roleSelect.querySelector('option[value="user"]');
   if (customerRole) customerRole.hidden = createUserMode === 'hr';
-  if (title) title.textContent = createUserMode === 'hr' ? 'Create Staff Account' : 'Create New User';
+  if (title) title.textContent = createUserMode === 'hr' ? 'Create staff account' : 'Create new user';
   roleSelect.value = createUserMode === 'hr' ? 'store_admin' : 'user';
   showAdminPage('createUserView');
 }
@@ -106,9 +106,10 @@ function showBmfToast(message, kind = 'success') {
 
   toast.textContent = message;
   toast.dataset.kind = kind;
-  toast.style.background = kind === 'error' ? 'var(--error)' : 'var(--success)';
-  toast.style.color = 'var(--on-primary)';
-  toast.style.display = 'block';
+  toast.style.background = '';
+  toast.style.color = '';
+  toast.classList.add('visible');
+  toast.style.display = '';
   clearTimeout(adminToastTimer);
   adminToastTimer = setTimeout(() => {
     toast.style.display = 'none';
@@ -163,10 +164,10 @@ function renderReportLibrary() {
         ` : ''}
       </div>
       <div class="report-actions">
-        <button type="button" class="toggle-mode" data-report-action data-report-type="${report.type}" data-report-format="xlsx">⬇ Download Excel</button>
-        <button type="button" class="toggle-mode" data-report-action data-report-type="${report.type}" data-report-format="pdf">📄 Download PDF</button>
+        <button type="button" class="toggle-mode" data-report-action data-report-type="${report.type}" data-report-format="xlsx">Download Excel</button>
+        <button type="button" class="toggle-mode" data-report-action data-report-type="${report.type}" data-report-format="pdf">Download PDF</button>
       </div>
-      <div class="last-generated">Last generated: —</div>
+      <div class="last-generated">Not generated yet</div>
     </article>
   `).join('');
 
@@ -257,12 +258,15 @@ async function pullReport(reportType, format, params = {}) {
     a.remove();
     URL.revokeObjectURL(url);
     const lastGenerated = params.card?.querySelector('.last-generated');
-    if (lastGenerated) lastGenerated.textContent = `Last generated: ${new Date().toLocaleString('en-GB')}`;
+    if (lastGenerated) lastGenerated.textContent = `Last generated: ${new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
     showBmfToast('Report downloaded successfully.');
   } catch (err) {
     showBmfToast(err.message || 'Could not generate report. Please try again.', 'error');
   }
 }
+
+const THEME_SUN = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const THEME_MOON = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z"/></svg>';
 
 function applyTheme(theme) {
   const activeTheme = theme === 'light' ? 'light' : 'dark';
@@ -270,12 +274,13 @@ function applyTheme(theme) {
   document.body.classList.remove('dark', 'light');
   document.documentElement.classList.add(activeTheme);
   document.body.classList.add(activeTheme);
-  const toggle = document.getElementById('adminThemeToggle');
-  if (toggle) {
-    const nextTheme = activeTheme === 'light' ? 'dark' : 'light';
-    toggle.textContent = `Use ${nextTheme} theme`;
+  const nextTheme = activeTheme === 'light' ? 'dark' : 'light';
+  ['adminThemeToggle', 'authThemeToggle'].forEach(id => {
+    const toggle = document.getElementById(id);
+    if (!toggle) return;
+    toggle.innerHTML = activeTheme === 'light' ? THEME_MOON : THEME_SUN;
     toggle.setAttribute('aria-label', `Switch to ${nextTheme} theme`);
-  }
+  });
 }
 
 function showAuthScreen() {
@@ -283,6 +288,7 @@ function showAuthScreen() {
   setViewVisibility('adminAuth', true);
   hideAdminViews();
   showAdminLogin();
+  document.body.classList.remove('nav-open');
 }
 
 function setViewVisibility(id, visible) {
@@ -314,7 +320,7 @@ function ensureAdminPageBackButton(page) {
   button.type = 'button';
   button.className = 'admin-page-back';
   button.dataset.adminBack = '';
-  button.textContent = '← Back';
+  button.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Back</span>';
   button.setAttribute('aria-label', 'Return to the previous admin page');
   page.insertBefore(button, page.firstChild);
 }
@@ -341,6 +347,8 @@ function showAdminPage(pageId, { recordHistory = true } = {}) {
   setAdminPageVisibility(pageId);
   const navButton = document.querySelector(`#adminSidebar [data-admin-page="${pageId}"]`);
   setDashboardNavActive(navButton || null);
+  document.body.classList.remove('nav-open');
+  document.getElementById('adminNavToggle')?.setAttribute('aria-expanded', 'false');
   window.scrollTo({ top: 0, behavior: 'instant' });
 
   if (pageId === 'paymentsView') fetchPayments();
@@ -557,10 +565,14 @@ async function showApplicationsView(applicationId = null) {
 }
 
 function showStoreSelection() {
-  setViewVisibility('storeSelect', true);
-  setViewVisibility('adminAuth', false);
-  hideAdminViews();
-  document.getElementById('storeContext').textContent = '';
+  const token = getDeviceToken();
+  const role = localStorage.getItem('userRole');
+  if (token && ['admin', 'store_admin', 'franchise_admin'].includes(role)) {
+    localStorage.setItem('adminStore', 'buraza');
+    enterStore('buraza');
+    return;
+  }
+  showAuthScreen();
 }
 
 // Mirror of config.STORES on the server. Keep in sync when a subsidiary is added.
@@ -1245,9 +1257,20 @@ function renderLoanDirectory(pageId = activeAdminPage) {
   }).sort((a, b) => new Date(b.approvedAt || b.createdAt || 0) - new Date(a.approvedAt || a.createdAt || 0));
   const page = getDirectoryPage(loans, currentPage, LOAN_DIRECTORY_PAGE_SIZE);
   loanDirectoryPages[pageId] = page.currentPage;
-  if (statusMessage) statusMessage.textContent = `${loans.length} loan${loans.length === 1 ? '' : 's'} match this view · page ${page.currentPage} of ${page.pageCount}${customerLoansError ? ` · ${customerLoansError}` : ''}.`;
+  const sourceLoans = customerLoans.length || customerLoansLoaded ? customerLoans : portfolioLoans;
+  const nothingOnFile = !term && !from && !to && !selectedStatus && sourceLoans.length === 0;
+  if (statusMessage) {
+    statusMessage.textContent = nothingOnFile
+      ? ''
+      : `${loans.length} loan${loans.length === 1 ? '' : 's'} match this view. Page ${page.currentPage} of ${page.pageCount}${customerLoansError ? `. ${customerLoansError}` : ''}.`;
+  }
   if (!page.items.length) {
-    list.innerHTML = `<div class="directory-empty" role="status">${customerLoansError ? escapeHtml(customerLoansError) : config.type === 'overdue' ? 'No overdue loans with an outstanding balance were found.' : config.type === 'defaulted' ? 'No defaulted loans with an outstanding balance were found.' : 'No loans match these filters.'}</div>`;
+    const emptyCopy = customerLoansError
+      ? customerLoansError
+      : nothingOnFile
+        ? (config.type === 'overdue' ? 'No overdue loans.' : config.type === 'defaulted' ? 'No defaulters.' : 'No loans yet.')
+        : (config.type === 'overdue' ? 'No overdue loans with an outstanding balance were found.' : config.type === 'defaulted' ? 'No defaulted loans with an outstanding balance were found.' : 'No loans match these filters.');
+    list.innerHTML = `<div class="directory-empty" role="status">${escapeHtml(emptyCopy)}</div>`;
   } else {
     list.innerHTML = `<table class="admin-table loan-directory-table">
       <thead><tr><th>Loan ID</th><th>Borrower</th><th>Phone</th><th>Borrowed</th><th>Due Date</th><th>Status</th><th>Principal</th><th>Paid</th><th>Outstanding</th><th>Action</th></tr></thead>
@@ -1279,22 +1302,6 @@ function renderLoanDirectory(pageId = activeAdminPage) {
   renderDirectoryPagination(config.paginationId, page.currentPage, loans.length, pageId, LOAN_DIRECTORY_PAGE_SIZE);
 }
 
-function renderKpiSparkline(values, color, label) {
-  const width = 84;
-  const height = 34;
-  const max = Math.max(1, ...values);
-  const points = values.map((value, index) => {
-    const x = values.length < 2 ? width / 2 : 2 + index * (width - 4) / (values.length - 1);
-    const y = height - 3 - (value / max) * (height - 8);
-    return `${x},${y}`;
-  });
-  const line = points.map((point, index) => `${index ? 'L' : 'M'} ${point}`).join(' ');
-  const firstX = points.length ? points[0].split(',')[0] : '2';
-  const lastX = points.length ? points[points.length - 1].split(',')[0] : String(width - 2);
-  const area = `${line} L ${lastX},${height} L ${firstX},${height} Z`;
-  return `<svg class="kpi-sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(label)}"><path d="${area}" fill="${color}" opacity=".15"></path><path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
-}
-
 function renderLoanTablePagination(pageCount, currentPage) {
   const nav = document.getElementById('loanTablePagination');
   if (!nav) return;
@@ -1314,6 +1321,10 @@ function setDashboardNavActive(activeButton) {
     button.classList.toggle('active', active);
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
+  });
+  const pageId = activeButton?.dataset.adminPage || '';
+  document.querySelectorAll('[data-mobile-page]').forEach(button => {
+    button.classList.toggle('active', button.dataset.mobilePage === pageId);
   });
 }
 
@@ -1349,46 +1360,15 @@ function renderPortfolioOverview() {
   if (customFromInput) customFromInput.max = todayDateValue;
   if (customToInput) customToInput.max = todayDateValue;
 
-  const sparkDays = Array.from({ length: 14 }, (_, index) => {
-    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13 + index);
-    return { date, key: dashboardDateKey(date) };
-  });
-  const paymentByDay = new Map();
-  payments.forEach(item => {
-    const key = dashboardDateKey(item.date);
-    paymentByDay.set(key, (paymentByDay.get(key) || 0) + (Number(item.payment.amount) || 0));
-  });
-  const activeByDay = new Map();
-  active.forEach(loan => {
-    const key = dashboardDateKey(loan.approvedAt);
-    if (key) activeByDay.set(key, (activeByDay.get(key) || 0) + 1);
-  });
-  const overdueByDay = new Map();
-  overdue.forEach(loan => {
-    const key = dashboardDateKey(loan.dueDate);
-    if (key) overdueByDay.set(key, (overdueByDay.get(key) || 0) + 1);
-  });
-  const balanceByDay = new Map();
-  openLoans.forEach(loan => {
-    const key = dashboardDateKey(loan.approvedAt);
-    if (key) balanceByDay.set(key, (balanceByDay.get(key) || 0) + Math.max(0, Number(loan.outstanding) || 0));
-  });
-  const sparklineValues = {
-    cash: sparkDays.map(day => paymentByDay.get(day.key) || 0),
-    active: sparkDays.map(day => activeByDay.get(day.key) || 0),
-    overdue: sparkDays.map(day => overdueByDay.get(day.key) || 0),
-    balance: sparkDays.map(day => balanceByDay.get(day.key) || 0)
-  };
   const kpiData = [
-    { label: 'Cash Collected', value: formatCurrency(collectedMonth), note: `${monthPayments.length} payments this month`, color: '#5B94D6', accent: 'blue', spark: 'cash', metric: 'payments by date' },
-    { label: 'Active Loans', value: String(active.length), note: `${pendingRequests.length} requests awaiting review`, color: '#F0C56A', accent: 'amber', spark: 'active', metric: 'active loans by approval date' },
-    { label: 'Overdue Loans', value: String(overdue.length), note: `${formatCurrency(overdueBalance)} outstanding`, color: '#FFB4AB', accent: 'red', spark: 'overdue', metric: 'overdue loans by due date' },
-    { label: 'Outstanding Balance', value: formatCurrency(openBalance), note: 'Across all open loans', color: '#F0D0D4', accent: 'purple', spark: 'balance', metric: 'open balances by approval date' }
+    { label: 'Cash collected', value: formatCurrency(collectedMonth), note: `${monthPayments.length} payments this month` },
+    { label: 'Active loans', value: String(active.length), note: `${pendingRequests.length} requests awaiting review` },
+    { label: 'Overdue loans', value: String(overdue.length), note: `${formatCurrency(overdueBalance)} outstanding` },
+    { label: 'Outstanding balance', value: formatCurrency(openBalance), note: 'Across all open loans' }
   ];
   kpis.innerHTML = kpiData.map(item => `
-    <article class="admin-kpi-card accent-${item.accent}">
+    <article class="admin-kpi-card">
       <div class="kpi-copy"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong><small>${escapeHtml(item.note)}</small></div>
-      ${renderKpiSparkline(sparklineValues[item.spark], item.color, `${item.label}: ${item.metric}, last 14 days`)}
     </article>
   `).join('');
 
@@ -1424,7 +1404,7 @@ function renderPortfolioOverview() {
   };
   if (monthLabel) {
     monthLabel.textContent = customRangeValid
-      ? `${formatDate(firstDay)} – ${formatDate(lastDay)}`
+      ? `${formatDate(firstDay)} to ${formatDate(lastDay)}`
       : isCustomRange ? 'Choose a custom date range' : ({ '7D': 'Last 7 days', '1M': 'Last 30 days', '3M': 'Last 90 days', '1Y': 'Last 12 months' }[activeCollectionRange] || `Last ${rangeDays} days`);
   }
   const chartPayments = new Map();
@@ -1483,15 +1463,18 @@ function renderPortfolioOverview() {
   const intervalLabel = bucketDays === 1 ? 'Daily' : bucketDays <= 7 ? 'Weekly' : 'Monthly';
   const chartSvg = `<svg class="collections-svg admin-month-chart" viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="${intervalLabel} payments received and newly approved loan amounts from ${formatDate(firstDay)} to ${formatDate(lastDay)}">
     ${grid}${xLabels}
-    <path d="${makeArea(paymentPoints)}" fill="#5B94D6" opacity=".1"></path>
-    <path d="${makeArea(loanPoints)}" fill="#8FDCB0" opacity=".1"></path>
-    <path d="${makeLine(paymentPoints)}" fill="none" stroke="#5B94D6" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></path>
-    <path d="${makeLine(loanPoints)}" fill="none" stroke="#8FDCB0" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="${makeArea(paymentPoints)}" fill="#C6F432" opacity=".12"></path>
+    <path d="${makeArea(loanPoints)}" fill="#8A8D86" opacity=".08"></path>
+    <path d="${makeLine(paymentPoints)}" fill="none" stroke="#C6F432" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="${makeLine(loanPoints)}" fill="none" stroke="#8A8D86" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
     ${tooltips}
   </svg>`;
-  chart.innerHTML = customRangeValid || !isCustomRange
-    ? chartSvg
-    : '<p class="collection-range-prompt">Choose a start and end date, then select Apply to view the custom range.</p>';
+  const hasChartData = series.some(point => point.payments > 0 || point.loans > 0);
+  chart.innerHTML = !(customRangeValid || !isCustomRange)
+    ? '<p class="collection-range-prompt">Choose a start and end date, then select Apply.</p>'
+    : hasChartData
+      ? chartSvg
+      : '<p class="chart-empty">No collections in this period.</p>';
   document.querySelectorAll('[data-collection-range]').forEach(button => {
     const selected = button.dataset.collectionRange === activeCollectionRange;
     button.classList.toggle('active', selected);
@@ -1568,7 +1551,7 @@ function renderPortfolioOverview() {
           <td class="admin-row-actions">${action}</td>
         </tr>`;
       }).join('')}</tbody>
-    </table>` : '<p class="table-empty">No loans match the current search and status filter.</p>';
+    </table>` : `<p class="table-empty">${portfolioLoans.length ? 'No loans match the current search and status filter.' : 'No loans yet.'}</p>`;
   renderLoanTablePagination(pageCount, loanTablePage);
 
   const customerMap = new Map();
@@ -2615,13 +2598,33 @@ async function notifyAllOverdue() {
   }
 }
 
+async function finishAdminSession(data, email) {
+  if (!['admin', 'store_admin', 'franchise_admin'].includes(data.role)) {
+    setAuthMessage('This account is not a staff account.', true);
+    showAdminLogin();
+    return;
+  }
+  localStorage.setItem('deviceToken', data.deviceToken);
+  localStorage.setItem('userEmail', data.email || email);
+  localStorage.setItem('userRole', data.role);
+  localStorage.setItem('userStoreId', data.storeId || 'buraza');
+  localStorage.setItem('adminStore', 'buraza');
+  localStorage.setItem('username', data.username || 'Admin');
+  applyRolePermissions();
+  localStorage.setItem('lastAppPage', '/admin');
+  showAdminSuccess('Signed in.');
+  showDashboard();
+  await fetchUsers();
+}
+
 async function handleAdminLogin(event) {
   event.preventDefault();
-  const email = document.getElementById('adminEmail').value.trim();
+  const identifier = document.getElementById('adminEmail').value.trim();
   const password = document.getElementById('adminPassword').value;
+  const requireOtp = Boolean(document.getElementById('adminRequireOtp')?.checked);
 
-  if (!email || !password) {
-    setAuthMessage('Email and password are required.', true);
+  if (!identifier || !password) {
+    setAuthMessage('Enter your username or email, and your password.', true);
     return;
   }
 
@@ -2632,16 +2635,20 @@ async function handleAdminLogin(event) {
     const response = await fetch('/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ identifier, password, requireOtp })
     });
 
     const data = await response.json();
     setLoader(false);
 
-    if (data.message) {
-      showAdminSuccess(data.message);
-      pendingEmail = email;
-      document.getElementById('otpSentTo').textContent = `OTP sent to: ${data.otpSentTo || email}`;
+    if (data.deviceToken && data.message === 'Login successful.') {
+      await finishAdminSession(data, data.email || identifier);
+      return;
+    }
+
+    if (data.message && data.otpSentTo) {
+      pendingEmail = data.email || identifier;
+      document.getElementById('otpSentTo').textContent = `Code sent to ${data.otpSentTo}`;
       document.getElementById('adminLoginForm').classList.add('hidden');
       document.getElementById('adminOtpForm').classList.remove('hidden');
       document.getElementById('adminOtp').focus();
@@ -2762,24 +2769,7 @@ async function handleAdminOtp(event) {
     setLoader(false);
 
     if (data.message === 'Login successful.') {
-      showAdminSuccess('Admin login verified. Dashboard ready.');
-      if (!['admin', 'store_admin', 'franchise_admin'].includes(data.role)) {
-        setAuthMessage('This account is not an admin account.', true);
-        document.getElementById('adminOtpForm').classList.add('hidden');
-        document.getElementById('adminLoginForm').classList.remove('hidden');
-        return;
-      }
-
-      localStorage.setItem('deviceToken', data.deviceToken);
-      localStorage.setItem('userEmail', pendingEmail);
-      localStorage.setItem('userRole', data.role);
-      localStorage.setItem('userStoreId', data.storeId || 'buraza');
-      localStorage.setItem('adminStore', 'buraza');
-      localStorage.setItem('username', data.username || 'Admin');
-      applyRolePermissions();
-      localStorage.setItem('lastAppPage', 'admin.html');
-      showDashboard();
-      await fetchUsers();
+      await finishAdminSession(data, pendingEmail);
       return;
     }
 
@@ -2807,7 +2797,7 @@ function logoutAdmin() {
   document.getElementById('adminOtpForm').classList.add('hidden');
   document.getElementById('adminLoginForm').classList.remove('hidden');
   setAuthMessage('');
-  showStoreSelection();
+  showAuthScreen();
 }
 
 async function handleCreateUser(event) {
@@ -3504,13 +3494,44 @@ document.addEventListener('keydown', event => {
     .filter(modal => !modal.hidden && getComputedStyle(modal).display !== 'none');
   openModals[openModals.length - 1]?.querySelector('[data-close-modal]')?.click();
 });
-document.querySelectorAll('[data-store]').forEach(button => {
-  button.addEventListener('click', () => enterStore(button.dataset.store));
-});
-document.getElementById('adminThemeToggle')?.addEventListener('click', () => {
+function toggleAdminTheme() {
   const theme = document.body.classList.contains('light') ? 'dark' : 'light';
   localStorage.setItem('adminTheme', theme);
   applyTheme(theme);
+}
+document.getElementById('adminThemeToggle')?.addEventListener('click', toggleAdminTheme);
+document.getElementById('authThemeToggle')?.addEventListener('click', toggleAdminTheme);
+document.getElementById('adminNavToggle')?.addEventListener('click', () => {
+  const open = document.body.classList.toggle('nav-open');
+  document.getElementById('adminNavToggle').setAttribute('aria-expanded', String(open));
+});
+document.getElementById('adminNavScrim')?.addEventListener('click', () => {
+  document.body.classList.remove('nav-open');
+  document.getElementById('adminNavToggle')?.setAttribute('aria-expanded', 'false');
+});
+document.querySelectorAll('[data-mobile-page]').forEach(button => {
+  button.addEventListener('click', () => {
+    if (button.dataset.mobilePage === 'menu') {
+      const open = document.body.classList.toggle('nav-open');
+      document.getElementById('adminNavToggle')?.setAttribute('aria-expanded', String(open));
+      return;
+    }
+    document.querySelector(`#adminSidebar [data-admin-page="${button.dataset.mobilePage}"]`)?.click();
+  });
+});
+document.querySelectorAll('input[name="adminLoginMethod"]').forEach(input => {
+  input.addEventListener('change', () => {
+    if (!input.checked) return;
+    const field = document.getElementById('adminEmail');
+    const label = document.getElementById('adminIdentifierLabel');
+    const emailMode = input.value === 'email';
+    if (field) {
+      field.placeholder = emailMode ? 'Email' : 'Username';
+      field.autocomplete = emailMode ? 'email' : 'username';
+      field.inputMode = emailMode ? 'email' : 'text';
+    }
+    if (label) label.textContent = emailMode ? 'Email' : 'Username';
+  });
 });
 document.getElementById('adminLoginForm').addEventListener('submit', handleAdminLogin);
 document.getElementById('adminOtpForm').addEventListener('submit', handleAdminOtp);
@@ -3526,12 +3547,6 @@ document.querySelectorAll('[data-reset-back]').forEach(button => {
 });
 document.getElementById('backToLogin').addEventListener('click', () => {
   showAdminLogin();
-});
-document.getElementById('backToStores').addEventListener('click', () => {
-  pendingResetEmail = '';
-  showAdminLogin();
-  localStorage.removeItem('adminStore');
-  showStoreSelection();
 });
 document.getElementById('logoutBtn').addEventListener('click', logoutAdmin);
 document.getElementById('createUserBtn').addEventListener('click', () => {
@@ -4036,19 +4051,18 @@ async function fetchInvites() {
 // the store picker with a half-validated session.
 async function restoreSession() {
   const token = getDeviceToken();
-  const store = localStorage.getItem('adminStore');
-  if (!token || !isKnownStore(store)) {
-    showStoreSelection();
+  if (!token) {
+    showAuthScreen();
     return;
   }
+  localStorage.setItem('adminStore', 'buraza');
   try {
     const response = await fetch('/users', { headers: getStoreHeaders() });
     if (!response.ok) {
       showAuthScreen();
       return;
     }
-    // Token valid — re-enter the store and rebuild the dashboard + identity.
-    enterStore(store);
+    enterStore('buraza');
   } catch (err) {
     showAuthScreen();
   }

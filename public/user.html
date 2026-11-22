@@ -3,42 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PrymeBMF — My Account</title>
-  <link rel="stylesheet" href="style.css?v=20261017-shared-theme-refresh">
+  <title>My account — Buraza Micro Finance</title>
+  <link rel="stylesheet" href="style.css?v=20261116-bmf-redesign">
   <style>
-    body.customer-portal { background:#10141A; color:#E6EAF0; }
+    body.customer-portal { background:#0F1014; color:#F2F2F0; }
     .customer-portal .dashboard { width: 100%; max-width: 100vw; margin: 0; padding: 18px clamp(12px, 3vw, 24px); box-sizing: border-box; }
     .customer-portal .dash-header { display:flex; align-items:center; justify-content:space-between; min-height:44px; }
     .customer-portal .brand { margin:0; font-size:20px; }
-    .customer-portal .loan-tabs { display:flex; align-items:center; gap:8px; overflow-x:auto; padding:8px 0 14px; border-bottom:1px solid #3A4452; }
-    .customer-portal .loan-tab { border:0; border-radius:7px; padding:10px 16px; white-space:nowrap; color:#B4BCC6; background:transparent; }
-    .customer-portal .loan-tab.active { color:#0E1A2C; background:#5B94D6; }
+    .customer-portal .loan-tabs { display:flex; align-items:center; gap:8px; overflow-x:auto; padding:8px 0 14px; border-bottom:1px solid #2E3036; }
+    .customer-portal .loan-tab { border:0; border-radius:7px; padding:10px 16px; white-space:nowrap; color:#C6C7C2; background:transparent; }
+    .customer-portal .loan-tab.active { color:#0F1014; background:#C6F432; }
     .customer-portal .screen-section { padding-top:16px; }
-    .customer-portal .welcome-card,.customer-portal .board-card,.customer-portal .loan-summary-card,.customer-portal .panel { background:#1A212B; border:1px solid #3A4452; border-radius:10px; box-shadow:none; }
-    .customer-portal .welcome-card { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 24px; margin-bottom:18px; border-left:4px solid #5B94D6; }
+    .customer-portal .welcome-card,.customer-portal .board-card,.customer-portal .loan-summary-card,.customer-portal .panel { background:#1A1C22; border:1px solid #2E3036; border-radius:10px; box-shadow:none; }
+    .customer-portal .welcome-card { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 24px; margin-bottom:18px; border-left:0; }
     .customer-portal .welcome-card h2 { margin:0 0 5px; font-size:20px; }
-    .customer-portal .welcome-card p { margin:0; color:#B4BCC6; }
+    .customer-portal .welcome-card p { margin:0; color:#C6C7C2; }
     .customer-portal .standing-badge { color:#8FDCB0; border:1px solid #8FDCB0; border-radius:20px; padding:8px 13px; white-space:nowrap; }
     .customer-portal .portal-kpis { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:0 0 18px; }
     .customer-portal .portal-kpis .loan-summary-card { padding:17px 20px; }
-    .customer-portal .portal-kpis h3 { font-size:12px; color:#B4BCC6; text-transform:uppercase; letter-spacing:.05em; }
+    .customer-portal .portal-kpis h3 { font-size:12px; color:#C6C7C2; text-transform:uppercase; letter-spacing:.05em; }
     .customer-portal .portal-kpis .summary-value { font-size:26px; font-weight:700; margin:6px 0; }
-    .customer-portal .portal-kpis .summary-label { color:#B4BCC6; }
+    .customer-portal .portal-kpis .summary-label { color:#C6C7C2; }
     .customer-portal #statusSummaryCards { display:none; }
     .customer-portal .board-card { padding:18px; margin-bottom:16px; }
     .customer-portal .overview-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-    .customer-portal .summary-inline-card { background:#222B38; border:1px solid #3A4452; border-radius:9px; padding:15px; }
+    .customer-portal .summary-inline-card { background:#22242B; border:1px solid #2E3036; border-radius:9px; padding:15px; }
     .customer-portal .history-filters { display:none; }
     .customer-portal .loan-list { padding:0; list-style:none; }
-    .customer-portal .loan-card { background:#1A212B; border:1px solid #3A4452; border-radius:10px; margin:10px 0; padding:16px; cursor:pointer; min-width:0; overflow-wrap:anywhere; }
-    .customer-portal .loan-meta { color:#B4BCC6; margin-top:9px; }
+    .customer-portal .loan-card { background:#1A1C22; border:1px solid #2E3036; border-radius:10px; margin:10px 0; padding:16px; cursor:pointer; min-width:0; overflow-wrap:anywhere; }
+    .customer-portal .loan-meta { color:#C6C7C2; margin-top:9px; }
     .customer-portal .request-field-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
     .customer-portal .request-field-grid:first-child { grid-template-columns:1fr; }
     .customer-portal .field-label { display:block; margin-bottom:6px; }
     @media(max-width:650px) { .customer-portal .dashboard{padding:12px}.customer-portal .portal-kpis,.customer-portal .overview-grid{grid-template-columns:1fr}.customer-portal .welcome-card{align-items:flex-start;flex-direction:column}.customer-portal .request-field-grid{grid-template-columns:1fr} }
 
     /*── PrymeBMF — BMF Master Fidelity skin ─────────────────── */
-    *, *::before, *::after, html, body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; }
+    *, *::before, *::after, html, body { font-family:'IBM Plex Sans','Segoe UI',sans-serif; }
     .customer-portal .standing-badge.warn { color:#F0C56A; border-color:#F0C56A; }
     .customer-portal .standing-badge.alert { color:#FFB4AB; border-color:#FFB4AB; }
 
@@ -50,16 +50,15 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(16, 20, 26, 0.85);
-      backdrop-filter: blur(4px);
+      background: rgba(15, 16, 20, 0.72);
     }
     .customer-portal .request-lock-box.hidden { display: none; }
     .customer-portal .lock-box-content {
       text-align: center;
       padding: 32px 24px;
       border-radius: 14px;
-      background: #1A212B;
-      border: 1px solid #3A4452;
+      background: #1A1C22;
+      border: 1px solid #2E3036;
       box-shadow: 0 24px 48px rgba(0,0,0,0.4);
       max-width: 360px;
       width: 90vw;
@@ -72,12 +71,12 @@
     }
     .customer-portal .lock-message {
       margin: 0 0 24px;
-      color: #B4BCC6;
+      color: #C6C7C2;
       line-height: 1.5;
     }
     .customer-portal .lock-close-btn {
       background: #FFB4AB;
-      color: #0E1A2C;
+      color: #0F1014;
       border: none;
       border-radius: 7px;
       padding: 12px 24px;
@@ -89,8 +88,8 @@
 
     /* Record Payment button on loan cards */
     .customer-portal .record-payment-btn {
-      background: #5B94D6;
-      color: #0E1A2C;
+      background: #C6F432;
+      color: #0F1014;
       border: none;
       border-radius: 7px;
       padding: 10px 16px;
@@ -98,34 +97,34 @@
       font-weight: 600;
       cursor: pointer;
     }
-    .customer-portal .record-payment-btn:hover { background: #7EAEDE; }
+    .customer-portal .record-payment-btn:hover { background: #D4F56A; }
 
     body.customer-portal {
-      --portal-bg:#10141A;
-      --portal-card:#1A212B;
-      --portal-surface:#222B38;
-      --portal-border:#3A4452;
-      --portal-text:#E6EAF0;
-      --portal-muted:#B4BCC6;
+      --portal-bg:#0F1014;
+      --portal-card:#1A1C22;
+      --portal-surface:#22242B;
+      --portal-border:#2E3036;
+      --portal-text:#F2F2F0;
+      --portal-muted:#C6C7C2;
       background:var(--portal-bg);
       color:var(--portal-text);
     }
     body.customer-portal.light {
-      --portal-bg:#F4F6F8;
+      --portal-bg:#F2F2F0;
       --portal-card:#fff;
-      --portal-surface:#F4F6F8;
+      --portal-surface:#F2F2F0;
       --portal-border:#D5DCE3;
-      --portal-text:#1A2330;
+      --portal-text:#0F1014;
       --portal-muted:#556170;
     }
     body.customer-portal.light .loan-tab.active,
     body.customer-portal.light .portal-avatar,
     body.customer-portal.light .record-payment-btn {
-      background:#1E4E8C;
-      color:#FFFFFF;
+      background:#C6F432;
+      color:#0F1014;
     }
     body.customer-portal.light .portal-identity strong,
-    body.customer-portal.light .loan-receipt { color:#1E4E8C; }
+    body.customer-portal.light .loan-receipt { color:#0F1014; }
     .customer-portal .portal-topbar {
       position:sticky;
       top:0;
@@ -139,7 +138,7 @@
       border-bottom:1px solid var(--portal-border);
     }
     .customer-portal .portal-identity { display:flex; align-items:baseline; gap:8px; flex:none; white-space:nowrap; }
-    .customer-portal .portal-identity strong { color:#5B94D6; font-size:18px; }
+    .customer-portal .portal-identity strong { color:#C6F432; font-size:18px; }
     .customer-portal .portal-identity span { color:var(--portal-muted); font-size:14px; }
     .customer-portal .portal-topbar .loan-tabs {
       flex:1;
@@ -153,9 +152,9 @@
       scrollbar-width:thin;
     }
     .customer-portal .portal-topbar .loan-tab { flex:none; padding:10px 15px; color:var(--portal-muted); }
-    .customer-portal .portal-topbar .loan-tab.active { color:#0E1A2C; }
+    .customer-portal .portal-topbar .loan-tab.active { color:#0F1014; }
     .customer-portal .portal-user-controls { display:flex; align-items:center; gap:10px; flex:none; white-space:nowrap; }
-    .customer-portal .portal-avatar { display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#5B94D6; color:#0E1A2C; font-size:12px; font-weight:700; }
+    .customer-portal .portal-avatar { display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#C6F432; color:#0F1014; font-size:12px; font-weight:700; }
     .customer-portal .portal-user-name { max-width:150px; overflow:hidden; text-overflow:ellipsis; font-size:14px; font-weight:600; }
     body.customer-portal #modeBtn { position:static; top:auto; right:auto; z-index:auto; width:auto !important; padding:8px 12px; border-radius:7px; font-size:12px; }
     .customer-portal .dashboard { padding:18px clamp(12px, 1.5vw, 22px) 32px; }
@@ -168,21 +167,19 @@
     .customer-portal .welcome-card p,.customer-portal .loan-meta,.customer-portal .portal-kpis h3,
     .customer-portal .portal-kpis .summary-label,.customer-portal .support-page-heading p,
     .customer-portal .support-panel-heading p { color:var(--portal-muted); }
-    .customer-portal .portal-kpis .loan-summary-card { min-height:126px; border-top:4px solid #5B94D6; }
-    .customer-portal .portal-kpis .loan-summary-card:nth-child(2) { border-top-color:#F0C56A; }
-    .customer-portal .portal-kpis .loan-summary-card:nth-child(3) { border-top-color:#8FDCB0; }
-    .customer-portal .summary-inline-card { background:var(--portal-surface); border-color:var(--portal-border); color:var(--portal-text); }
+    .customer-portal .portal-kpis .loan-summary-card { min-height:126px; border-top:0; }
+        .customer-portal .summary-inline-card { background:var(--portal-surface); border-color:var(--portal-border); color:var(--portal-text); }
     .customer-portal .loan-list { margin:0; }
     .customer-portal .loan-card { background:var(--portal-card); border-color:var(--portal-border); }
-    .customer-portal .loan-card:hover { border-color:#5B94D6; transform:translateY(-1px); }
+    .customer-portal .loan-card:hover { border-color:#C6F432; transform:translateY(-1px); }
     .customer-portal .loan-card-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
     .customer-portal .loan-card-identity { display:grid; gap:4px; min-width:0; }
-    .customer-portal .loan-receipt { color:#5B94D6; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:12px; }
+    .customer-portal .loan-receipt { color:#C6F432; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:12px; }
     .customer-portal .loan-card-heading strong { color:var(--portal-text); font-size:16px; }
     .customer-portal .loan-progress-meta { display:flex; justify-content:space-between; gap:12px; margin-top:12px; color:var(--portal-muted); font-size:12px; }
     .customer-portal .loan-progress { height:7px; overflow:hidden; margin-top:6px; border-radius:999px; background:var(--portal-surface); }
     .customer-portal .loan-progress > span { display:block; height:100%; border-radius:inherit; background:#8FDCB0; }
-    .customer-portal .loan-card[data-loan-status="paid"] .loan-progress > span { background:#5B94D6; }
+    .customer-portal .loan-card[data-loan-status="paid"] .loan-progress > span { background:#C6F432; }
     .customer-portal .support-page-heading { display:flex; align-items:center; justify-content:space-between; gap:14px; margin:4px 0 12px; }
     .customer-portal .support-page-heading .toggle-mode { width:auto; max-width:none; padding:8px 12px; }
     .customer-portal .support-page-heading h2,.customer-portal .support-panel-heading h3 { margin:0 0 4px; }
@@ -200,8 +197,8 @@
       cursor:pointer;
       white-space:nowrap;
     }
-    .customer-portal .support-tab:hover { border-color:#5B94D6; color:var(--portal-text); }
-    .customer-portal .support-tab.active { border-color:#5B94D6; background:rgba(91, 148, 214,.16); color:#5B94D6; font-weight:700; }
+    .customer-portal .support-tab:hover { border-color:#C6F432; color:var(--portal-text); }
+    .customer-portal .support-tab.active { border-color:#C6F432; background:rgba(91, 148, 214,.16); color:#C6F432; font-weight:700; }
     .customer-portal .support-panel { margin-top:16px; padding:20px; border:1px solid var(--portal-border); border-radius:10px; background:var(--portal-card); }
     .customer-portal .support-panel[hidden] { display:none !important; }
     .customer-portal .support-panel-heading { margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--portal-border); }
@@ -214,7 +211,7 @@
     .customer-portal .payment-history-ranges { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0; }
     .customer-portal .payment-summary-grid { grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:16px; }
     .customer-portal .payment-summary-grid .summary-inline-card { border-top:3px solid #8FDCB0; }
-    .customer-portal .payment-summary-grid .summary-inline-card:nth-child(2) { border-top-color:#5B94D6; }
+    .customer-portal .payment-summary-grid .summary-inline-card:nth-child(2) { border-top-color:#C6F432; }
     .customer-portal .payment-summary-grid .summary-inline-card:nth-child(3) { border-top-color:#F0C56A; }
     .customer-portal .payment-summary-grid .summary-inline-card p { margin:6px 0; font-size:22px; font-weight:700; }
     .customer-portal .payment-summary-grid .summary-inline-card:first-child p { color:#8FDCB0; }
@@ -224,16 +221,16 @@
     .customer-portal .customer-payment-table { color:var(--portal-text); }
     .customer-portal .customer-payment-table th { background:var(--portal-surface); color:var(--portal-muted); text-transform:uppercase; letter-spacing:.04em; }
     .customer-portal .customer-payment-table td { border-color:var(--portal-border); }
-    .customer-portal .modal { z-index:1100; background:rgba(5,9,14,.92); backdrop-filter:blur(3px); padding:12px; }
-    .customer-portal .modal-content { width:min(760px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow-y:auto; background:#1A212B; border:1px solid #3A4452; color:#E6EAF0; opacity:1; isolation:isolate; }
-    .customer-portal .modal-grid p { min-width:0; overflow-wrap:anywhere; padding:10px; border:1px solid #3A4452; border-radius:8px; background:#10141A; }
+    .customer-portal .modal { z-index:1100; background:rgba(15,16,20,.72); padding:12px; }
+    .customer-portal .modal-content { width:min(760px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow-y:auto; background:#1A1C22; border:1px solid #2E3036; color:#F2F2F0; opacity:1; isolation:isolate; }
+    .customer-portal .modal-grid p { min-width:0; overflow-wrap:anywhere; padding:10px; border:1px solid #2E3036; border-radius:8px; background:#0F1014; }
     .customer-portal .loan-receipt { overflow-wrap:anywhere; }
     .customer-portal .loan-facts { overflow-wrap:anywhere; line-height:1.7; }
     @media(max-width:600px) { .customer-portal .modal-grid { grid-template-columns:1fr; } }
     .customer-portal .modal-close { display:grid; place-items:center; width:40px; height:40px; border:1px solid var(--portal-border); border-radius:8px; background:var(--portal-surface); color:var(--portal-text); font:inherit; font-size:24px; line-height:1; }
-    .customer-portal .modal-close:hover,.customer-portal .modal-close:focus-visible { border-color:#5B94D6; outline:2px solid rgba(91, 148, 214,.35); outline-offset:2px; }
+    .customer-portal .modal-close:hover,.customer-portal .modal-close:focus-visible { border-color:#C6F432; outline:2px solid rgba(91, 148, 214,.35); outline-offset:2px; }
     body.customer-portal.light .standing-badge { color:#146B3E; border-color:#146B3E; }
-    body.customer-portal.light .support-tab.active { color:#1E4E8C; }
+    body.customer-portal.light .support-tab.active { color:#0F1014; }
     body.customer-portal.light .portal-topbar { box-shadow:0 2px 8px rgba(31,41,55,.06); }
     @media(max-width:900px) {
       .customer-portal .portal-topbar { flex-wrap:wrap; gap:8px 16px; }
@@ -280,6 +277,12 @@
       .customer-portal .support-page-heading { align-items:flex-start; }
     }
   </style>
+<style>
+      body.customer-portal.light, body.light.customer-portal { background:#F2F2F0; color:#0F1014; }
+      body.light.customer-portal .welcome-card, body.light.customer-portal .board-card, body.light.customer-portal .loan-summary-card, body.light.customer-portal .panel, body.light.customer-portal .loan-card, body.light.customer-portal .summary-inline-card { background:#fff; border-color:#D5D5D0; color:#0F1014; }
+      body.light.customer-portal .loan-tab { color:#3E423C; }
+      body.light.customer-portal .loan-tab.active { color:#0F1014; background:#C6F432; }
+    </style>
 </head>
 <body class="customer-portal">
   <div id="bmfToast" class="bmf-toast" role="status" aria-live="polite"></div>
@@ -379,7 +382,7 @@
         <div class="support-tabs" role="tablist" aria-label="Payments and support sections">
           <button type="button" class="support-tab active" id="paymentHistoryTab" role="tab" aria-selected="true" aria-controls="paymentHistoryPanel" data-support-tab="payment-history">💰 Payment History</button>
           <button type="button" class="support-tab" id="inquiriesTab" role="tab" aria-selected="false" aria-controls="inquiriesPanel" data-support-tab="inquiries">💬 Inquiries</button>
-          <button type="button" class="support-tab" id="recordPaymentTab" role="tab" aria-selected="false" aria-controls="recordPaymentPanel" data-support-tab="record-payment">💸 Record Payment</button>
+          <button type="button" class="support-tab" id="recordPaymentTab" role="tab" aria-selected="false" aria-controls="recordPaymentPanel" data-support-tab="record-payment">Record Payment</button>
           <button type="button" class="support-tab" id="dueScheduleTab" role="tab" aria-selected="false" aria-controls="dueSchedulePanel" data-support-tab="due-schedule">🗓 Due Schedule</button>
         </div>
         <p id="supportMessage" class="message-text support-message" role="status" aria-live="polite"></p>
@@ -746,7 +749,7 @@
 
   <script>
     const deviceToken = localStorage.getItem('deviceToken');
-    localStorage.setItem('lastAppPage', 'user.html');
+    localStorage.setItem('lastAppPage', '/account');
     const savedMode = localStorage.getItem('mode') || 'dark';
     applyTheme(savedMode);
 
@@ -755,7 +758,7 @@
       localStorage.removeItem('username');
       localStorage.removeItem('userEmail');
       localStorage.removeItem('userRole');
-      window.location.href = 'login.html';
+      window.location.href = '/login';
     }
 
     function applyTheme(theme) {
@@ -1963,7 +1966,7 @@
           localStorage.removeItem('deviceToken');
           localStorage.removeItem('username');
           localStorage.removeItem('userEmail');
-          window.location.href = 'login.html';
+          window.location.href = '/login';
         });
       }
     }
@@ -1994,7 +1997,7 @@
       const reasonField = document.getElementById('adminDecisionReason');
       const reason = (reasonField?.value || '').trim();
       const token = localStorage.getItem('deviceToken');
-      if (!token) return window.location.href = 'login.html';
+      if (!token) return window.location.href = '/login';
 
       try {
         const res = await fetch(`/loans/${loanId}/action`, {
@@ -2021,7 +2024,7 @@
 
     async function openLoanDetails(id) {
       const token = localStorage.getItem('deviceToken');
-      if (!token) return window.location.href = 'login.html';
+      if (!token) return window.location.href = '/login';
       try {
         const res = await fetch(`/loans/${id}`, {
           headers: { 'x-device-token': token }

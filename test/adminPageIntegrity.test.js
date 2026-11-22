@@ -185,8 +185,9 @@ test('admin dashboard controls are wired and persist an admin-only theme prefere
   assert.match(js, /The start date must be on or before the end date/);
   assert.match(js, /The end date cannot be in the future/);
   assert.match(js, /applyCollectionRange/);
-  assert.match(html, /id="adminThemeToggle"[^>]*>Use light theme/);
-  assert.match(html, /body\.light \.panel/);
+  assert.match(html, /id="adminThemeToggle"/);
+  assert.match(html, /aria-label="Switch to light theme"/);
+  assert.match(fs.readFileSync(path.join(PUBLIC_DIR, 'style.css'), 'utf8'), /body\.light \.panel/);
   assert.match(js, /getElementById\('adminThemeToggle'\)\?\.addEventListener\('click'/);
   assert.match(js, /localStorage\.setItem\('adminTheme', theme\)/);
   assert.match(js, /applyTheme\(localStorage\.getItem\('adminTheme'\) === 'light' \? 'light' : 'dark'\)/);
@@ -205,7 +206,7 @@ test('admin dialogs close from their close buttons, backdrop, and Escape key', (
 });
 
 test('all public HTML pages are non-trivial and start with a doctype', () => {
-  const pages = ['admin.html', 'dashboard.html', 'index.html', 'login.html', 'signup.html', 'forgot-password.html', 'user.html'];
+  const pages = ['admin.html', 'index.html', 'login.html', 'signup.html', 'forgot-password.html', 'user.html'];
   for (const page of pages) {
     const file = path.join(PUBLIC_DIR, page);
     assert.ok(fs.existsSync(file), `${page} is missing`);

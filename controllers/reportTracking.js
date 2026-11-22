@@ -27,7 +27,7 @@ const TRACKING_FILE = path.join(dataStore.DATA_DIR, 'trackingSheet.json');
 
 function loadTracking() {
   try {
-    return JSON.parse(fs.readFileSync(TRACKING_FILE, 'utf8'));
+    return dataStore.readJson(TRACKING_FILE, null);
   } catch (err) {
     if (err.code !== 'ENOENT') {
       logError(`TRACKING SHEET READ FAILED: ${err.message}`);

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pryme Vertex — Sign Up</title>
-  <link rel="stylesheet" href="style.css?v=20261017-shared-theme-refresh">
+  <title>Create account — Buraza Micro Finance</title>
+  <link rel="stylesheet" href="style.css?v=20261116-bmf-redesign">
   <style>
     .eye-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; width: 20px; height: 20px; opacity: 0.6; }
     .eye-icon:hover { opacity: 1; }
@@ -14,12 +14,11 @@
 </head>
 <body>
   <div id="bmfToast" class="bmf-toast" role="status" aria-live="polite"></div>
-  <a href="index.html" class="toggle-mode back-corner">← Back</a>
-  <button class="toggle-mode" id="modeBtn">Switch Mode</button>
+  <a href="/" class="toggle-mode back-corner">Back</a>
+  <button class="icon-btn theme-float" id="modeBtn" type="button" aria-label="Switch theme"></button>
 
-  <div class="landing">
-    <h1 class="brand">Pryme Vertex</h1>
-    <p class="tagline">Create Your Account</p>
+  <div class="auth-page"><section class="auth-card">
+    <div class="brand-lockup"><strong>Create your account</strong><span>Buraza Micro Finance</span></div>
 
     <form id="signupForm" class="auth-form">
       <input type="text" id="username" placeholder="Username" required class="auth-input">
@@ -47,7 +46,7 @@
 
     <div class="loader" id="loader"><span></span><span></span><span></span></div>
     <p id="message" class="message-text"></p>
-  </div>
+  </section></div>
 
   <script>
     let bmfToastTimer;
@@ -91,7 +90,7 @@
       });
     }
 
-    animateTagline('.tagline');
+    document.getElementById('modeBtn').innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>';
 
     let pendingEmail = '';
 
@@ -204,7 +203,7 @@
         // Keep first-time experience on the user dashboard, but avoid relying on long-lived flags.
         localStorage.setItem('newSignup', 'true');
         // After signup, send the user to the login screen to complete OTP-based access.
-        setTimeout(() => window.location.href = 'login.html', 2000);
+        setTimeout(() => window.location.href = '/login', 2000);
       }
 
     });

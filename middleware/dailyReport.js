@@ -12,7 +12,7 @@ const REPORT_STATE_FILE = dataStore.paths.dailyReportState;
 
 function readLastSentDate() {
   try {
-    return JSON.parse(fs.readFileSync(REPORT_STATE_FILE, 'utf8')).lastSentDate || '';
+    return (dataStore.readJson(REPORT_STATE_FILE, {}) || {}).lastSentDate || '';
   } catch (err) {
     if (err.code !== 'ENOENT') logError(`DAILY BMF REPORT STATE READ FAILED: ${err.message}`);
     return '';
