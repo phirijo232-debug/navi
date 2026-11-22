@@ -70,7 +70,7 @@ function openCreateUserModal(mode = 'customer') {
   const roleSelect = document.getElementById('newUserRole');
   const customerRole = roleSelect.querySelector('option[value="user"]');
   if (customerRole) customerRole.hidden = createUserMode === 'hr';
-  if (title) title.textContent = createUserMode === 'hr' ? 'Create Staff Account' : 'Create New User';
+  if (title) title.textContent = createUserMode === 'hr' ? 'Create staff account' : 'Create new user';
   roleSelect.value = createUserMode === 'hr' ? 'store_admin' : 'user';
   showAdminPage('createUserView');
 }
@@ -320,7 +320,7 @@ function ensureAdminPageBackButton(page) {
   button.type = 'button';
   button.className = 'admin-page-back';
   button.dataset.adminBack = '';
-  button.textContent = '← Back';
+  button.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Back</span>';
   button.setAttribute('aria-label', 'Return to the previous admin page');
   page.insertBefore(button, page.firstChild);
 }
