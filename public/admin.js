@@ -297,19 +297,29 @@ function analyticsTrendChart(series) {
   const points = Array.isArray(series) ? series : [];
   const hasData = points.some(point => Number(point.collected) > 0 || Number(point.disbursed) > 0);
   if (!hasData) return '<p class="chart-empty">No collections or disbursements in this period.</p>';
-  const width = 640;
-  const height = 220;
-  const left = 16;
-  const right = 16;
-  const top = 16;
-  const bottom = 28;
+  const width = 720;
+  const height = 240;
+  const left = 78;
+  const right = 12;
+  const top = 12;
+  const bottom = 32;
   const plotWidth = width - left - right;
   const plotHeight = height - top - bottom;
   const max = Math.max(1, ...points.map(point => Math.max(Number(point.collected) || 0, Number(point.disbursed) || 0)));
   const x = index => left + (points.length <= 1 ? plotWidth / 2 : index * plotWidth / (points.length - 1));
   const y = value => top + plotHeight - (value / max) * plotHeight;
   const line = field => points.map((point, index) => `${index ? 'L' : 'M'} ${x(index)},${y(Number(point[field]) || 0)}`).join(' ');
-  return `<svg class="collections-svg analytics-trend" viewBox="0 0 ${width} ${height}" role="img" aria-label="Collections and disbursements"><path class="chart-line-collected" d="${line('collected')}" fill="none"></path><path class="chart-line-disbursed" d="${line('disbursed')}" fill="none"></path></svg>`;
+  const yLabels = [max, max / 2, 0].map((value, index) => {
+    const yPos = top + plotHeight * index / 2;
+    return `<text x="${left - 8}" y="${yPos + 4}" text-anchor="end">${escapeHtml(formatCurrency(value))}</text><line class="chart-grid-line" x1="${left}" y1="${yPos}" x2="${width - right}" y2="${yPos}"/>`;
+  }).join('');
+  const tickIndexes = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])];
+  const xLabels = tickIndexes.map(index => {
+    const day = String(points[index].date || '');
+    const label = /^\d{4}-\d{2}-\d{2}$/.test(day) ? `${day.slice(8, 10)}/${day.slice(5, 7)}` : day;
+    return `<text x="${x(index)}" y="${height - 8}" text-anchor="middle">${escapeHtml(label)}</text>`;
+  }).join('');
+  return `<svg class="collections-svg analytics-trend" viewBox="0 0 ${width} ${height}" role="img" aria-label="Collections and disbursements">${yLabels}${xLabels}<path class="chart-line-disbursed" d="${line('disbursed')}" fill="none"></path><path class="chart-line-collected" d="${line('collected')}" fill="none"></path></svg><div class="chart-legend"><span><i class="legend-collected"></i>Collections</span><span><i class="legend-disbursed"></i>Disbursements</span></div>`;
 }
 
 async function loadAnalytics() {
@@ -334,16 +344,17 @@ async function loadAnalytics() {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || 'Could not load analytics.');
     const summary = data.summary || {};
+    const overdueCount = Number(summary.overdueCount) || 0;
     const cards = [
-      ['Disbursed', formatCurrency(summary.disbursed)],
-      ['Collected', formatCurrency(summary.collected)],
-      ['Outstanding', formatCurrency(summary.outstanding)],
-      ['Overdue', `${formatCurrency(summary.overdueAmount)} · ${summary.overdueCount || 0}`],
-      ['Profit', formatCurrency(summary.profit)],
-      ['Arrears', `${Number(summary.parPercent || 0).toFixed(1)}%`]
+      ['Disbursed', formatCurrency(summary.disbursed), 'Loans issued'],
+      ['Collected', formatCurrency(summary.collected), 'Payments received'],
+      ['Outstanding', formatCurrency(summary.outstanding), 'Still owed'],
+      ['Overdue', formatCurrency(summary.overdueAmount), `${overdueCount} loan${overdueCount === 1 ? '' : 's'}`],
+      ['Profit', formatCurrency(summary.profit), 'Interest collected'],
+      ['Arrears', `${Number(summary.parPercent || 0).toFixed(1)}%`, 'Of outstanding']
     ];
-    const empty = !summary.disbursed && !summary.collected && !summary.outstanding && !summary.overdueCount;
-    figures.innerHTML = cards.map(([label, value]) => `<article class="admin-kpi-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></article>`).join('');
+    const empty = !summary.disbursed && !summary.collected && !summary.outstanding && !overdueCount;
+    figures.innerHTML = cards.map(([label, value, caption]) => `<article class="admin-kpi-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(caption)}</small></article>`).join('');
     if (status) status.textContent = empty ? 'No loans in this period.' : `Figures for ${from || 'the start'} to ${to || 'today'}.`;
     const officerSelect = document.getElementById('analyticsOfficer');
     if (officerSelect && Array.isArray(data.officers)) {

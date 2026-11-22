@@ -553,7 +553,8 @@ body.light .admin-kpi-card strong::before {
 .chart-point-loans { fill: var(--muted); }
 .chart-legend { display: flex; gap: var(--space-4); margin-top: var(--space-3); color: var(--muted); font-size: 0.82rem; }
 .chart-legend i { display: inline-block; width: 12px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--muted); }
-.legend-payments { background: var(--accent); }
+.legend-payments, .legend-collected { background: var(--chart-collected); }
+.legend-disbursed { background: var(--chart-disbursed); }
 
 .admin-chart-panel, .admin-activity-panel, .admin-feedback-panel { margin-bottom: var(--space-4); }
 
@@ -715,6 +716,7 @@ body.light .pool-value { color: var(--text); }
 
 @media (min-width: 960px) {
   .admin-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #analyticsFigures.admin-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .pool-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
@@ -882,8 +884,9 @@ body.light .est-total .est-val { color: var(--text); }
 .bar-row { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; align-items: center; font-size: 0.88rem; }
 .bar-track { height: 10px; background: var(--bg); border-radius: 99px; overflow: hidden; }
 .bar-fill { display: block; height: 100%; background: var(--chart-collected); }
-.chart-line-payments, .chart-line-collected { stroke: var(--chart-payments); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-.chart-line-loans, .chart-line-disbursed { stroke: var(--chart-loans); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.chart-line-payments, .chart-line-collected { stroke: var(--chart-collected); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.chart-line-loans, .chart-line-disbursed { stroke: var(--chart-disbursed); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.analytics-trend text { fill: var(--muted); font-size: 11px; font-family: var(--font); }
 .chart-area-payments { fill: var(--chart-payments); opacity: 0.12; }
 .chart-area-loans { fill: var(--chart-loans); opacity: 0.1; }
 .chart-point-payments { fill: var(--chart-payments); }
