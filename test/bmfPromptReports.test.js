@@ -138,7 +138,7 @@ test('Version 3 filenames use the report generation date and selected receipt ID
   );
   assert.equal(
     Reports.filenameFor('par', 'xlsx', '20260503'),
-    'bmf_how_risky_20260503.xlsx'
+    'bmf_loan_risk_20260503.xlsx'
   );
 });
 
@@ -166,7 +166,8 @@ test('typed-report endpoint dispatches Version 3 aliases with safe, store-scoped
   await getTypedReport(request, response);
 
   assert.equal(response.statusCode, 200);
-  assert.equal(response.body.type, 'how-risky');
+  assert.equal(response.body.type, 'loan-risk');
+  assert.equal(Reports.canonicalReportType('how-risky'), 'loan-risk');
   assert.equal(response.body.rows.length, 1);
   assert.equal('loans' in response.body, false);
 });

@@ -12,6 +12,10 @@
     { "source": "/signup.html", "destination": "/signup", "permanent": false },
     { "source": "/forgot-password.html", "destination": "/forgot-password", "permanent": false }
   ],
+  "headers": [
+    { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }] },
+    { "source": "/admin", "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }] }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
   ],

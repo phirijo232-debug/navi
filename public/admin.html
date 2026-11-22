@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>document.documentElement.classList.add(localStorage.getItem('adminTheme') === 'light' ? 'light' : 'dark');</script>
   <title>BMF Admin</title>
-  <link rel="stylesheet" href="style.css?v=20261116-bmf-redesign">
+  <link rel="stylesheet" href="style.css?v=20261122-analytics">
   
 </head>
 <body>
@@ -135,17 +135,17 @@
           <section class="admin-data-section" id="loyalBorrowersPanel"><header><div><h2>Loyal borrowers</h2><p>Verified on-time repayers</p></div><button type="button" id="jumpCustomersBtn" class="link-button with-icon"><span>View all</span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></header><div id="loyalBorrowers" class="admin-table-wrap"></div></section>
           <section id="feedbackOverview" class="panel admin-feedback-panel"><header><h2>Customer feedback</h2><div class="feedback-export-actions"><button type="button" class="toggle-mode" data-export-table="feedback">Export CSV</button><button type="button" class="toggle-mode" data-export-table="feedback" data-export-format="pdf">Export PDF</button></div></header><div id="adminFeedbackPreview"></div><button type="button" class="link-button with-icon" data-admin-jump="feedbackDetails"><span>Manage feedback</span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></section>
           <section class="panel admin-quick-actions"><h2>Quick actions</h2><div class="admin-quick-grid">
-            <button id="addLoanBtn" class="quick-primary" type="button">+ Add new loan</button>
-            <button id="notifyOverdueBtn" class="quick-warning" type="button">Notify Overdue</button>
-            <button id="announcementBtn" type="button">Send Announcement</button>
-            <button id="dailyReportQuickBtn" type="button">Generate Report</button>
+            <button id="addLoanBtn" class="quick-primary" type="button"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Add new loan</span></button>
+            <button id="notifyOverdueBtn" class="quick-warning" type="button">Notify overdue</button>
+            <button id="announcementBtn" type="button">Send announcement</button>
+            <button id="dailyReportQuickBtn" type="button">Generate report</button>
             <button id="inviteBtn" type="button">Invite links</button>
             <button id="createUserBtn" type="button">Create user</button>
           </div></section>
         </section>
 
         <section id="allLoansView" class="admin-page hidden" aria-labelledby="allLoansTitle">
-          <header class="admin-page-header"><div><h1 id="allLoansTitle">All loans</h1><p>Search and review every loan in your authorized scope.</p></div><div class="button-row"><button type="button" class="quick-primary" id="addLoanFromLoansBtn">+ Create new loan</button><button type="button" class="toggle-mode" id="refreshAllLoansBtn">Refresh</button></div></header>
+          <header class="admin-page-header"><div><h1 id="allLoansTitle">All loans</h1><p>Search and review every loan in your authorized scope.</p></div><div class="button-row"><button type="button" class="quick-primary" id="addLoanFromLoansBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Create new loan</span></button><button type="button" class="toggle-mode" id="refreshAllLoansBtn">Refresh</button></div></header>
           <div class="toolbar" role="search" aria-label="Filter loans">
             <input id="allLoansSearch" class="search-box" type="search" placeholder="Search borrower, loan ID, phone or status" aria-label="Search loans">
             <select id="allLoansStatus" class="search-box" aria-label="Filter loans by status"><option value="">All statuses</option><option value="pending">Pending</option><option value="active">Active</option><option value="grace">Grace</option><option value="defaulted">Defaulted</option><option value="liquidated">Liquidated</option><option value="paid">Paid</option><option value="declined">Declined</option></select>
@@ -193,12 +193,33 @@
           <nav id="defaultersPagination" class="directory-pagination" aria-label="Defaulter pages"></nav>
         </section>
 
-        <section id="requestQueue" class="panel store-section admin-utility-section admin-page hidden" aria-labelledby="newRequestsTitle"><div class="admin-topbar"><div><h1 id="newRequestsTitle">Loan requests and payment reviews <span id="newRequestsBadge" class="request-badge" aria-live="polite">0</span></h1><p>Review loan requests and submitted payment proofs.</p></div><div class="button-row"><button type="button" class="toggle-mode" id="refreshRequestsBtn">Refresh requests</button><button type="button" class="toggle-mode" data-export-table="requests">Export CSV</button><button type="button" class="toggle-mode" data-export-table="requests" data-export-format="pdf">Export PDF</button></div></div><div id="newRequestsList"><p>Loading requests...</p></div><p id="newRequestsNote" class="message-text"></p></section>
-        <section id="portfolioReports" class="panel store-section admin-utility-section admin-page hidden" aria-labelledby="storeReportsTitle">
-          <div class="admin-page-header"><div><h1 id="storeReportsTitle">Reports</h1><p>Choose a report, set the dates, and download Excel or PDF.</p></div></div>
+        <section id="requestQueue" class="panel admin-page hidden" aria-labelledby="newRequestsTitle"><div class="admin-topbar"><div><h1 id="newRequestsTitle">Loan requests and payment reviews <span id="newRequestsBadge" class="request-badge" aria-live="polite">0</span></h1><p>Review loan requests and submitted payment proofs.</p></div><div class="button-row"><button type="button" class="toggle-mode" id="refreshRequestsBtn">Refresh requests</button><button type="button" class="toggle-mode" data-export-table="requests">Export CSV</button><button type="button" class="toggle-mode" data-export-table="requests" data-export-format="pdf">Export PDF</button></div></div><div id="newRequestsList"><p>Loading requests...</p></div><p id="newRequestsNote" class="message-text"></p></section>
+        <section id="portfolioReports" class="admin-page hidden" aria-labelledby="storeReportsTitle">
+          <div class="admin-page-header"><div><h1 id="storeReportsTitle">Reports</h1><p>Portfolio figures for the selected period, then the files you can download.</p></div></div>
+          <div class="analytics-toolbar panel">
+            <div class="chart-range-pills" role="group" aria-label="Report period">
+              <button type="button" class="active" data-analytics-preset="month" aria-pressed="true">This month</button>
+              <button type="button" data-analytics-preset="30" aria-pressed="false">Last 30 days</button>
+              <button type="button" data-analytics-preset="90" aria-pressed="false">Last 90 days</button>
+              <button type="button" data-analytics-preset="year" aria-pressed="false">This year</button>
+              <button type="button" data-analytics-preset="custom" aria-pressed="false">Custom</button>
+            </div>
+            <label>From <input type="date" id="analyticsFrom" aria-label="Report period from"></label>
+            <label>To <input type="date" id="analyticsTo" aria-label="Report period to"></label>
+            <label>Officer <select id="analyticsOfficer" aria-label="Officer"><option value="">All officers</option></select></label>
+            <button type="button" id="analyticsApply" class="enter-btn">Apply</button>
+          </div>
+          <p id="analyticsStatus" class="directory-status" role="status" aria-live="polite"></p>
+          <div id="analyticsFigures" class="admin-kpi-grid"></div>
+          <div class="analytics-charts">
+            <section class="panel"><h2>Collections and disbursements</h2><div id="analyticsTrend"></div></section>
+            <section class="panel"><h2>Arrears by age</h2><div id="analyticsArrears"></div></section>
+            <section class="panel"><h2>Loans by status</h2><div id="analyticsStatusChart"></div></section>
+          </div>
+          <h2 class="downloads-heading">Downloads</h2>
           <div id="reportLibrary" class="report-library"></div>
         </section>
-        <section id="feedbackDetails" class="panel store-section admin-utility-section admin-page hidden" aria-labelledby="feedbackDetailsTitle"><h1 id="feedbackDetailsTitle">Feedback review</h1><div class="loan-filters" id="storeFeedbackFilters" role="group" aria-label="Filter customer feedback"><button class="toggle-mode loan-filter active" data-feedback-filter="all" type="button">All</button><button class="toggle-mode loan-filter" data-feedback-filter="complaint" type="button">Complaints</button><button class="toggle-mode loan-filter" data-feedback-filter="experience" type="button">Experiences</button><button class="toggle-mode loan-filter" data-feedback-filter="improvement" type="button">Improvements</button><button class="toggle-mode loan-filter" data-feedback-filter="inquiry" type="button">Inquiries</button></div><div id="storeFeedbackList"><p>Loading feedback...</p></div></section>
+        <section id="feedbackDetails" class="panel admin-page hidden" aria-labelledby="feedbackDetailsTitle"><h1 id="feedbackDetailsTitle">Feedback review</h1><div class="loan-filters" id="storeFeedbackFilters" role="group" aria-label="Filter customer feedback"><button class="toggle-mode loan-filter active" data-feedback-filter="all" type="button">All</button><button class="toggle-mode loan-filter" data-feedback-filter="complaint" type="button">Complaints</button><button class="toggle-mode loan-filter" data-feedback-filter="experience" type="button">Experiences</button><button class="toggle-mode loan-filter" data-feedback-filter="improvement" type="button">Improvements</button><button class="toggle-mode loan-filter" data-feedback-filter="inquiry" type="button">Inquiries</button></div><div id="storeFeedbackList"><p>Loading feedback...</p></div></section>
 
         <section id="announcementView" class="admin-page hidden panel" aria-labelledby="announcementTitle">
           <h1 id="announcementTitle">Buraza customer announcement</h1>
@@ -333,7 +354,7 @@
       <nav id="hrPagination" class="directory-pagination" aria-label="Employee pages"></nav>
       <p id="hrMessage" class="message-text"></p>
 
-      <section class="panel store-section" aria-labelledby="securityGroupsTitle">
+      <section class="panel" aria-labelledby="securityGroupsTitle">
         <div class="admin-topbar">
           <div>
             <h2 id="securityGroupsTitle">Permission groups</h2>
@@ -360,7 +381,7 @@
         <div id="securityEmployeeList" class="security-role-list" aria-live="polite"><div class="directory-empty">Staff security settings will appear here after loading.</div></div>
       </section>
 
-      <section class="panel store-section" aria-labelledby="auditLogTitle">
+      <section class="panel" aria-labelledby="auditLogTitle">
         <div class="admin-topbar">
           <div><h2 id="auditLogTitle">Security audit log</h2><p>Recent sign-ins, loan and payment changes, and security alerts.</p></div>
           <button type="button" class="toggle-mode" id="auditLogRefreshBtn">Refresh audit log</button>
@@ -369,7 +390,7 @@
         <div id="auditLogList" class="directory-empty">Audit records will appear here after loading.</div>
       </section>
 
-      <section class="panel store-section" aria-labelledby="accessApprovalsTitle">
+      <section class="panel" aria-labelledby="accessApprovalsTitle">
         <div class="admin-topbar">
           <div><h2 id="accessApprovalsTitle">Temporary access requests</h2><p>Review staff requests. Approved access expires after 15 minutes and does not bypass existing role or store safeguards.</p></div>
           <button type="button" class="toggle-mode" id="accessApprovalsRefreshBtn">Refresh requests</button>
@@ -378,7 +399,7 @@
         <div id="accessApprovalsList" class="directory-empty">Access requests will appear here after loading.</div>
       </section>
 
-      <section class="panel store-section" aria-labelledby="hrSwitchTitle">
+      <section class="panel" aria-labelledby="hrSwitchTitle">
         <div class="admin-topbar">
           <div>
             <h2 id="hrSwitchTitle">Switch store (OTP required)</h2>
@@ -566,6 +587,6 @@
     </div>
   </div>
 
-  <script src="admin.js?v=20261116-bmf-redesign"></script>
+  <script src="admin.js?v=20261122-analytics"></script>
 </body>
 </html>

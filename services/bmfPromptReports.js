@@ -3,7 +3,7 @@
 const loanTerms = require('./loanTerms');
 
 const REPORTS = [
-  { type: 'how-risky', title: 'Loan risk / arrears report', sheet: 'PAR Report', filename: 'bmf_how_risky' },
+  { type: 'loan-risk', title: 'Loan risk / arrears report', sheet: 'PAR Report', filename: 'bmf_loan_risk' },
   { type: 'who-owes', title: 'Borrower arrears by age', sheet: 'Aging Schedule', filename: 'bmf_who_owes' },
   { type: 'full-history', title: 'Borrower statement', sheet: 'Loan Statement', filename: 'bmf_full_history', loanRequired: true },
   { type: 'all-loans', title: 'Loans issued', sheet: 'Disbursement Register', filename: 'bmf_all_loans' },
@@ -15,14 +15,15 @@ const REPORTS = [
 ];
 
 const REPORT_ALIASES = {
-  par: 'how-risky',
+  par: 'loan-risk',
+  'how-risky': 'loan-risk',
   aging: 'who-owes',
   statement: 'full-history',
   disbursements: 'all-loans',
   defaults: 'problem-loans',
   cashbook: 'daily-cashbook',
   officers: 'officer-scorecard',
-  overdue: 'how-risky',
+  overdue: 'loan-risk',
   'all-loans': 'all-loans',
   'repayment-tracker': 'full-history',
   'monthly-collections': 'collection',
