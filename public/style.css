@@ -933,7 +933,9 @@ html.dark .qs-page input[type="date"]::-webkit-calendar-picker-indicator { filte
   border-color: var(--accent);
 }
 .admin-shell input[type="file"] { min-height: 44px; color: var(--text); font-size: 0.92rem; }
-.admin-search-wrap input { padding-left: 40px; }
+.admin-shell .admin-search-wrap input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]) {
+  padding-left: 44px;
+}
 @media (max-width: 800px) {
   .toolbar, .loan-table-tools, .button-row, .collection-custom-range { flex-direction: column; align-items: stretch; }
   .toolbar > *, .loan-table-tools > *, .button-row > *, .directory-date-filter, .collection-custom-range label {
