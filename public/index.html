@@ -4,19 +4,20 @@
   <script>document.documentElement.classList.add(localStorage.getItem('mode') === 'light' ? 'light' : 'dark');</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Buraza Micro Finance</title>
-  <link rel="stylesheet" href="style.css?v=20261122-analytics2">
+  <title>PRYME LOAN</title>
+  <link rel="stylesheet" href="style.css?v=20261123-license">
+  <script src="/pryme-client.js?v=20261123-license"></script>
 </head>
 <body class="qs-page">
   <div id="qsSuccessOverlay" class="qs-success-overlay hidden">
     <div class="qs-success-card">
       <h2>Application received</h2>
-      <p class="qs-lead">BMF has your quick loan application. A loan officer will review it and reply to the email address you gave.</p>
+      <p class="qs-lead"><span data-brand-name>PRYME LOAN</span> has your quick loan application. A loan officer will review it and reply to the email address you gave.</p>
       <a class="enter-btn" href="/login">Sign in</a>
     </div>
   </div>
   <header class="qs-top">
-    <strong>Buraza Micro Finance</strong>
+    <span class="brand-with-logo"><img data-brand-logo class="brand-logo hidden" alt="" hidden><strong data-brand-name>PRYME LOAN</strong></span>
     <nav>
       <a href="/login">Sign in</a>
       <button type="button" class="icon-btn" id="modeBtn" aria-label="Switch to light theme">
@@ -108,6 +109,7 @@
         <p class="qs-error" id="qsError"></p>
       </form>
       <p class="qs-footer-note">Already have an account? <a href="/login">Sign in</a></p>
+      <p class="powered-by" data-brand-footer>Powered by PRYME LOAN</p>
     </div>
   </main>
   <script>

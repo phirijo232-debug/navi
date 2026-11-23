@@ -18,6 +18,9 @@ node_modules
 logs/
 # Core data files hold customer PII (users, loans, feedback) + runtime state
 data/*.json
+data/license-logo.png
+data/license-logo.jpg
+data/license-logo.jpeg
 # Uploaded KYC / proof-of-payment / collateral images (customer PII)
 public/uploads/
 

@@ -4,6 +4,7 @@
 
 const PDFDocument = require('pdfkit');
 const R = require('./bmfReports');
+const license = require('../middleware/prymeLogLicense');
 
 const MARGIN = 56.7; // ~2cm in points
 const STATEMENT_COLORS = {
@@ -33,7 +34,7 @@ function header(doc, title, dateStr, period) {
   doc.save();
   doc.rect(0, 0, doc.page.width, 36).fill('#0F1014');
   doc.fillColor('#F2F2F0').font('Helvetica-Bold').fontSize(11)
-    .text('BURAZA MICRO FINANCE', doc.page.margins.left, 12, {
+    .text(license.headerName(), doc.page.margins.left, 12, {
       width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
       align: 'left',
       lineBreak: false
@@ -57,7 +58,7 @@ function footerAll(doc) {
     doc.switchToPage(i);
     const y = doc.page.height - doc.page.margins.bottom - 12;
     doc.font('Helvetica').fontSize(8).fillColor('#555555')
-      .text(`CONFIDENTIAL — page ${i + 1} of ${pages}`, doc.page.margins.left, y, {
+      .text(`CONFIDENTIAL — page ${i + 1} of ${pages} · Powered by PRYME LOAN`, doc.page.margins.left, y, {
         align: 'center',
         width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
         lineBreak: false
@@ -136,7 +137,7 @@ function trackerPdf(loan, user) {
       doc.on('error', reject);
       header(doc, 'LOAN REPAYMENT TRACKING SHEET', new Date().toISOString().slice(0, 10));
       const info = [
-        ['Lender', t.header.lender], ['Borrower', t.header.borrower],
+        ['Lender', license.publicBranding().name], ['Borrower', t.header.borrower],
         ['NRC/ID No.', t.header.nrc], ['Phone Number', t.header.phone],
         ['Loan Amount', `K ${Number(t.header.principal).toFixed(2)}`],
         ['Interest', `K ${Number(t.header.interest).toFixed(2)}`],
@@ -197,9 +198,9 @@ function statementPdf(statement, statementDate = new Date().toISOString().slice(
       };
 
       doc.rect(0, 0, pageWidth, 60).fill(STATEMENT_COLORS.navy);
-      doc.font('Helvetica-Bold').fontSize(14).fillColor(STATEMENT_COLORS.white).text('BURAZA MICRO FINANCE', 40, 7, { lineBreak: false });
+      doc.font('Helvetica-Bold').fontSize(14).fillColor(STATEMENT_COLORS.white).text(license.headerName(), 40, 7, { lineBreak: false });
       doc.font('Helvetica').fontSize(9).fillColor(STATEMENT_COLORS.muted).text('LOAN ACCOUNT STATEMENT', 40, 27, { lineBreak: false });
-      doc.font('Helvetica').fontSize(8).text('PRYME VERTEX HOLDINGS', 40, 41, { lineBreak: false });
+      doc.font('Helvetica').fontSize(8).text('Powered by PRYME LOAN', 40, 41, { lineBreak: false });
       doc.font('Helvetica').fontSize(8).fillColor(STATEMENT_COLORS.muted)
         .text(`Statement Date: ${dateText(statementDate)}`, 360, 25, { width: 195, align: 'right', lineBreak: false });
 
@@ -311,7 +312,7 @@ function statementPdf(statement, statementDate = new Date().toISOString().slice(
       doc.font('Helvetica-Bold').fontSize(9).fillColor(STATEMENT_COLORS.white)
         .text(`${progress.toFixed(1)}%`, barX, barY + 5, { width: barWidth, align: 'center' });
 
-      const notice = 'This statement is confidential and intended solely for the named borrower and authorised Buraza Micro Finance staff. Unauthorised disclosure, copying, or distribution is strictly prohibited. For queries, contact: prymebmf@gmail.com';
+      const notice = `This statement is confidential and intended solely for the named borrower and authorised ${license.publicBranding().name} staff. Unauthorised disclosure, copying, or distribution is strictly prohibited. For queries, contact: prymebmf@gmail.com`;
       doc.font('Helvetica').fontSize(7).fillColor(STATEMENT_COLORS.muted)
         .text(notice, 55, 165, { width: contentWidth - 30, align: 'center', lineGap: 3 });
       const signatureY = 290;
@@ -323,14 +324,14 @@ function statementPdf(statement, statementDate = new Date().toISOString().slice(
       doc.font('Helvetica').fontSize(9).text(statement.officer || 'Loan Officer', 55, signatureY + 32, { width: 190, align: 'center' })
         .text('Branch Manager', 350, signatureY + 32, { width: 190, align: 'center' });
       doc.font('Helvetica').fontSize(8).fillColor(STATEMENT_COLORS.muted)
-        .text('Buraza Micro Finance', 55, signatureY + 47, { width: 190, align: 'center' })
-        .text('Buraza Micro Finance', 350, signatureY + 47, { width: 190, align: 'center' });
+        .text(license.publicBranding().name, 55, signatureY + 47, { width: 190, align: 'center' })
+        .text(license.publicBranding().name, 350, signatureY + 47, { width: 190, align: 'center' });
       const pageRange = doc.bufferedPageRange();
       for (let index = 0; index < pageRange.count; index += 1) {
         doc.switchToPage(index);
         doc.font('Helvetica').fontSize(7).fillColor(STATEMENT_COLORS.muted)
           .text(`Page ${index + 1} of ${pageRange.count}`, 40, 792, { width: 100, height: 8, lineBreak: false });
-        doc.text('BURAZA MICRO FINANCE · PRYME VERTEX HOLDINGS · Confidential', 150, 792, {
+        doc.text(`${license.headerName()} · Powered by PRYME LOAN · Confidential`, 150, 792, {
           width: contentWidth - 110, height: 8, align: 'right', lineBreak: false
         });
       }

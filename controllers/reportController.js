@@ -15,6 +15,7 @@ const P = require('../services/bmfPdf');
 const PromptReports = require('../services/bmfPromptReports');
 const PromptExcel = require('../services/bmfPromptExcel');
 const loanTerms = require('../services/loanTerms');
+const license = require('../middleware/prymeLogLicense');
 
 const USERS_FILE = dataStore.paths.users;
 const LOANS_FILE = dataStore.paths.loans;
@@ -599,7 +600,7 @@ function buildPaymentsReportData(from, to, storeId = 'all') {
 
 async function buildPaymentsExcelReport(data) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Pryme Vertex';
+  workbook.creator = 'PRYME LOAN';
   workbook.created = new Date(data.generatedAt);
 
   const addSheet = (name, columns, rows) => {
@@ -643,7 +644,8 @@ async function buildPaymentsExcelReport(data) {
 
 function buildPaymentsPdfReport(data) {
   const doc = new PDFDocument();
-  doc.fontSize(16).text('BMF Payment Tracking Sheet', { align: 'center' });
+  doc.fontSize(16).text(`${license.headerName()} — Payment Tracking Sheet`, { align: 'center' });
+  doc.fontSize(8).text('Powered by PRYME LOAN', { align: 'center' });
   doc.fontSize(11).text(`Generated: ${data.generatedAt}`, { align: 'center' });
   doc.moveDown();
   doc.fontSize(11).text(`From: ${data.from || 'All time'}`);
@@ -781,7 +783,7 @@ function addSheet(workbook, name, columns, rows) {
 
 async function buildExcelReport(data) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Pryme Vertex';
+  workbook.creator = 'PRYME LOAN';
   workbook.created = new Date(data.generatedAt);
   addSheet(workbook, 'Summary', [
     { header: 'Metric', key: 'metric', width: 32 },
@@ -867,7 +869,8 @@ function buildPdfReport(data, res, label) {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${label}-ledger-${new Date().toISOString().slice(0, 10)}.pdf"`);
   doc.pipe(res);
-  doc.fontSize(20).text(`${label} Portfolio Report`);
+  doc.fontSize(20).text(`${license.headerName()} Portfolio Report`);
+  doc.fontSize(8).text('Powered by PRYME LOAN');
   doc.moveDown(0.5).fontSize(10).text(`Generated ${new Date(data.generatedAt).toLocaleString('en-GB')}`);
   doc.moveDown().fontSize(12).text(data.note, { width: 500 });
   doc.moveDown();
@@ -926,7 +929,7 @@ async function exportReport(req, res) {
 function buildDailyReportText(data) {
   const { summary } = data;
   return [
-    `Daily Buraza Micro Finance (BMF) report - ${new Date(data.generatedAt).toLocaleDateString('en-GB')}`,
+    `${license.headerName()} daily report - ${new Date(data.generatedAt).toLocaleDateString('en-GB')}`,
     '',
     `Customer accounts: ${summary.customerAccounts}`,
     `Loan records: ${summary.totalLoans}`,

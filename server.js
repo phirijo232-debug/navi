@@ -6,6 +6,7 @@ const cron = require('node-cron');
 const config = require('./config');
 const { logError, logAccess, replayPendingAlerts } = require('./middleware/logger');
 const { helmet, deviceAuth, rateLimiter, authRateLimiter, getServerMode, healthRateLimiter } = require('./middleware/security');
+const { licenseSession, configurationError } = require('./middleware/prymeLogLicense');
 const { verifyOTP, sendOTP } = require('./middleware/otp');
 const { trackSession } = require('./controllers/sessionController');
 const { serveFile } = require('./controllers/fileController');
@@ -76,7 +77,7 @@ app.use(express.json());
 // Brute-force-sensitive endpoints (auth + vault OTP) get a strict limiter for
 // EVERY source IP — including localhost — so a local process can't hammer them.
 const AUTH_SENSITIVE_PATHS = new Set([
-  '/login', '/login/confirm', '/signup', '/signup/confirm', '/signup/resend',
+  '/login', '/login/resume', '/login/confirm', '/signup', '/signup/confirm', '/signup/resend',
   '/password-reset', '/password-reset/confirm', '/vault/request', '/vault/authorize'
 ]);
 
@@ -249,6 +250,7 @@ app.use((req, res, next) => {
 });
 app.use('/api/cron', require('./routes/cron'));
 app.use(deviceAuth);
+app.use(licenseSession);
 app.use(premiumPrivacy);
 app.use(logAccess);
 app.use(trackSession);
@@ -297,7 +299,10 @@ if (!supabaseStorage) {
   }
 }
 
-if (require.main === module) app.listen(config.PORT, config.HOST, () => {
+if (require.main === module) {
+  const licenseProblem = configurationError();
+  if (licenseProblem) console.error(`[license] ${licenseProblem}`);
+  app.listen(config.PORT, config.HOST, () => {
   console.log(`Navi Server running on port ${config.PORT}`);
   auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.SERVER_STARTED, actor: 'system', detail: { port: config.PORT } });
   const mode = typeof getServerMode === 'function' ? getServerMode() : 'private';
@@ -326,6 +331,7 @@ if (require.main === module) app.listen(config.PORT, config.HOST, () => {
 
   // Retry any alerts queued during a prior SMTP outage
   replayPendingAlerts().catch(() => {});
-});
+  });
+}
 
 module.exports = app;

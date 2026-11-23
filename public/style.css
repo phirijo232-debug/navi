@@ -337,6 +337,30 @@ body.light .auth-input, body.light .search-box, body.light .modal-input, body.li
 }
 
 .brand-mark { font-weight: 600; text-decoration: none; letter-spacing: -0.02em; }
+.brand-with-logo { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.brand-logo { height: 28px; width: auto; max-width: 96px; object-fit: contain; }
+.powered-by { margin: 12px 0 0; color: var(--muted); font-size: 0.75rem; text-align: center; }
+.license-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+}
+.license-banner p { margin: 0; }
+.license-banner button {
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
 .store-context { color: var(--muted); font-size: 0.85rem; }
 
 body:has(#adminDashboard:not(.hidden)) .brand-header { display: none; }
