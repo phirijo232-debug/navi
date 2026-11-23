@@ -879,8 +879,9 @@ async function createAdminUser(req, res) {
       return res.status(400).json({ error: 'Username, email, password, and confirmation are required.' });
     }
 
-    if (!nrc || !isValidNrc(nrc)) {
-      return res.status(400).json({ error: 'NRC/ID number is required and must look like 123456/78/1.' });
+    const nrcValue = nrc == null ? '' : String(nrc).trim();
+    if (nrcValue && !isValidNrc(nrcValue)) {
+      return res.status(400).json({ error: 'NRC/ID number must look like 123456/78/1.' });
     }
 
     if (password !== confirmPassword) {
@@ -915,7 +916,7 @@ async function createAdminUser(req, res) {
       username: String(username).trim(),
       email: String(email).trim().toLowerCase(),
       phone: normalizedPhone,
-      nrc: String(nrc).trim(),
+      nrc: nrcValue || null,
       password: hashedPassword,
       tokens: generateUserTokens(nextId),
       role: assignedRole,
