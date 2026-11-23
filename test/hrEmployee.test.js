@@ -118,7 +118,7 @@ test('createAdminUser enforces the role hierarchy (main admin can make franchise
   }
 });
 
-test('createAdminUser rejects a missing NRC', async () => {
+test('createAdminUser allows a missing NRC and rejects an invalid one', async () => {
   const original = fs.readFileSync(USERS_FILE, 'utf8');
   fs.writeFileSync(USERS_FILE, JSON.stringify([{ id: 1, email: 'existing@example.test' }]));
   try {
@@ -128,8 +128,17 @@ test('createAdminUser rejects a missing NRC', async () => {
       headers: {},
       body: { username: 'No Nrc', email: 'nonrc@example.test', password: 'StrongPass1!', confirmPassword: 'StrongPass1!', role: 'user' }
     }, missing);
-    assert.equal(missing.statusCode, 400);
-    assert.match(missing.body.error, /NRC/i);
+    assert.equal(missing.statusCode, 201);
+    assert.equal(missing.body.user.email, 'nonrc@example.test');
+
+    const invalid = responseRecorder();
+    await createAdminUser({
+      authUser: { role: 'admin', email: 'main@example.test' },
+      headers: {},
+      body: { username: 'Bad Nrc', email: 'badnrc@example.test', password: 'StrongPass1!', confirmPassword: 'StrongPass1!', nrc: 'not-an-nrc', role: 'user' }
+    }, invalid);
+    assert.equal(invalid.statusCode, 400);
+    assert.match(invalid.body.error, /NRC/i);
   } finally {
     fs.writeFileSync(USERS_FILE, original);
   }

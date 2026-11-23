@@ -2966,8 +2966,8 @@ async function handleCreateUser(event) {
     setCreateUserMessage('All required fields must be filled.', true);
     return;
   }
-  if (!/^\d{6}\/\d{2}\/\d$/.test(payload.nrc)) {
-    setCreateUserMessage('NRC number is required and must look like 123456/78/1.', true);
+  if (payload.nrc && !/^\d{6}\/\d{2}\/\d$/.test(payload.nrc)) {
+    setCreateUserMessage('NRC number must look like 123456/78/1.', true);
     return;
   }
 
