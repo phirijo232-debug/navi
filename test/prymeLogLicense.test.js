@@ -38,7 +38,12 @@ function licensedEnv(extra = {}) {
 
 function harness(options = {}) {
   const calls = [];
-  const store = options.store || memoryStore(options.state);
+  const env = options.env || licensedEnv();
+  let initial = options.state ? JSON.parse(JSON.stringify(options.state)) : undefined;
+  if (initial && env.PRYMELOG_LICENSE_SECRET) {
+    initial = license.sealState(initial, env.PRYMELOG_LICENSE_SECRET);
+  }
+  const store = options.store || memoryStore(initial);
   let clock = options.now || NOW;
   const fetchImpl = options.fetchImpl || (async (url, init) => {
     calls.push({ url: String(url), init });
@@ -47,9 +52,9 @@ function harness(options = {}) {
     return responseFor(payload, options.status);
   });
   const client = license.createClient({
-    env: options.env || licensedEnv(),
+    env,
     enforce: options.enforce !== false,
-    cacheLogo: false,
+    cacheLogo: options.cacheLogo === true,
     now: () => clock,
     store,
     fetchImpl
@@ -280,6 +285,72 @@ test('session middleware blocks a signed-in request when the license is expired'
   assert.equal(res.body.license, true);
   assert.equal(res.body.code, 'SEATS_FULL');
   assert.equal(res.body.error, license.SEATS_FULL_MESSAGE);
+});
+
+test('a tampered license state cannot extend the offline grace period', async () => {
+  const { client, store } = harness({
+    state: {
+      version: 1,
+      installs: {
+        [INSTALL_ID]: { lastResult: 'ok', lastSuccessAt: NOW - 60 * 1000 }
+      },
+      company: null,
+      logoFile: null
+    },
+    payload: new Error('connect ECONNREFUSED')
+  });
+  const saved = store.snapshot();
+  saved.installs[INSTALL_ID].lastSuccessAt = NOW;
+  store.write(saved);
+  const decision = await client.gateCredential(INSTALL_ID, 'desk');
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.code, 'UNREACHABLE');
+});
+
+test('unsigned license state is not trusted for grace', async () => {
+  const store = memoryStore({
+    version: 1,
+    installs: {
+      [INSTALL_ID]: { lastResult: 'ok', lastSuccessAt: NOW - 60 * 1000 }
+    },
+    company: null,
+    logoFile: null
+  });
+  const { client } = harness({ store, payload: new Error('connect ECONNREFUSED') });
+  const decision = await client.gateCredential(INSTALL_ID, 'desk');
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.code, 'UNREACHABLE');
+});
+
+test('the license logo is not fetched from a private or metadata address', async () => {
+  const calls = [];
+  const { client } = harness({
+    cacheLogo: true,
+    payload: {
+      ok: true,
+      company: { name: 'Acme Loans', logo_url: 'https://169.254.169.254/latest/meta-data', contact: {} },
+      warn: false,
+      days_left: 10
+    },
+    fetchImpl: async (url) => {
+      calls.push(String(url));
+      if (String(url).includes('169.254.169.254')) throw new Error('ssrf');
+      return responseFor({
+        ok: true,
+        company: { name: 'Acme Loans', logo_url: 'https://169.254.169.254/latest/meta-data', contact: {} },
+        warn: false,
+        days_left: 10
+      });
+    }
+  });
+  const decision = await client.gateCredential(INSTALL_ID, 'desk');
+  assert.equal(decision.allowed, true);
+  assert.equal(calls.some(url => url.includes('169.254.169.254')), false);
+  assert.equal(license.isBlockedIp('127.0.0.1'), true);
+  assert.equal(license.isBlockedIp('10.1.2.3'), true);
+  assert.equal(license.isBlockedIp('8.8.8.8'), false);
+  assert.equal(await license.logoUrlAllowed('https://127.0.0.1/logo.png'), false);
+  assert.equal(await license.logoUrlAllowed('http://example.com/logo.png'), false);
 });
 
 test('the test runner leaves the process-wide gate off so existing logins keep working', () => {

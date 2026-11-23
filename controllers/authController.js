@@ -487,15 +487,15 @@ async function confirmSignup(req, res) {
 
 async function resendOTP(req, res) {
   try {
-    const { email } = req.body;
-    const pending = pendingSignups[email];
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const pending = email ? pendingSignups[email] : null;
 
-    if (!pending) {
-      return res.status(400).json({ error: 'No pending signup found.' });
+    // Same reply whether or not a signup is waiting, so this public route
+    // cannot be used to discover which addresses have a pending account.
+    if (pending) {
+      await otpService.sendOTP('Account Signup Verification', email, true);
     }
-
-    await otpService.sendOTP('Account Signup Verification', email, true);
-    res.json({ message: `OTP resent to ${email}` });
+    res.json({ message: 'If a signup is waiting for a code, a new one has been sent.' });
 
   } catch (err) {
     logBreakage('authController.js', 'resendOTP', err, 'RESEND OTP CIRCUIT TRIPPED');
@@ -847,12 +847,11 @@ async function confirmPasswordReset(req, res) {
 
 async function createInvite(req, res) {
   try {
-    const { email, secret } = req.body;
-    const isAdmin = req.authUser?.role === 'admin';
-    const hasSecret = secret && secret === process.env.INVITE_SECRET;
-
-    if (!email || (!isAdmin && !hasSecret)) {
-      return res.status(403).json({ error: 'Invite generation requires admin access or a valid invite secret.' });
+    const { email } = req.body || {};
+    // The invite secret is not an alternate login. A customer session plus a
+    // leaked INVITE_SECRET must not be able to mint signup links.
+    if (!email || req.authUser?.role !== 'admin') {
+      return res.status(403).json({ error: 'Invite generation requires admin access.' });
     }
 
     const token = generateInviteToken(email);
@@ -1040,7 +1039,9 @@ function validateInvite(req, res) {
 
 function listInvites(req, res) {
   try {
-    if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'Admin access required.' });
+    // Same door as createInvite. Store staff with the invite permission must
+    // not receive every unused signup link.
+    if (req.authUser?.role !== 'admin') return res.status(403).json({ error: 'Admin access required.' });
 
     cleanupExpiredInvites();
     const invites = Object.entries(loadInvites())

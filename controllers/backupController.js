@@ -3,7 +3,7 @@ const path = require('path');
 const config = require('../config');
 const { logError, logBreakage, logHr } = require('../middleware/logger');
 const dataStore = require('../middleware/dataStore');
-const { isAdminRole } = require('../middleware/storeScope');
+const { isFranchiseAdmin } = require('../middleware/storeScope');
 
 // ─── Backup / restore ────────────────────────────────────────────────────────
 // A backup is one timestamped JSON file under data/backups/ holding every core
@@ -42,7 +42,7 @@ function readBackupFile(name) {
 
 function createBackup(req, res) {
   try {
-    if (!isAdminRole(req.authUser?.role)) {
+    if (!isFranchiseAdmin(req.authUser?.role)) {
       return res.status(403).json({ error: 'Admin access required.' });
     }
 
@@ -98,7 +98,7 @@ function createBackup(req, res) {
 
 function listBackups(req, res) {
   try {
-    if (!isAdminRole(req.authUser?.role)) {
+    if (!isFranchiseAdmin(req.authUser?.role)) {
       return res.status(403).json({ error: 'Admin access required.' });
     }
 
@@ -124,7 +124,7 @@ function listBackups(req, res) {
 
 function restoreBackup(req, res) {
   try {
-    if (!isAdminRole(req.authUser?.role)) {
+    if (!isFranchiseAdmin(req.authUser?.role)) {
       return res.status(403).json({ error: 'Admin access required.' });
     }
 
