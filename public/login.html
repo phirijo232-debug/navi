@@ -4,8 +4,9 @@
   <script>document.documentElement.classList.add(localStorage.getItem('mode') === 'light' ? 'light' : 'dark');</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign in — Buraza Micro Finance</title>
-  <link rel="stylesheet" href="style.css?v=20261122-analytics2">
+  <title>Sign in — PRYME LOAN</title>
+  <link rel="stylesheet" href="style.css?v=20261123-license">
+  <script src="/pryme-client.js?v=20261123-license"></script>
 </head>
 <body>
   <div id="bmfToast" class="bmf-toast" role="status" aria-live="polite"></div>
@@ -15,7 +16,8 @@
   <main class="auth-page">
     <section class="auth-card">
       <div class="brand-lockup">
-        <strong>Buraza Micro Finance</strong>
+        <img data-brand-logo class="brand-logo hidden" alt="" hidden>
+        <strong data-brand-name>PRYME LOAN</strong>
         <span>Sign in to your account</span>
       </div>
       <form id="loginForm" class="auth-form">
@@ -46,6 +48,7 @@
       </form>
       <div class="loader" id="loader"><span></span><span></span><span></span></div>
       <p id="message" class="message-text"></p>
+      <p class="powered-by" data-brand-footer>Powered by PRYME LOAN</p>
     </section>
   </main>
   <script>
@@ -74,10 +77,30 @@
     function destinationFor(role) {
       return staffRoles.includes(role) ? '/admin' : '/account';
     }
+    const savedLicenseMessage = window.prymeTakeLicenseMessage ? window.prymeTakeLicenseMessage() : '';
+    if (savedLicenseMessage) document.getElementById('message').textContent = savedLicenseMessage;
     const savedRole = localStorage.getItem('userRole');
-    if (localStorage.getItem('deviceToken') && savedRole) {
-      window.location.replace(destinationFor(savedRole));
+    async function resumeStoredSession() {
+      const token = localStorage.getItem('deviceToken');
+      if (!token || !savedRole) return;
+      try {
+        const res = await fetch('/login/resume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-device-token': token },
+          body: JSON.stringify({ installId: window.prymeInstallId ? window.prymeInstallId() : '' })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          window.location.replace(destinationFor(data.role || savedRole));
+          return;
+        }
+        if (data.license || res.status === 401) localStorage.removeItem('deviceToken');
+        if (data.license && data.error) document.getElementById('message').textContent = data.error;
+      } catch (err) {
+        document.getElementById('message').textContent = 'Connection error. Please try again.';
+      }
     }
+    resumeStoredSession();
 
     const passInput = document.getElementById('password');
     document.getElementById('togglePass').addEventListener('click', () => {
@@ -106,7 +129,7 @@
         const res = await fetch('/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier, password, requireOtp })
+          body: JSON.stringify({ identifier, password, requireOtp, installId: window.prymeInstallId ? window.prymeInstallId() : '' })
         });
         const data = await res.json();
         document.getElementById('loader').classList.remove('active');
@@ -142,7 +165,7 @@
         const res = await fetch('/login/confirm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: pendingEmail, otp: document.getElementById('otp').value.trim() })
+          body: JSON.stringify({ email: pendingEmail, otp: document.getElementById('otp').value.trim(), installId: window.prymeInstallId ? window.prymeInstallId() : '' })
         });
         const data = await res.json();
         document.getElementById('loader').classList.remove('active');

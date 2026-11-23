@@ -12,6 +12,7 @@ const config = require('../config');
 const { normalizeZambianPhone, isValidZambianMobile } = require('../middleware/phoneNumber');
 const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole, isFranchiseAdmin } = require('../middleware/storeScope');
 const auditGuardian = require('../middleware/auditLog');
+const licenseClient = require('../middleware/prymeLogLicense');
 
 const NRC_PATTERN = /^\d{6}\/\d{2}\/\d$/;
 
@@ -542,6 +543,23 @@ function findLoginUser(users, identifier) {
   return byUsername.length === 1 ? byUsername[0] : null;
 }
 
+async function requireInstallLicense(req, res) {
+  let decision;
+  try {
+    decision = await licenseClient.gateCredential(licenseClient.readInstallId(req), licenseClient.readDeviceLabel(req));
+  } catch (err) {
+    logError(`LICENSE GATE CIRCUIT TRIPPED: ${err.message}`);
+    res.status(503).json({ error: 'License check is temporarily unavailable.' });
+    return false;
+  }
+  if (!decision.allowed) {
+    logError(`LICENSE BLOCKED: ${decision.code || 'UNKNOWN'}`);
+    res.status(403).json({ error: decision.message, code: decision.code, license: true });
+    return false;
+  }
+  return true;
+}
+
 async function rejectLogin(req, res, identifier, password, user, reason) {
   auditGuardian.writeAudit({ action: auditGuardian.ACTIONS.USER_LOGIN_FAILED, actor: normalizeEmail(identifier), targetId: user?.id, ip: req.ip, detail: { reason } });
   if (auditGuardian.trackFailedLogin(req.ip) >= auditGuardian.BRUTE_THRESHOLD) {
@@ -641,6 +659,9 @@ async function requestLogin(req, res) {
     }
     auditGuardian.clearFailedLogin(req.ip);
 
+    const licensed = await requireInstallLicense(req, res);
+    if (!licensed) return;
+
     const accountEmail = String(user.email || '').trim();
     const pending = {
       email: accountEmail,
@@ -726,6 +747,9 @@ async function confirmLogin(req, res) {
     if (!user) {
       return res.status(400).json({ error: 'Unable to locate your account.' });
     }
+
+    const licensed = await requireInstallLicense(req, res);
+    if (!licensed) return;
 
     const session = establishLoginSession(user, req, { ...pending, otp: true });
     delete pendingLogins[email];

@@ -20,6 +20,7 @@ const { buildPaymentsReportData, buildPaymentsExcelReport, buildPaymentsPdfRepor
 const R = require('./services/bmfReports');
 const X = require('./services/bmfExcel');
 const P = require('./services/bmfPdf');
+const license = require('./middleware/prymeLogLicense');
 
 const TIMEZONE = process.env.DAILY_REPORT_TIMEZONE || 'Africa/Lusaka';
 // Rule 8: report recipient. Env wins; default is the admin mailbox.
@@ -74,7 +75,7 @@ function buildPaymentsLeadersData() {
 function buildPaymentsReportBody(data) {
   const range = `${data.from || 'All time'}${data.to ? ` to ${data.to}` : ''}`;
   const lines = [
-    'Pryme Buraza Micro Finance (BMF) - Payment Tracking Sheet',
+    `${license.headerName()} - Payment Tracking Sheet`,
     `Time frame: ${range}`,
     `Generated: ${data.generatedAt}`,
     '',
@@ -186,7 +187,8 @@ function buildReportPdf(data) {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    doc.fontSize(16).text('Pryme Buraza Micro Finance — Daily Loan Report', { align: 'center' });
+    doc.fontSize(16).text(`${license.headerName()} — Daily Loan Report`, { align: 'center' });
+    doc.fontSize(8).text('Powered by PRYME LOAN', { align: 'center' });
     doc.moveDown(0.5);
     doc.fontSize(11).text(`Date: ${data.reportDate}${data.period ? ` (${data.period.from || 'start'} to ${data.period.to || 'today'})` : ''}`, { align: 'center' });
     doc.moveDown(1.5);
@@ -254,7 +256,7 @@ async function buildReportXlsx(data) {
 
 async function sendDailyLoanReport() {
   const data = buildDailyReportData();
-  const subject = `Pryme Buraza Micro Finance — Daily Loan Report ${data.reportDate}` + (data.period ? ` (${data.period.from || 'start'} to ${data.period.to || 'today'})` : '');
+  const subject = `${license.headerName()} — Daily Loan Report ${data.reportDate}` + (data.period ? ` (${data.period.from || 'start'} to ${data.period.to || 'today'})` : '');
 
   const loans = getEnrichedLoans();
   const users = dataStore.readJson(dataStore.paths.users, [], Array.isArray);
@@ -300,7 +302,7 @@ function streamToBuffer(stream) {
 async function sendPaymentsTrackingEmail() {
   const data = buildPaymentsLeadersData();
   const range = `${data.from || 'AllTime'}${data.to ? `-${data.to}` : ''}`;
-  const subject = `Pryme Buraza Micro Finance — Daily Payment Tracking Sheet ${lusakaDate()}`;
+  const subject = `${license.headerName()} — Daily Payment Tracking Sheet ${lusakaDate()}`;
   const pdf = await streamToBuffer(buildPaymentsPdfReport(data));
   const xlsx = await buildPaymentsExcelReport(data);
 

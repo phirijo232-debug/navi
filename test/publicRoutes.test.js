@@ -41,7 +41,9 @@ test('clean pages are served and old HTML paths redirect', async () => {
     const home = await request(port, '/');
     assert.equal(home.status, 200);
     assert.match(home.body, /id="qsForm"/);
-    assert.match(home.body, /Buraza Micro Finance/);
+    assert.match(home.body, /PRYME LOAN/);
+    assert.match(home.body, /Powered by PRYME LOAN/);
+    assert.doesNotMatch(home.body, /Buraza Micro Finance/);
     assert.doesNotMatch(home.body, /Pryme Vertex/);
 
     const admin = await request(port, '/admin');
