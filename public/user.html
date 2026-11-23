@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My account — Buraza Micro Finance</title>
-  <link rel="stylesheet" href="style.css?v=20261122-analytics2">
+  <link rel="stylesheet" href="style.css?v=20261123-license">
+  <script src="/pryme-client.js?v=20261123-license"></script>
   <style>
     body.customer-portal { background:#0F1014; color:#F2F2F0; }
     .customer-portal .dashboard { width: 100%; max-width: 100vw; margin: 0; padding: 18px clamp(12px, 3vw, 24px); box-sizing: border-box; }
@@ -1561,8 +1562,8 @@
             ${(Array.isArray(loan.payments) && loan.payments.length)
               ? `<ul>${loan.payments.map(payment => `
                   <li>
-                    ${formatKwacha(payment.amount)} • ${payment.mode || 'payment'} • ${formatDateDisplay(payment.paymentDate || payment.date)}
-                    ${payment.receiptNumber || payment.paymentReceiptId ? ` • Ref: ${payment.receiptNumber || payment.paymentReceiptId}` : ''}
+                    ${formatKwacha(payment.amount)} • ${escapeHtml(payment.mode || 'payment')} • ${escapeHtml(formatDateDisplay(payment.paymentDate || payment.date))}
+                    ${payment.receiptNumber || payment.paymentReceiptId ? ` • Ref: ${escapeHtml(payment.receiptNumber || payment.paymentReceiptId)}` : ''}
                   </li>`).join('')}</ul>`
               : '<p>No payments recorded yet.</p>'}
           </div>

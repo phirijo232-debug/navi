@@ -46,6 +46,7 @@ const {
 const { getAuditEntries } = require('../controllers/auditController');
 const { requestApproval, listApprovals, decideApproval, checkApproval } = require('../controllers/accessApprovalController');
 const { getPools, setLendingCapital } = require('../controllers/poolsController');
+const { getBranding, getBrandingLogo, resumeLogin, getLicenseStatus } = require('../controllers/licenseController');
 const { requireFeatures, requirePremiumReportVisibility } = require('../middleware/featurePermissions');
 
 const viewRevenueGate = requireFeatures('view_revenue');
@@ -79,6 +80,9 @@ router.get('/api/apply/public-config', (req, res) => {
   res.json({ turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || '' });
 });
 
+router.get('/branding/logo', getBrandingLogo);
+router.get('/branding', getBranding);
+router.get('/license/status', getLicenseStatus);
 router.get('/status', getStatus);
 // IMMUNE: public tier returns {status, uptime} only; the admin tier (memory, db,
 // heartbeat) activates only with a valid admin x-device-token in the same call.
@@ -163,6 +167,7 @@ router.post('/signup', requestSignup);
 router.post('/signup/confirm', confirmSignup);
 router.post('/signup/resend', resendOTP);
 router.post('/login', requestLogin);
+router.post('/login/resume', resumeLogin);
 router.post('/login/confirm', confirmLogin);
 router.post('/password-reset', requestPasswordReset);
 router.post('/password-reset/confirm', confirmPasswordReset);

@@ -2,6 +2,7 @@
 
 const ExcelJS = require('exceljs');
 const P = require('./bmfPromptReports');
+const license = require('../middleware/prymeLogLicense');
 
 const C = {
   navy: 'FF0F1014',
@@ -67,7 +68,7 @@ function dateLabel(value) {
 function makeHeader(ws, title, subtitle, report, columnCount = 13) {
   const lastColumn = String.fromCharCode(64 + columnCount);
   ws.mergeCells(`A1:${lastColumn}1`);
-  setValue(ws.getCell('A1'), 'BURAZA MICRO FINANCE', {
+  setValue(ws.getCell('A1'), license.headerName(), {
     fill: C.navy, color: C.onDark, bold: true, size: 15
   });
   ws.mergeCells(`A2:${lastColumn}2`);
@@ -123,7 +124,7 @@ function directorySheet(wb, report) {
   const ws = wb.addWorksheet('Report Directory');
   ws.columns = [{ width: 5 }, { width: 35 }, { width: 52 }, { width: 28 }, { width: 18 }];
   ws.mergeCells('A1:E1');
-  setValue(ws.getCell('A1'), 'BURAZA MICRO FINANCE', { fill: C.navy, color: C.onDark, bold: true, size: 16 });
+  setValue(ws.getCell('A1'), license.headerName(), { fill: C.navy, color: C.onDark, bold: true, size: 16 });
   ws.mergeCells('A2:E2');
   setValue(ws.getCell('A2'), 'Loan reports', { fill: C.navy, color: C.onDark, size: 11 });
   ws.mergeCells('A3:E3');
@@ -269,7 +270,7 @@ function statementSheet(wb, report) {
   const statement = report.statement;
   ws.columns = [{ width: 8 }, { width: 19 }, { width: 35 }, { width: 24 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 13 }, { width: 24 }];
   ws.mergeCells('A1:I1');
-  setValue(ws.getCell('A1'), 'BURAZA MICRO FINANCE. BORROWER STATEMENT', { fill: C.navy, bold: true, size: 15 });
+  setValue(ws.getCell('A1'), `${license.headerName()}. BORROWER STATEMENT`, { fill: C.navy, bold: true, size: 15 });
   ws.mergeCells('A3:I3');
   setValue(ws.getCell('A3'), 'Full record of recorded payments and current balance. Missing schedule data is not inferred.', { fill: C.card, color: C.muted, italic: true });
   if (!statement) {
@@ -667,7 +668,7 @@ function officerSheet(wb, report) {
 
 function buildPromptWorkbook(report) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Buraza Micro Finance';
+  wb.creator = license.headerName();
   wb.subject = 'BMF loan management reports';
   wb.calculation = { fullCalcOnLoad: true, forceFullCalc: true, calcMode: 'auto' };
   directorySheet(wb, report);

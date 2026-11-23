@@ -30,3 +30,18 @@ test('OTP keys are normalized so same email data does not generate a fresh code 
   assert.equal(first, second);
   assert.equal(verifyOTP(first, ' sameuser@example.com ', 'Login Verification').valid, true);
 });
+
+test('five wrong OTP guesses burn the code', () => {
+  const email = 'otp-lock@example.com';
+  const code = generateOTP(`${email}:Login Verification`);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    assert.equal(verifyOTP('000000', email, 'Login Verification').valid, false);
+  }
+  assert.equal(verifyOTP(code, email, 'Login Verification').valid, true);
+
+  const burned = generateOTP(`${email}:Password Reset`);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    assert.equal(verifyOTP('000000', email, 'Password Reset').valid, false);
+  }
+  assert.equal(verifyOTP(burned, email, 'Password Reset').valid, false);
+});

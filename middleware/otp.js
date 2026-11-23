@@ -149,6 +149,22 @@ async function sendOTP(purpose = 'Account Verification', targetEmail = null, for
   }
 }
 
+const OTP_MAX_ATTEMPTS = 5;
+const otpAttempts = new Map();
+
+function registerOtpFailure(key) {
+  const attempts = (otpAttempts.get(key) || 0) + 1;
+  if (attempts >= OTP_MAX_ATTEMPTS) {
+    delete otpStore[key];
+    issuedPlain.delete(key);
+    otpAttempts.delete(key);
+    if (supabaseApi.enabled()) supabaseApi.deleteOtp(key);
+    return { valid: false, message: 'OTP expired or not generated.' };
+  }
+  otpAttempts.set(key, attempts);
+  return { valid: false, message: 'Incorrect OTP.' };
+}
+
 function verifyOTP(input, targetEmail = null, purpose = null) {
   const key = buildOtpKey(targetEmail, purpose);
   if (supabaseApi.enabled()) {
@@ -156,13 +172,15 @@ function verifyOTP(input, targetEmail = null, purpose = null) {
     if (!row || Date.parse(row.expires_at) <= Date.now()) {
       if (row) supabaseApi.deleteOtp(key);
       issuedPlain.delete(key);
+      otpAttempts.delete(key);
       return { valid: false, message: 'OTP expired or not generated.' };
     }
     if (!otpMatches(input, row.code_hash)) {
-      return { valid: false, message: 'Incorrect OTP.' };
+      return registerOtpFailure(key);
     }
     supabaseApi.deleteOtp(key);
     issuedPlain.delete(key);
+    otpAttempts.delete(key);
     return { valid: true };
   }
   const record = otpStore[key];
@@ -170,15 +188,17 @@ function verifyOTP(input, targetEmail = null, purpose = null) {
   if (!record || Date.now() > record.expiry) {
     delete otpStore[key];
     issuedPlain.delete(key);
+    otpAttempts.delete(key);
     return { valid: false, message: 'OTP expired or not generated.' };
   }
 
   if (!otpMatches(input, record.codeHash)) {
-    return { valid: false, message: 'Incorrect OTP.' };
+    return registerOtpFailure(key);
   }
 
   delete otpStore[key];
   issuedPlain.delete(key);
+  otpAttempts.delete(key);
   return { valid: true };
 }
 module.exports = { sendOTP, verifyOTP, generateOTP, buildOtpKey, cleanupExpiredOtps };

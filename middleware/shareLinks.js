@@ -1,4 +1,5 @@
 const config = require('../config');
+const { timingSafeEqualString } = require('./tokenAuth');
 
 // Public share-link helpers (Option A — keyed public links).
 // PUBLIC_URL + SHARE_PUBLIC_KEY come ONLY from process.env (never hardcoded).
@@ -57,7 +58,7 @@ function shareKeyGate(req, res, next) {
     // (login page is unauthenticated by design — login form itself does auth).
     if (path !== '/signup.html' && path !== '/signup') return next();
     const supplied = String((req.query && req.query.key) || '');
-    if (supplied === key) return next();
+    if (supplied && timingSafeEqualString(supplied, key)) return next();
     return res.status(403).send('Access denied. A valid share key (?key=) is required to open this page.');
   } catch (err) {
     return next();

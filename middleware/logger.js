@@ -192,7 +192,7 @@ function logAccess(req, res, next) {
     // Redact any device token in the query string so it never lands in the
     // access log (KYC/payment image links carry a scoped ?token= that plain
     // <a> navigation needs). LAN mitigation only — full fix is signed URLs.
-    const safeUrl = String(req.url).replace(/([?&])token=[^&]*/gi, '$1token=REDACTED');
+    const safeUrl = String(req.url).replace(/([?&])(token|sig|jti|u|key|otp|password|masterKey|secret)=[^&]*/gi, '$1$2=REDACTED');
     const entry = `[${time}] ${req.method} ${safeUrl} - ${req.ip}\n`;
     fs.appendFileSync(ACCESS_FILE, entry);
   }

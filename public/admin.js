@@ -396,6 +396,8 @@ function showAuthScreen() {
   setViewVisibility('adminAuth', true);
   hideAdminViews();
   showAdminLogin();
+  const licenseMessage = window.prymeTakeLicenseMessage && window.prymeTakeLicenseMessage();
+  if (licenseMessage) setAuthMessage(licenseMessage, true);
   document.body.classList.remove('nav-open');
 }
 
@@ -647,6 +649,42 @@ function showDashboard() {
   if (bellRefreshTimer) clearInterval(bellRefreshTimer);
   refreshBellCount();
   bellRefreshTimer = setInterval(refreshBellCount, 60000);
+  refreshLicenseBanner();
+}
+
+function licenseBannerCopy(status) {
+  if (!status || !status.warn) return '';
+  if (status.grace) return 'The license server could not be reached. Access continues for up to 72 hours from the last successful check.';
+  const days = Number(status.daysLeft);
+  if (days === 0) return 'Your license expires today.';
+  if (days === 1) return 'Your license expires in 1 day.';
+  if (Number.isFinite(days)) return `Your license expires in ${days} days.`;
+  return 'Your license is close to expiry.';
+}
+
+async function refreshLicenseBanner() {
+  const banner = document.getElementById('licenseBanner');
+  const text = document.getElementById('licenseBannerText');
+  if (!banner || !text) return;
+  try {
+    const response = await fetch('/license/status', { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.warn) {
+      banner.classList.add('hidden');
+      return;
+    }
+    const copy = licenseBannerCopy(data);
+    const dismissKey = `${data.grace ? 'grace' : 'warn'}:${data.daysLeft}`;
+    if (sessionStorage.getItem('prymeLicenseBannerDismissed') === dismissKey) {
+      banner.classList.add('hidden');
+      return;
+    }
+    text.textContent = copy;
+    banner.classList.remove('hidden');
+    banner.dataset.dismissKey = dismissKey;
+  } catch (err) {
+    banner.classList.add('hidden');
+  }
 }
 
 function showReportsView() {
@@ -2747,7 +2785,7 @@ async function handleAdminLogin(event) {
     const response = await fetch('/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier, password, requireOtp })
+      body: JSON.stringify({ identifier, password, requireOtp, installId: window.prymeInstallId ? window.prymeInstallId() : '' })
     });
 
     const data = await response.json();
@@ -2874,7 +2912,7 @@ async function handleAdminOtp(event) {
     const response = await fetch('/login/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: pendingEmail, otp })
+      body: JSON.stringify({ email: pendingEmail, otp, installId: window.prymeInstallId ? window.prymeInstallId() : '' })
     });
 
     const data = await response.json();
@@ -2928,8 +2966,8 @@ async function handleCreateUser(event) {
     setCreateUserMessage('All required fields must be filled.', true);
     return;
   }
-  if (!/^\d{6}\/\d{2}\/\d$/.test(payload.nrc)) {
-    setCreateUserMessage('NRC number is required and must look like 123456/78/1.', true);
+  if (payload.nrc && !/^\d{6}\/\d{2}\/\d$/.test(payload.nrc)) {
+    setCreateUserMessage('NRC number must look like 123456/78/1.', true);
     return;
   }
 
@@ -4175,8 +4213,11 @@ async function restoreSession() {
   localStorage.setItem('adminStore', 'buraza');
   try {
     const response = await fetch('/users', { headers: getStoreHeaders() });
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
+      if (data.license) localStorage.removeItem('deviceToken');
       showAuthScreen();
+      if (data.license && data.error) setAuthMessage(data.error, true);
       return;
     }
     enterStore('buraza');
@@ -4233,6 +4274,11 @@ document.querySelectorAll('.directory-pagination').forEach(nav => {
 
 window.onload = () => {
   applyTheme(localStorage.getItem('adminTheme') === 'light' ? 'light' : 'dark');
+  document.getElementById('licenseBannerDismiss')?.addEventListener('click', () => {
+    const banner = document.getElementById('licenseBanner');
+    if (banner?.dataset.dismissKey) sessionStorage.setItem('prymeLicenseBannerDismissed', banner.dataset.dismissKey);
+    banner?.classList.add('hidden');
+  });
   restoreSession();
 };
 

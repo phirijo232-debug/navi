@@ -12,6 +12,7 @@ const config = require('../config');
 const { normalizeZambianPhone, isValidZambianMobile } = require('../middleware/phoneNumber');
 const { getRecordStoreId, getRequestedStoreId, canAccessStore, isAdminRole, isFranchiseAdmin } = require('../middleware/storeScope');
 const auditGuardian = require('../middleware/auditLog');
+const licenseClient = require('../middleware/prymeLogLicense');
 
 const NRC_PATTERN = /^\d{6}\/\d{2}\/\d$/;
 
@@ -486,15 +487,15 @@ async function confirmSignup(req, res) {
 
 async function resendOTP(req, res) {
   try {
-    const { email } = req.body;
-    const pending = pendingSignups[email];
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const pending = email ? pendingSignups[email] : null;
 
-    if (!pending) {
-      return res.status(400).json({ error: 'No pending signup found.' });
+    // Same reply whether or not a signup is waiting, so this public route
+    // cannot be used to discover which addresses have a pending account.
+    if (pending) {
+      await otpService.sendOTP('Account Signup Verification', email, true);
     }
-
-    await otpService.sendOTP('Account Signup Verification', email, true);
-    res.json({ message: `OTP resent to ${email}` });
+    res.json({ message: 'If a signup is waiting for a code, a new one has been sent.' });
 
   } catch (err) {
     logBreakage('authController.js', 'resendOTP', err, 'RESEND OTP CIRCUIT TRIPPED');
@@ -540,6 +541,23 @@ function findLoginUser(users, identifier) {
   if (byEmail.length > 1) return null;
   const byUsername = users.filter(user => String(user.username || '').trim().toLowerCase() === needle);
   return byUsername.length === 1 ? byUsername[0] : null;
+}
+
+async function requireInstallLicense(req, res) {
+  let decision;
+  try {
+    decision = await licenseClient.gateCredential(licenseClient.readInstallId(req), licenseClient.readDeviceLabel(req));
+  } catch (err) {
+    logError(`LICENSE GATE CIRCUIT TRIPPED: ${err.message}`);
+    res.status(503).json({ error: 'License check is temporarily unavailable.' });
+    return false;
+  }
+  if (!decision.allowed) {
+    logError(`LICENSE BLOCKED: ${decision.code || 'UNKNOWN'}`);
+    res.status(403).json({ error: decision.message, code: decision.code, license: true });
+    return false;
+  }
+  return true;
 }
 
 async function rejectLogin(req, res, identifier, password, user, reason) {
@@ -641,6 +659,9 @@ async function requestLogin(req, res) {
     }
     auditGuardian.clearFailedLogin(req.ip);
 
+    const licensed = await requireInstallLicense(req, res);
+    if (!licensed) return;
+
     const accountEmail = String(user.email || '').trim();
     const pending = {
       email: accountEmail,
@@ -726,6 +747,9 @@ async function confirmLogin(req, res) {
     if (!user) {
       return res.status(400).json({ error: 'Unable to locate your account.' });
     }
+
+    const licensed = await requireInstallLicense(req, res);
+    if (!licensed) return;
 
     const session = establishLoginSession(user, req, { ...pending, otp: true });
     delete pendingLogins[email];
@@ -823,12 +847,11 @@ async function confirmPasswordReset(req, res) {
 
 async function createInvite(req, res) {
   try {
-    const { email, secret } = req.body;
-    const isAdmin = req.authUser?.role === 'admin';
-    const hasSecret = secret && secret === process.env.INVITE_SECRET;
-
-    if (!email || (!isAdmin && !hasSecret)) {
-      return res.status(403).json({ error: 'Invite generation requires admin access or a valid invite secret.' });
+    const { email } = req.body || {};
+    // The invite secret is not an alternate login. A customer session plus a
+    // leaked INVITE_SECRET must not be able to mint signup links.
+    if (!email || req.authUser?.role !== 'admin') {
+      return res.status(403).json({ error: 'Invite generation requires admin access.' });
     }
 
     const token = generateInviteToken(email);
@@ -855,8 +878,9 @@ async function createAdminUser(req, res) {
       return res.status(400).json({ error: 'Username, email, password, and confirmation are required.' });
     }
 
-    if (!nrc || !isValidNrc(nrc)) {
-      return res.status(400).json({ error: 'NRC/ID number is required and must look like 123456/78/1.' });
+    const nrcValue = nrc == null ? '' : String(nrc).trim();
+    if (nrcValue && !isValidNrc(nrcValue)) {
+      return res.status(400).json({ error: 'NRC/ID number must look like 123456/78/1.' });
     }
 
     if (password !== confirmPassword) {
@@ -891,7 +915,7 @@ async function createAdminUser(req, res) {
       username: String(username).trim(),
       email: String(email).trim().toLowerCase(),
       phone: normalizedPhone,
-      nrc: String(nrc).trim(),
+      nrc: nrcValue || null,
       password: hashedPassword,
       tokens: generateUserTokens(nextId),
       role: assignedRole,
@@ -1015,7 +1039,9 @@ function validateInvite(req, res) {
 
 function listInvites(req, res) {
   try {
-    if (!isAdminRole(req.authUser?.role)) return res.status(403).json({ error: 'Admin access required.' });
+    // Same door as createInvite. Store staff with the invite permission must
+    // not receive every unused signup link.
+    if (req.authUser?.role !== 'admin') return res.status(403).json({ error: 'Admin access required.' });
 
     cleanupExpiredInvites();
     const invites = Object.entries(loadInvites())
