@@ -632,11 +632,15 @@ try {
 const diskUploadStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
-    const safe = path.basename(String(file.originalname || 'upload'))
+    const original = path.basename(String(file.originalname || 'upload'));
+    const ext = path.extname(original).toLowerCase();
+    const safeExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext) ? ext : '.jpg';
+    const stem = path.basename(original, path.extname(original))
       .replace(/[^a-zA-Z0-9._-]/g, '_')
       .replace(/_{2,}/g, '_')
-      .slice(-60);
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`);
+      .replace(/^\.+$/, '')
+      .slice(0, 40) || 'upload';
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${stem}${safeExt}`);
   }
 });
 const supabaseUploadStorage = {

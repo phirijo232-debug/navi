@@ -1562,8 +1562,8 @@
             ${(Array.isArray(loan.payments) && loan.payments.length)
               ? `<ul>${loan.payments.map(payment => `
                   <li>
-                    ${formatKwacha(payment.amount)} • ${payment.mode || 'payment'} • ${formatDateDisplay(payment.paymentDate || payment.date)}
-                    ${payment.receiptNumber || payment.paymentReceiptId ? ` • Ref: ${payment.receiptNumber || payment.paymentReceiptId}` : ''}
+                    ${formatKwacha(payment.amount)} • ${escapeHtml(payment.mode || 'payment')} • ${escapeHtml(formatDateDisplay(payment.paymentDate || payment.date))}
+                    ${payment.receiptNumber || payment.paymentReceiptId ? ` • Ref: ${escapeHtml(payment.receiptNumber || payment.paymentReceiptId)}` : ''}
                   </li>`).join('')}</ul>`
               : '<p>No payments recorded yet.</p>'}
           </div>

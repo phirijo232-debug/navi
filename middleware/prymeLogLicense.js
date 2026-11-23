@@ -4,7 +4,9 @@
 // the license secret. Sign the exact JSON string that is posted — do not parse
 // it and stringify it again before the HMAC.
 const crypto = require('crypto');
+const dns = require('dns');
 const fs = require('fs');
+const net = require('net');
 const path = require('path');
 const dataStore = require('./dataStore');
 const { logError } = require('./logger');
@@ -23,6 +25,112 @@ const INSTALL_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 
 function signBody(rawBody, secret) {
   return crypto.createHmac('sha256', String(secret)).update(String(rawBody)).digest('hex');
+}
+
+function signaturesMatch(left, right) {
+  const a = Buffer.from(String(left));
+  const b = Buffer.from(String(right));
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+function licenseStateBody(state) {
+  const installs = state && state.installs && typeof state.installs === 'object' && !Array.isArray(state.installs)
+    ? state.installs
+    : {};
+  return {
+    version: 1,
+    installs,
+    company: state && state.company ? state.company : null,
+    logoFile: state && state.logoFile ? state.logoFile : null
+  };
+}
+
+function sealState(state, secret) {
+  const body = licenseStateBody(state);
+  const sig = crypto.createHmac('sha256', String(secret || ''))
+    .update(`prymelog-state-v1\n${JSON.stringify(body)}`)
+    .digest('hex');
+  return { ...body, sig };
+}
+
+function stateSignatureMatches(state, secret) {
+  if (!state || typeof state.sig !== 'string' || !secret) return false;
+  return signaturesMatch(state.sig, sealState(state, secret).sig);
+}
+
+function isBlockedIp(address) {
+  const raw = String(address || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
+  const ip = raw.startsWith('::ffff:') ? raw.slice(7) : raw;
+  if (!ip || ip === '::1' || ip === '0.0.0.0') return true;
+  if (ip.includes(':')) {
+    return ip.startsWith('fe80:') || ip.startsWith('fc') || ip.startsWith('fd');
+  }
+  const parts = ip.split('.').map(part => Number(part));
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return true;
+  const [a, b] = parts;
+  if (a === 0 || a === 10 || a === 127 || a === 255) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  return false;
+}
+
+function isBlockedHostname(hostname) {
+  const host = String(hostname || '').replace(/\.$/, '').toLowerCase();
+  if (!host) return true;
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) return true;
+  if (host === 'metadata.google.internal' || host === 'metadata.internal') return true;
+  return false;
+}
+
+async function logoUrlAllowed(logoUrl) {
+  let parsed;
+  try {
+    parsed = new URL(String(logoUrl || ''));
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return false;
+  const host = parsed.hostname.replace(/^\[|\]$/g, '');
+  if (isBlockedHostname(host)) return false;
+  if (net.isIP(host)) return !isBlockedIp(host);
+  let records;
+  try {
+    records = await dns.promises.lookup(host, { all: true });
+  } catch {
+    return false;
+  }
+  return records.length > 0 && records.every(record => !isBlockedIp(record.address));
+}
+
+async function readLimited(response, maxBytes) {
+  const declared = response.headers && typeof response.headers.get === 'function'
+    ? Number(response.headers.get('content-length'))
+    : NaN;
+  if (Number.isFinite(declared) && declared > maxBytes) return null;
+  if (response.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const chunks = [];
+    let total = 0;
+    while (true) {
+      const step = await reader.read();
+      if (step.done) break;
+      total += step.value.byteLength;
+      if (total > maxBytes) {
+        try { await reader.cancel(); } catch { /* ignore */ }
+        return null;
+      }
+      chunks.push(Buffer.from(step.value));
+    }
+    return Buffer.concat(chunks);
+  }
+  if (typeof response.arrayBuffer === 'function') {
+    const bytes = Buffer.from(await response.arrayBuffer());
+    return bytes.length > maxBytes ? null : bytes;
+  }
+  return null;
 }
 
 function buildPayload({ licenseId, installId, deviceLabel, ts, nonce }) {
@@ -189,6 +297,10 @@ function createClient(deps = {}) {
     try {
       const state = store.read() || emptyState();
       if (!state.installs || typeof state.installs !== 'object') state.installs = {};
+      const secret = readConfig(env).secret;
+      // A missing or wrong signature means the grace clock cannot be trusted.
+      // Live validation still runs and writes a fresh sealed state.
+      if (secret && !stateSignatureMatches(state, secret)) return emptyState();
       return state;
     } catch (err) {
       logError(`LICENSE STATE READ FAILED: ${err.message}`);
@@ -197,7 +309,8 @@ function createClient(deps = {}) {
   }
 
   function writeState(state) {
-    store.write(state);
+    const secret = readConfig(env).secret;
+    store.write(secret ? sealState(state, secret) : state);
   }
 
   function cachedLogoFile() {
@@ -260,12 +373,31 @@ function createClient(deps = {}) {
     return { allowed: false, code, message, warn: false, grace: false, daysLeft: null, company: null };
   }
 
+  async function fetchLogo(logoUrl, hops = 0) {
+    if (!(await logoUrlAllowed(logoUrl))) return null;
+    const response = await fetchImpl(logoUrl, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(4000)
+    });
+    const status = Number(response && response.status);
+    if (status >= 300 && status < 400 && hops < 2) {
+      const location = response.headers && typeof response.headers.get === 'function'
+        ? response.headers.get('location')
+        : '';
+      if (!location) return null;
+      return fetchLogo(new URL(location, logoUrl).toString(), hops + 1);
+    }
+    if (!response || status < 200 || status >= 300) return null;
+    return response;
+  }
+
   async function downloadLogo(logoUrl) {
     if (!cacheLogo || !logoUrl) return null;
-    const response = await fetchImpl(logoUrl, { method: 'GET', signal: AbortSignal.timeout(4000) });
-    if (!response || !response.ok) return null;
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (!bytes.length || bytes.length > LOGO_MAX_BYTES) return null;
+    const response = await fetchLogo(logoUrl);
+    if (!response) return null;
+    const bytes = await readLimited(response, LOGO_MAX_BYTES);
+    if (!bytes || !bytes.length) return null;
     const png = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
     const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
     if (!png && !jpeg) return null;
@@ -485,6 +617,10 @@ module.exports = {
   GRACE_MS,
   signBody,
   buildPayload,
+  sealState,
+  stateSignatureMatches,
+  isBlockedIp,
+  logoUrlAllowed,
   createClient,
   createLicenseSession,
   licenseSession: createLicenseSession(client),
